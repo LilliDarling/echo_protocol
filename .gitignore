@@ -1,0 +1,77 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter-configuration-cache
+.flutter-versions
+build/
+pubspec.lock.backup
+
+# Android
+**/local.properties
+**/.gradle/
+**/build/
+**/captures/
+**/outputs/
+android/key.properties
+*.keystore
+*.jks
+
+# iOS
+ios/Pods/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Runner/GeneratedPluginRegistrant.*
+ios/Runner/GoogleService-Info.plist
+ios/Runner/Generated.xcconfig
+ios/Flutter/App.framework
+ios/Flutter/engine/
+DerivedData/
+*.xcworkspace
+*.xcuserdata
+*.moved-aside
+*.ipa
+
+# Firebase / secrets
+google-services.json
+**/google-services.json
+ios/Runner/GoogleService-Info.plist
+**/GoogleService-Info.plist
+.serviceAccount.json
+serviceAccount*.json
+firebase-debug.log
+.firebaserc.local
+.firebase/
+
+# IDEs / editors
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs, temp
+*.log
+*.tmp
+*.swp
+
+# CI / tooling
+.fastlane/report.xml
+.fastlane/Preview.html
+.fastlane/screenshots
+fastlane/report.xml
+
+# Optional: ignore generated plugin/version files
+.flutter-plugins-dependencies
+.packages
+
+# Unused Platform Folders
+ios/
+macos/
+web/
+linux/
