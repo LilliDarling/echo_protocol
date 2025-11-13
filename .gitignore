@@ -43,6 +43,7 @@ serviceAccount*.json
 firebase-debug.log
 .firebaserc.local
 .firebase/
+firebase_options.dart
 
 # IDEs / editors
 .idea/
@@ -73,5 +74,4 @@ fastlane/report.xml
 # Unused Platform Folders
 ios/
 macos/
-web/
 linux/
