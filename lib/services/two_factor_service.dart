@@ -19,6 +19,7 @@ class TwoFactorService {
 
   /// Enable 2FA for user account
   /// Returns secret key and QR code data for authenticator app setup
+  /// SECURITY: Secrets are ONLY stored locally in secure storage, NEVER in Firestore
   Future<TwoFactorSetup> enable2FA(String userId) async {
     // Generate random secret (32 bytes = 256 bits)
     final secret = _generateSecret();
@@ -26,15 +27,15 @@ class TwoFactorService {
     // Generate backup codes (10 codes)
     final backupCodes = _generateBackupCodes(10);
 
-    // Store in Firestore (encrypted with user's key)
+    // Store ONLY the hashed backup codes in Firestore (for verification)
+    // NEVER store the TOTP secret in Firestore - it stays local only
     await _db.collection('users').doc(userId).update({
       'twoFactorEnabled': true,
-      'twoFactorSecret': secret,
       'backupCodes': backupCodes.map((code) => _hashBackupCode(code)).toList(),
       'twoFactorEnabledAt': FieldValue.serverTimestamp(),
     });
 
-    // Store secret locally for verification
+    // Store secret and backup codes ONLY in local secure storage
     await _secureStorage.storeTwoFactorSecret(secret);
     await _secureStorage.storeBackupCodes(backupCodes);
 
@@ -53,29 +54,18 @@ class TwoFactorService {
 
   /// Verify TOTP code from authenticator app
   /// Returns true if valid
+  /// SECURITY: Secret is ONLY retrieved from local secure storage
   Future<bool> verifyTOTP(String code, {String? userId}) async {
     userId ??= _auth.currentUser?.uid;
     if (userId == null) return false;
 
+    // Get secret from local secure storage ONLY (never from Firestore)
     final secret = await _secureStorage.getTwoFactorSecret();
     if (secret == null) {
-      // Try to fetch from Firestore
-      final userDoc = await _db.collection('users').doc(userId).get();
-      final firestoreSecret = userDoc.data()?['twoFactorSecret'] as String?;
-      if (firestoreSecret == null) {
-        await _logFailedAttempt(userId, 'totp');
-        return false;
-      }
-      await _secureStorage.storeTwoFactorSecret(firestoreSecret);
-      final isValid = _verifyTOTPCode(code, firestoreSecret);
-
-      if (isValid) {
-        await _logVerification(userId, 'totp');
-      } else {
-        await _logFailedAttempt(userId, 'totp');
-      }
-
-      return isValid;
+      // Secret not found on this device
+      // User needs to use backup code or re-setup 2FA on this device
+      await _logFailedAttempt(userId, 'totp_no_secret');
+      throw Exception('2FA not set up on this device. Please use a backup code or contact support.');
     }
 
     final isValid = _verifyTOTPCode(code, secret);
@@ -133,10 +123,9 @@ class TwoFactorService {
 
     await user.reauthenticateWithCredential(credential);
 
-    // Disable 2FA
+    // Disable 2FA in Firestore (only stores status and backup codes, never secret)
     await _db.collection('users').doc(userId).update({
       'twoFactorEnabled': false,
-      'twoFactorSecret': FieldValue.delete(),
       'backupCodes': FieldValue.delete(),
       'twoFactorDisabledAt': FieldValue.serverTimestamp(),
     });

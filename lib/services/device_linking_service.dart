@@ -41,10 +41,11 @@ class DeviceLinkingService {
     }
 
     // Encrypt private key with session key for transfer
+    // Using AES-256-GCM for authenticated encryption (prevents tampering)
     final key = encrypt.Key.fromBase64(sessionKey + '=' * (4 - sessionKey.length % 4));
     final iv = encrypt.IV.fromSecureRandom(16);
     final encrypter = encrypt.Encrypter(
-      encrypt.AES(key, mode: encrypt.AESMode.cbc),
+      encrypt.AES(key, mode: encrypt.AESMode.gcm),
     );
 
     final encryptedPrivateKey = encrypter.encrypt(privateKey, iv: iv);
@@ -131,11 +132,12 @@ class DeviceLinkingService {
       final publicKey = linkData['publicKey'] as String;
       final ivBase64 = linkData['iv'] as String;
 
-      // Decrypt private key using session key
+      // Decrypt private key using session key with AES-256-GCM
+      // GCM mode provides authentication - will throw if data was tampered with
       final key = encrypt.Key.fromBase64(sessionKey + '=' * (4 - sessionKey.length % 4));
       final iv = encrypt.IV.fromBase64(ivBase64);
       final encrypter = encrypt.Encrypter(
-        encrypt.AES(key, mode: encrypt.AESMode.cbc),
+        encrypt.AES(key, mode: encrypt.AESMode.gcm),
       );
 
       final encrypted = encrypt.Encrypted.fromBase64(encryptedPrivateKey);
