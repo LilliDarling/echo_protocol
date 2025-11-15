@@ -1,7 +1,6 @@
 import 'package:logger/logger.dart';
 
 /// Centralized logging service for Echo Protocol
-/// Uses the logger package for production-ready logging
 class LoggerService {
   static final Logger _logger = Logger(
     printer: PrettyPrinter(
@@ -19,7 +18,7 @@ class LoggerService {
     _logger.d(message, error: error, stackTrace: stackTrace);
   }
 
-  /// Log general information
+
   static void info(String message, [dynamic error, StackTrace? stackTrace]) {
     _logger.i(message, error: error, stackTrace: stackTrace);
   }

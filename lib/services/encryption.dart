@@ -4,78 +4,29 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:pointycastle/export.dart';
-import '../utils/security_utils.dart';
+import '../utils/security.dart';
 
 /// End-to-end encryption service for Echo Protocol
-///
-/// CRYPTOGRAPHIC SPECIFICATION:
-/// ============================
-/// Key Exchange: ECDH with secp256k1 curve (256-bit security)
-///   - Same curve used by Bitcoin, Ethereum, Signal
-///   - Provides Perfect Forward Secrecy (PFS)
-///   - 100x faster than RSA-2048 with equivalent security
-///
-/// Key Derivation: HKDF-SHA256 (HMAC-based KDF)
-///   - NIST SP 800-56C Rev. 2 compliant
-///   - Extracts uniform key material from ECDH output
-///   - Prevents related-key attacks
-///   - Used by Signal Protocol, TLS 1.3, WireGuard
-///
-/// Encryption: AES-256-GCM (Galois/Counter Mode)
-///   - 256-bit keys (quantum-resistant for next 20+ years)
-///   - Authenticated Encryption with Associated Data (AEAD)
-///   - Protects confidentiality, integrity, and authenticity
-///   - NIST approved, FIPS 140-2 compliant
-///   - Used by Google, WhatsApp, iMessage, Signal
-///
-/// Security Properties:
-/// - End-to-End Encrypted: Only sender and recipient can read
-/// - Forward Secrecy: Compromise of long-term keys doesn't decrypt past messages
-/// - Authenticated: Prevents man-in-the-middle attacks
-/// - Tamper-Proof: Any modification detected by GCM authentication tag
-/// - Non-Repudiation: Cryptographic proof of sender identity
-///
-/// Threat Model Protection:
-/// ✅ Prevents eavesdropping (even by server/cloud provider)
-/// ✅ Prevents tampering (modification detected immediately)
-/// ✅ Prevents replay attacks (with timestamp validation)
-/// ✅ Prevents man-in-the-middle (authenticated key exchange)
-/// ✅ Prevents brute force (256-bit keys = 2^256 combinations)
-/// ✅ Resists quantum computers (for next 20+ years at current technology)
-/// ✅ Prevents timing attacks (constant-time operations)
-/// ✅ Prevents padding oracle attacks (GCM has no padding)
-///
-/// This implementation meets or exceeds:
-/// - NIST recommendations for cryptographic algorithms
-/// - OWASP security standards
-/// - Signal Protocol security model
-/// - Industry best practices for E2EE messaging
 class EncryptionService {
   // EC key pair for current user (Curve25519)
   late ECPrivateKey? _privateKey;
   late ECPublicKey? _publicKey;
 
-  // Partner's public key
   ECPublicKey? _partnerPublicKey;
 
-  // Shared secret derived from ECDH
   encrypt.Key? _sharedSecret;
 
   /// Generate a new EC key pair for the current user
-  /// Uses Curve25519 (X25519) - fast, secure, industry standard
-  /// Takes milliseconds instead of seconds like RSA
+  /// Uses Curve25519 (X25519)
   Future<Map<String, String>> generateKeyPair() async {
     // Use secp256k1 curve (used by Bitcoin, Signal, etc.)
     final ecDomainParameters = ECDomainParameters('secp256k1');
 
-    // Generate secure random private key
     final random = _getSecureRandom();
     final privateKeyNum = random.nextBigInteger(ecDomainParameters.n.bitLength);
 
-    // Create private key
     _privateKey = ECPrivateKey(privateKeyNum, ecDomainParameters);
 
-    // Calculate public key: Q = d * G
     final Q = ecDomainParameters.G * privateKeyNum;
     _publicKey = ECPublicKey(Q, ecDomainParameters);
 
@@ -85,48 +36,39 @@ class EncryptionService {
     };
   }
 
-  /// Set the current user's private key (loaded from secure storage)
   void setPrivateKey(String privateKeyPem) {
     _privateKey = _decodePrivateKey(privateKeyPem);
 
-    // Reconstruct public key from private key
     final ecDomainParameters = _privateKey!.parameters as ECDomainParameters;
     final Q = ecDomainParameters.G * _privateKey!.d;
     _publicKey = ECPublicKey(Q, ecDomainParameters);
   }
 
-  /// Set the partner's public key and derive shared secret
   void setPartnerPublicKey(String publicKeyPem) {
     _partnerPublicKey = _decodePublicKey(publicKeyPem);
     _deriveSharedSecret();
   }
 
-  /// Derive shared secret using ECDH
-  /// Both users can derive the same secret: sharedSecret = d_A * Q_B = d_B * Q_A
   /// SECURITY: Uses HKDF for proper key derivation (Signal Protocol standard)
   void _deriveSharedSecret() {
     if (_privateKey == null || _partnerPublicKey == null) {
       throw Exception('Keys not initialized');
     }
 
-    // Perform ECDH: multiply our private key with partner's public key
     final sharedPoint = _partnerPublicKey!.Q! * _privateKey!.d!;
 
-    // Use X coordinate as shared secret input
     final sharedSecretBytes = _encodeBigInt(sharedPoint!.x!.toBigInteger()!);
 
-    // SECURITY UPGRADE: Use HKDF instead of simple SHA-256
     // HKDF provides proper key derivation as used in Signal Protocol
     // Salt should ideally be random, but for compatibility we use a fixed context
     final salt = Uint8List.fromList(utf8.encode('EchoProtocol-v1'));
     final info = Uint8List.fromList(utf8.encode('message-encryption-key'));
 
-    // Derive 256-bit AES key using HKDF-SHA256
     final derivedKey = SecurityUtils.hkdfSha256(
       Uint8List.fromList(sharedSecretBytes),
       salt,
       info,
-      32, // 256 bits for AES-256
+      32,
     );
 
     _sharedSecret = encrypt.Key(derivedKey);
@@ -139,7 +81,6 @@ class EncryptionService {
       throw Exception('Encryption not initialized. Set partner public key first.');
     }
 
-    // Generate random IV (nonce) for this message
     final iv = encrypt.IV.fromSecureRandom(16);
 
     // Encrypt using AES-256-GCM
@@ -149,7 +90,6 @@ class EncryptionService {
 
     final encrypted = encrypter.encrypt(plaintext, iv: iv);
 
-    // Combine IV + encrypted data for storage
     final combined = '${iv.base64}:${encrypted.base64}';
     return combined;
   }
@@ -162,7 +102,6 @@ class EncryptionService {
     }
 
     try {
-      // Split IV and encrypted data
       final parts = encryptedText.split(':');
       if (parts.length != 2) {
         throw SecurityUtils.sanitizeDecryptionError('Invalid format');
@@ -198,7 +137,6 @@ class EncryptionService {
 
     final encrypted = encrypter.encryptBytes(fileData, iv: iv);
 
-    // Prepend IV to encrypted data
     final result = Uint8List(iv.bytes.length + encrypted.bytes.length);
     result.setRange(0, iv.bytes.length, iv.bytes);
     result.setRange(iv.bytes.length, result.length, encrypted.bytes);
@@ -206,13 +144,11 @@ class EncryptionService {
     return result;
   }
 
-  /// Decrypt file data
   Uint8List decryptFile(Uint8List encryptedData) {
     if (_sharedSecret == null) {
       throw Exception('Decryption not initialized');
     }
 
-    // Extract IV from beginning
     final iv = encrypt.IV(encryptedData.sublist(0, 16));
     final encryptedBytes = encryptedData.sublist(16);
 
@@ -228,7 +164,6 @@ class EncryptionService {
     );
   }
 
-  /// Hash a value (for searchable fields that need privacy)
   String hashValue(String value) {
     return sha256.convert(utf8.encode(value)).toString();
   }
@@ -300,7 +235,6 @@ class EncryptionService {
     return result;
   }
 
-  /// Get a properly seeded secure random number generator
   SecureRandom _getSecureRandom() {
     final secureRandom = FortunaRandom();
     final random = Random.secure();
@@ -312,7 +246,6 @@ class EncryptionService {
     return secureRandom;
   }
 
-  /// Clear all keys from memory (call on logout)
   void clearKeys() {
     _privateKey = null;
     _publicKey = null;

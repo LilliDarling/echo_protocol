@@ -5,12 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'secure_storage_service.dart';
-import 'logger_service.dart';
+import 'secure_storage.dart';
+import 'logger.dart';
 
-/// Device linking service for transferring encryption keys between devices
-/// Similar to Telegram's device linking via QR code
-/// Allows secure multi-device access without cloud backup of private keys
 class DeviceLinkingService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final SecureStorageService _secureStorage = SecureStorageService();
@@ -19,28 +16,23 @@ class DeviceLinkingService {
   /// This creates a temporary secure token that the new device will use
   /// to authenticate and receive the encrypted private key
   Future<DeviceLinkData> generateLinkQRCode(String userId) async {
-    // Generate random linking token (256 bits)
     final random = Random.secure();
     final tokenBytes = List<int>.generate(32, (_) => random.nextInt(256));
     final linkToken = base64Url.encode(tokenBytes).replaceAll('=', '');
 
-    // Generate random encryption key for this session (256 bits)
     final sessionKeyBytes = List<int>.generate(32, (_) => random.nextInt(256));
     final sessionKey = base64Url.encode(sessionKeyBytes).replaceAll('=', '');
 
-    // Get user's private key
     final privateKey = await _secureStorage.getPrivateKey();
     if (privateKey == null) {
       throw Exception('No private key found on this device');
     }
 
-    // Get public key
     final publicKey = await _secureStorage.getPublicKey();
     if (publicKey == null) {
       throw Exception('No public key found on this device');
     }
 
-    // Encrypt private key with session key for transfer
     // Using AES-256-GCM for authenticated encryption (prevents tampering)
     final key = encrypt.Key.fromBase64(sessionKey + '=' * (4 - sessionKey.length % 4));
     final iv = encrypt.IV.fromSecureRandom(16);
@@ -50,7 +42,6 @@ class DeviceLinkingService {
 
     final encryptedPrivateKey = encrypter.encrypt(privateKey, iv: iv);
 
-    // Store linking session in Firestore (expires in 5 minutes)
     final expiresAt = DateTime.now().add(const Duration(minutes: 5));
     await _db.collection('deviceLinking').doc(linkToken).set({
       'userId': userId,
@@ -85,10 +76,8 @@ class DeviceLinkingService {
   /// This retrieves and decrypts the private key from the linking session
   Future<bool> linkDeviceFromQRCode(String qrData) async {
     try {
-      // Parse QR code data
       final data = jsonDecode(qrData) as Map<String, dynamic>;
 
-      // Validate QR code
       if (data['type'] != 'echo_protocol_device_link') {
         throw Exception('Invalid QR code type');
       }
@@ -101,12 +90,10 @@ class DeviceLinkingService {
       final userId = data['userId'] as String;
       final expiresTimestamp = data['expires'] as int;
 
-      // Check if expired
       if (DateTime.now().millisecondsSinceEpoch > expiresTimestamp) {
         throw Exception('QR code has expired');
       }
 
-      // Fetch linking session from Firestore
       final linkDoc = await _db.collection('deviceLinking').doc(linkToken).get();
 
       if (!linkDoc.exists) {
@@ -115,18 +102,15 @@ class DeviceLinkingService {
 
       final linkData = linkDoc.data()!;
 
-      // Check if already used
       if (linkData['used'] == true) {
         throw Exception('This link has already been used');
       }
 
-      // Check expiration again (server time)
       final expiresAt = (linkData['expiresAt'] as Timestamp).toDate();
       if (DateTime.now().isAfter(expiresAt)) {
         throw Exception('Link has expired');
       }
 
-      // Retrieve encrypted private key and session key
       final sessionKey = linkData['sessionKey'] as String;
       final encryptedPrivateKey = linkData['encryptedPrivateKey'] as String;
       final publicKey = linkData['publicKey'] as String;
@@ -143,42 +127,35 @@ class DeviceLinkingService {
       final encrypted = encrypt.Encrypted.fromBase64(encryptedPrivateKey);
       final privateKey = encrypter.decrypt(encrypted, iv: iv);
 
-      // Store keys on this device
       await _secureStorage.storePrivateKey(privateKey);
       await _secureStorage.storePublicKey(publicKey);
       await _secureStorage.storeUserId(userId);
 
-      // Mark link as used and add new device info
       await _db.collection('deviceLinking').doc(linkToken).update({
         'used': true,
         'usedAt': FieldValue.serverTimestamp(),
         'linkedDeviceId': await _getDeviceId(),
       });
 
-      // Add this device to user's linked devices list
       await _addLinkedDevice(userId);
 
-      // Delete the linking session after successful link (cleanup)
       Future.delayed(const Duration(minutes: 1), () {
         _db.collection('deviceLinking').doc(linkToken).delete();
       });
 
-      // Log successful device link
       await _logDeviceLink(userId, linkToken);
 
       return true;
     } catch (e) {
-      LoggerService.error('Device linking failed', e);
+      LoggerService.error('Device linking failed');
       return false;
     }
   }
 
-  /// Cancel a pending device link (if QR code was generated but not used)
   Future<void> cancelDeviceLink(String linkToken) async {
     await _db.collection('deviceLinking').doc(linkToken).delete();
   }
 
-  /// Get list of linked devices for a user
   Future<List<LinkedDevice>> getLinkedDevices(String userId) async {
     final userDoc = await _db.collection('users').doc(userId).get();
     final devicesData = userDoc.data()?['linkedDevices'] as List? ?? [];
@@ -193,7 +170,6 @@ class DeviceLinkingService {
   Future<void> removeLinkedDevice(String userId, String deviceId) async {
     final currentDeviceId = await _getDeviceId();
 
-    // Don't allow removing current device
     if (deviceId == currentDeviceId) {
       throw Exception('Cannot remove current device');
     }
@@ -201,7 +177,6 @@ class DeviceLinkingService {
     final userDoc = await _db.collection('users').doc(userId).get();
     final devicesData = userDoc.data()?['linkedDevices'] as List? ?? [];
 
-    // Remove device from list
     final updatedDevices = devicesData.where((device) {
       return (device as Map<String, dynamic>)['deviceId'] != deviceId;
     }).toList();
@@ -210,18 +185,15 @@ class DeviceLinkingService {
       'linkedDevices': updatedDevices,
     });
 
-    // Log device removal for security audit
     await _logDeviceRemoval(userId, deviceId);
   }
 
   // Private helper methods
-
+  
   Future<String> _getDeviceId() async {
-    // Try to get existing device ID
     var deviceId = await _secureStorage.getDeviceId();
 
     if (deviceId == null) {
-      // Generate new device ID
       final random = Random.secure();
       final bytes = List<int>.generate(16, (_) => random.nextInt(256));
       deviceId = base64Url.encode(bytes).replaceAll('=', '');
@@ -270,7 +242,7 @@ class DeviceLinkingService {
         return linuxInfo.name;
       }
     } catch (e) {
-      LoggerService.warning('Failed to get device name', e);
+      LoggerService.warning('Failed to get device name');
     }
 
     return 'Unknown Device';
@@ -314,7 +286,6 @@ class DeviceLinkingService {
     });
   }
 
-  /// Clean up expired linking sessions (call periodically)
   Future<void> cleanupExpiredLinks() async {
     final now = Timestamp.now();
     final expiredLinks = await _db
@@ -328,7 +299,6 @@ class DeviceLinkingService {
   }
 }
 
-/// Device link data for QR code generation
 class DeviceLinkData {
   final String qrCodeData;
   final String linkToken;
@@ -340,14 +310,11 @@ class DeviceLinkData {
     required this.expiresAt,
   });
 
-  /// Check if link has expired
   bool get isExpired => DateTime.now().isAfter(expiresAt);
 
-  /// Get remaining time until expiration
   Duration get timeRemaining => expiresAt.difference(DateTime.now());
 }
 
-/// Linked device information
 class LinkedDevice {
   final String deviceId;
   final String deviceName;
@@ -383,7 +350,6 @@ class LinkedDevice {
     };
   }
 
-  /// Check if device was active recently
   bool get isRecentlyActive {
     final daysSinceActive = DateTime.now().difference(lastActive).inDays;
     return daysSinceActive < 30;

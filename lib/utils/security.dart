@@ -11,7 +11,6 @@ class SecurityUtils {
   /// SECURITY: Regular == comparison can leak information through timing
   /// This compares every byte regardless of early mismatches
   static bool constantTimeEquals(String a, String b) {
-    // Convert to bytes for comparison
     final bytesA = utf8.encode(a);
     final bytesB = utf8.encode(b);
 
@@ -21,7 +20,6 @@ class SecurityUtils {
   /// Constant-time bytes comparison
   /// Essential for comparing cryptographic hashes, MACs, and signatures
   static bool constantTimeBytesEquals(List<int> a, List<int> b) {
-    // If lengths differ, still compare to prevent timing leaks
     if (a.length != b.length) {
       return false;
     }
@@ -53,16 +51,12 @@ class SecurityUtils {
     return length == 12 || length == 16;
   }
 
-  /// Validate AES key length (must be 128, 192, or 256 bits)
+  /// Validate key length for AES
   static bool isValidKeyLength(int lengthInBytes) {
     return lengthInBytes == 16 || lengthInBytes == 24 || lengthInBytes == 32;
   }
 
-  /// Generate a random string suitable for tokens
-  /// Uses cryptographically secure random source
-  /// Returns URL-safe base64 encoded string
   static String generateSecureToken(int lengthInBytes) {
-    // For security tokens, minimum 16 bytes (128 bits)
     if (lengthInBytes < 16) {
       throw ArgumentError('Token must be at least 16 bytes for security');
     }
@@ -80,7 +74,6 @@ class SecurityUtils {
   /// Sanitize error messages to prevent information leakage
   /// Cryptographic errors should be generic to prevent oracle attacks
   static String sanitizeError(String error) {
-    // Don't expose internal details like key sizes, algorithms, etc.
     final sensitivePatterns = [
       'key',
       'private',
@@ -109,10 +102,8 @@ class SecurityUtils {
     final now = DateTime.now();
     final age = now.difference(timestamp);
 
-    // Check if timestamp is in the past and not too old
     if (age.isNegative) {
-      // Timestamp is in the future - potential clock skew or attack
-      return age.abs() < const Duration(minutes: 2); // Allow 2 min clock skew
+      return age.abs() < const Duration(minutes: 2);
     }
 
     return age <= maxAge;
@@ -125,12 +116,10 @@ class SecurityUtils {
     DateTime timestamp,
     Set<String> usedNonces,
   ) async {
-    // Check timestamp first (cheap operation)
     if (!isTimestampValid(timestamp)) {
       return false;
     }
 
-    // Check if nonce was already used (replay detection)
     if (usedNonces.contains(messageId)) {
       return false;
     }
@@ -139,10 +128,6 @@ class SecurityUtils {
   }
 
   /// Derive a key using HKDF (HMAC-based Key Derivation Function)
-  /// Industry standard for deriving keys from shared secrets
-  ///
-  /// SECURITY: Never use raw ECDH output directly - always derive with HKDF
-  /// This is what Signal Protocol and TLS 1.3 do
   static Uint8List hkdfSha256(
     Uint8List inputKeyMaterial,
     Uint8List salt,
@@ -153,12 +138,10 @@ class SecurityUtils {
       throw ArgumentError('Output length exceeds HKDF-SHA256 maximum');
     }
 
-    // HKDF-Extract: extract pseudorandom key from input
     final hmacExtract = Hmac(sha256, salt);
     final prk = Uint8List.fromList(hmacExtract.convert(inputKeyMaterial).bytes);
 
-    // HKDF-Expand: expand PRK to desired length
-    final hashLen = 32; // SHA-256 output is 32 bytes
+    final hashLen = 32;
     final n = (outputLength / hashLen).ceil();
     final okm = <int>[];
     var t = <int>[];
@@ -173,23 +156,14 @@ class SecurityUtils {
     return Uint8List.fromList(okm.sublist(0, outputLength));
   }
 
-  /// Verify that an encryption operation succeeded without leaking timing info
-  /// Returns a generic error that doesn't reveal why decryption failed
   static Exception sanitizeDecryptionError(Object error) {
-    // Don't expose whether it was:
-    // - Wrong key
-    // - Tampered data
-    // - Corrupted ciphertext
-    // All become the same generic error
     return Exception('Failed to decrypt message');
   }
 
   /// Rate limiting check (simple in-memory implementation)
-  /// For production, use Redis or similar distributed cache
+  /// For production, will use Redis or similar distributed cache
   static final Map<String, List<DateTime>> _rateLimitCache = {};
 
-  /// Check if action is rate limited
-  /// Returns true if allowed, false if rate limit exceeded
   static bool checkRateLimit(
     String identifier,
     int maxAttempts,
@@ -198,25 +172,20 @@ class SecurityUtils {
     final now = DateTime.now();
     final cutoff = now.subtract(window);
 
-    // Get or create attempt list
     final attempts = _rateLimitCache[identifier] ?? [];
 
-    // Remove old attempts outside the window
     attempts.removeWhere((timestamp) => timestamp.isBefore(cutoff));
 
-    // Check if limit exceeded
     if (attempts.length >= maxAttempts) {
       return false;
     }
 
-    // Add current attempt
     attempts.add(now);
     _rateLimitCache[identifier] = attempts;
 
     return true;
   }
 
-  /// Clean up old rate limit entries (call periodically)
   static void cleanupRateLimitCache() {
     final now = DateTime.now();
     final cutoff = now.subtract(const Duration(hours: 1));
@@ -227,7 +196,6 @@ class SecurityUtils {
     });
   }
 
-  /// Validate that encryption parameters are secure
   static void validateEncryptionParams({
     required int keyLength,
     required int ivLength,

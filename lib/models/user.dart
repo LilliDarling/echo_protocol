@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// User model for partner accounts
-/// Firestore path: /users/{userId}
 class UserModel {
   final String id;
   final String name;

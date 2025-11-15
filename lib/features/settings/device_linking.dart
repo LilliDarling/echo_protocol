@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import '../../services/device_linking_service.dart';
+import '../../services/device_linking.dart';
 
-/// Screen for linking devices via QR code
-/// Similar to Telegram's device linking
 class DeviceLinkingScreen extends StatefulWidget {
   final String userId;
 

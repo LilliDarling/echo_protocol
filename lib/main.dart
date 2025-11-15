@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'features/auth/login_screen.dart';
-import 'features/home/home_screen.dart';
-import 'services/auth_service.dart';
-import 'core/theme/app_theme.dart';
+import 'features/auth/login.dart';
+import 'features/home/home.dart';
+import 'services/auth.dart';
+import 'core/theme/app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -33,7 +32,6 @@ class EchoProtocolApp extends StatelessWidget {
   }
 }
 
-/// Wrapper that shows login or home based on authentication state
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
@@ -44,7 +42,6 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder(
       stream: authService.authStateChanges,
       builder: (context, snapshot) {
-        // Show loading spinner while checking auth state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(
@@ -53,12 +50,10 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        // Show home screen if user is signed in
         if (snapshot.hasData && snapshot.data != null) {
           return const HomeScreen();
         }
 
-        // Show login screen if user is not signed in
         return const LoginScreen();
       },
     );

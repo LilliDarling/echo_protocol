@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../services/auth_service.dart';
-import '../auth/login_screen.dart';
+import '../../services/auth.dart';
+import '../auth/login.dart';
 
-/// Main home screen with navigation
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 

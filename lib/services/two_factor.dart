@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'secure_storage_service.dart';
+import 'secure_storage.dart';
 
 /// Two-Factor Authentication service
 /// Provides TOTP (Time-based One-Time Password) for enhanced security
@@ -21,25 +21,19 @@ class TwoFactorService {
   /// Returns secret key and QR code data for authenticator app setup
   /// SECURITY: Secrets are ONLY stored locally in secure storage, NEVER in Firestore
   Future<TwoFactorSetup> enable2FA(String userId) async {
-    // Generate random secret (32 bytes = 256 bits)
     final secret = _generateSecret();
 
-    // Generate backup codes (10 codes)
     final backupCodes = _generateBackupCodes(10);
 
-    // Store ONLY the hashed backup codes in Firestore (for verification)
-    // NEVER store the TOTP secret in Firestore - it stays local only
     await _db.collection('users').doc(userId).update({
       'twoFactorEnabled': true,
       'backupCodes': backupCodes.map((code) => _hashBackupCode(code)).toList(),
       'twoFactorEnabledAt': FieldValue.serverTimestamp(),
     });
 
-    // Store secret and backup codes ONLY in local secure storage
     await _secureStorage.storeTwoFactorSecret(secret);
     await _secureStorage.storeBackupCodes(backupCodes);
 
-    // Generate QR code data for authenticator apps
     final user = _auth.currentUser;
     final issuer = 'EchoProtocol';
     final accountName = user?.email ?? userId;
@@ -52,18 +46,12 @@ class TwoFactorService {
     );
   }
 
-  /// Verify TOTP code from authenticator app
-  /// Returns true if valid
-  /// SECURITY: Secret is ONLY retrieved from local secure storage
   Future<bool> verifyTOTP(String code, {String? userId}) async {
     userId ??= _auth.currentUser?.uid;
     if (userId == null) return false;
 
-    // Get secret from local secure storage ONLY (never from Firestore)
     final secret = await _secureStorage.getTwoFactorSecret();
     if (secret == null) {
-      // Secret not found on this device
-      // User needs to use backup code or re-setup 2FA on this device
       await _logFailedAttempt(userId, 'totp_no_secret');
       throw Exception('2FA not set up on this device. Please use a backup code or contact support.');
     }
@@ -79,7 +67,6 @@ class TwoFactorService {
     return isValid;
   }
 
-  /// Verify backup code (one-time use)
   Future<bool> verifyBackupCode(String code, String userId) async {
     final userDoc = await _db.collection('users').doc(userId).get();
     final hashedCodes = (userDoc.data()?['backupCodes'] as List?)?.cast<String>() ?? [];
@@ -87,32 +74,26 @@ class TwoFactorService {
     final hashedInput = _hashBackupCode(code);
 
     if (hashedCodes.contains(hashedInput)) {
-      // Remove used backup code
       hashedCodes.remove(hashedInput);
       await _db.collection('users').doc(userId).update({
         'backupCodes': hashedCodes,
       });
 
-      // Update local storage
       final localCodes = await _secureStorage.getBackupCodes() ?? [];
       localCodes.remove(code);
       await _secureStorage.storeBackupCodes(localCodes);
 
-      // Log successful verification
       await _logVerification(userId, 'backup_code');
 
       return true;
     }
 
-    // Log failed attempt
     await _logFailedAttempt(userId, 'backup_code');
 
     return false;
   }
 
-  /// Disable 2FA (requires current password confirmation)
   Future<void> disable2FA(String userId, String password) async {
-    // Verify password before disabling
     final user = _auth.currentUser;
     if (user?.email == null) throw Exception('User not authenticated');
 
@@ -123,26 +104,21 @@ class TwoFactorService {
 
     await user.reauthenticateWithCredential(credential);
 
-    // Disable 2FA in Firestore (only stores status and backup codes, never secret)
     await _db.collection('users').doc(userId).update({
       'twoFactorEnabled': false,
       'backupCodes': FieldValue.delete(),
       'twoFactorDisabledAt': FieldValue.serverTimestamp(),
     });
 
-    // Clear local storage
     await _secureStorage.clearTwoFactor();
   }
 
-  /// Check if 2FA is enabled for user
   Future<bool> is2FAEnabled(String userId) async {
     final userDoc = await _db.collection('users').doc(userId).get();
     return userDoc.data()?['twoFactorEnabled'] == true;
   }
 
-  /// Regenerate backup codes (requires 2FA verification)
   Future<List<String>> regenerateBackupCodes(String userId, String totpCode) async {
-    // Verify TOTP first
     if (!await verifyTOTP(totpCode, userId: userId)) {
       throw Exception('Invalid 2FA code');
     }
@@ -159,7 +135,6 @@ class TwoFactorService {
     return newCodes;
   }
 
-  /// Log successful 2FA verification (for security audit)
   Future<void> _logVerification(String userId, String method) async {
     await _db.collection('securityLog').add({
       'userId': userId,
@@ -170,7 +145,6 @@ class TwoFactorService {
     });
   }
 
-  /// Log failed 2FA attempt
   Future<void> _logFailedAttempt(String userId, String method) async {
     await _db.collection('securityLog').add({
       'userId': userId,
@@ -195,7 +169,6 @@ class TwoFactorService {
 
     for (var i = 0; i < count; i++) {
       final code = List<int>.generate(8, (_) => random.nextInt(10)).join();
-      // Format as XXXX-XXXX
       codes.add('${code.substring(0, 4)}-${code.substring(4, 8)}');
     }
 
@@ -207,11 +180,9 @@ class TwoFactorService {
   }
 
   bool _verifyTOTPCode(String code, String secret) {
-    // Get current time window
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final timeWindow = now ~/ _totpWindowSeconds;
 
-    // Check current window and ±1 window (to account for clock drift)
     for (var i = -1; i <= 1; i++) {
       final window = timeWindow + i;
       final generatedCode = _generateTOTPCode(secret, window);
@@ -225,10 +196,8 @@ class TwoFactorService {
   }
 
   String _generateTOTPCode(String secret, int timeWindow) {
-    // Decode base64 secret
     final key = base64Url.decode(secret + '=' * (4 - secret.length % 4));
 
-    // Convert time window to 8-byte array
     final timeBytes = <int>[];
     for (var i = 7; i >= 0; i--) {
       timeBytes.add((timeWindow >> (i * 8)) & 0xff);
@@ -251,10 +220,9 @@ class TwoFactorService {
   }
 }
 
-/// Two-factor setup data
 class TwoFactorSetup {
   final String secret;
-  final String qrCodeData; // For QR code generation
+  final String qrCodeData;
   final List<String> backupCodes;
 
   TwoFactorSetup({

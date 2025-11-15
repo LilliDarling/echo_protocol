@@ -1,47 +1,70 @@
 import 'package:flutter/material.dart';
-import '../../services/auth_service.dart';
+import '../../services/auth.dart';
 import '../../utils/validators.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
-import '../home/home_screen.dart';
-import 'signup_screen.dart';
+import '../home/home.dart';
 
-/// Login screen with email/password and Google Sign-In
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class SignUpScreen extends StatefulWidget {
+  const SignUpScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<SignUpScreen> createState() => _SignUpScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignUpScreenState extends State<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _displayNameController = TextEditingController();
   final _authService = AuthService();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _displayNameController.dispose();
     super.dispose();
   }
 
-  Future<void> _signInWithEmail() async {
+  String? _validateConfirmPassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Please confirm your password';
+    }
+    if (value != _passwordController.text) {
+      return 'Passwords do not match';
+    }
+    return null;
+  }
+
+  Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      await _authService.signInWithEmail(
+      await _authService.signUpWithEmail(
         email: _emailController.text.trim(),
         password: _passwordController.text,
+        displayName: _displayNameController.text.trim(),
       );
 
       if (mounted) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Navigate to home
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
@@ -62,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _signInWithGoogle() async {
+  Future<void> _signUpWithGoogle() async {
     setState(() => _isLoading = true);
 
     try {
@@ -89,22 +112,12 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _goToSignUp() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SignUpScreen()),
-    );
-  }
-
-  void _goToForgotPassword() {
-    showDialog(
-      context: context,
-      builder: (context) => _ForgotPasswordDialog(authService: _authService),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Create Account'),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -115,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo/Title
+                  // Icon
                   const Icon(
                     Icons.favorite,
                     size: 80,
@@ -123,23 +136,33 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'Echo Protocol',
+                    'Join Echo Protocol',
                     style: TextStyle(
-                      fontSize: 32,
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Private messages, just for you two',
+                    'Create your private space',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.grey[600],
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 32),
+
+                  // Display name field
+                  CustomTextField(
+                    controller: _displayNameController,
+                    label: 'Name',
+                    hint: 'Your name',
+                    validator: (value) => Validators.validateRequired(value, 'Name'),
+                    prefixIcon: const Icon(Icons.person),
+                  ),
+                  const SizedBox(height: 16),
 
                   // Email field
                   CustomTextField(
@@ -156,7 +179,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   CustomTextField(
                     controller: _passwordController,
                     label: 'Password',
-                    hint: 'Enter your password',
+                    hint: 'At least 6 characters',
                     obscureText: _obscurePassword,
                     validator: Validators.validatePassword,
                     prefixIcon: const Icon(Icons.lock),
@@ -169,22 +192,31 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
 
-                  // Forgot password
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: _goToForgotPassword,
-                      child: const Text('Forgot Password?'),
+                  // Confirm password field
+                  CustomTextField(
+                    controller: _confirmPasswordController,
+                    label: 'Confirm Password',
+                    hint: 'Re-enter your password',
+                    obscureText: _obscureConfirmPassword,
+                    validator: _validateConfirmPassword,
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                      ),
+                      onPressed: () {
+                        setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
+                      },
                     ),
                   ),
                   const SizedBox(height: 24),
 
-                  // Sign in button
+                  // Sign up button
                   CustomButton(
-                    text: 'Sign In',
-                    onPressed: _signInWithEmail,
+                    text: 'Create Account',
+                    onPressed: _signUp,
                     isLoading: _isLoading,
                   ),
                   const SizedBox(height: 16),
@@ -205,11 +237,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Google Sign-In button
+                  // Google Sign-Up button
                   SizedBox(
                     height: 50,
                     child: OutlinedButton.icon(
-                      onPressed: _isLoading ? null : _signInWithGoogle,
+                      onPressed: _isLoading ? null : _signUpWithGoogle,
                       icon: const Icon(Icons.g_mobiledata, size: 28),
                       label: const Text('Continue with Google'),
                       style: OutlinedButton.styleFrom(
@@ -219,16 +251,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Sign up link
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text("Don't have an account? "),
-                      TextButton(
-                        onPressed: _goToSignUp,
-                        child: const Text('Sign Up'),
-                      ),
-                    ],
+                  // Privacy notice
+                  Text(
+                    'By signing up, your messages will be end-to-end encrypted and completely private between you and your partner.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
@@ -236,103 +266,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _ForgotPasswordDialog extends StatefulWidget {
-  final AuthService authService;
-
-  const _ForgotPasswordDialog({required this.authService});
-
-  @override
-  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
-}
-
-class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
-  final _emailController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-  bool _isLoading = false;
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _sendResetEmail() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      await widget.authService.resetPassword(_emailController.text.trim());
-
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Password reset email sent! Check your inbox.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Reset Password'),
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Enter your email address and we\'ll send you a link to reset your password.',
-            ),
-            const SizedBox(height: 16),
-            CustomTextField(
-              controller: _emailController,
-              label: 'Email',
-              hint: 'your@email.com',
-              keyboardType: TextInputType.emailAddress,
-              validator: Validators.validateEmail,
-              prefixIcon: const Icon(Icons.email),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _isLoading ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: _isLoading ? null : _sendResetEmail,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Send Reset Link'),
-        ),
-      ],
     );
   }
 }

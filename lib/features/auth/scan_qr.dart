@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import '../../services/device_linking_service.dart';
+import '../../services/device_linking.dart';
 
-/// Screen for scanning QR code to link device
 class ScanQRScreen extends StatefulWidget {
   const ScanQRScreen({super.key});
 

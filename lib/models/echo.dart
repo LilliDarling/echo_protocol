@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Echo model for messages between partners
-/// Firestore path: /echos/{echoId}
 class EchoModel {
   final String id;
   final String senderId;

@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Session model for user authentication sessions
-/// Firestore path: /session/{sessionId}
 class SessionModel {
   final String id;
   final String userId;

@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Notification model for user notifications
-/// Firestore path: /notification/{notificationId}
 class NotificationModel {
   final String id;
   final String userId;
