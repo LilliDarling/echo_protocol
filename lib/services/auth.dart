@@ -10,10 +10,20 @@ import 'logger.dart';
 /// Authentication service for user login/signup
 /// Handles Firebase Auth, Google Sign-In, and encryption key generation
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final EncryptionService _encryptionService = EncryptionService();
-  final SecureStorageService _secureStorage = SecureStorageService();
+  final FirebaseAuth _auth;
+  final FirebaseFirestore _db;
+  final EncryptionService _encryptionService;
+  final SecureStorageService _secureStorage;
+
+  AuthService({
+    FirebaseAuth? auth,
+    FirebaseFirestore? firestore,
+    EncryptionService? encryptionService,
+    SecureStorageService? secureStorage,
+  })  : _auth = auth ?? FirebaseAuth.instance,
+        _db = firestore ?? FirebaseFirestore.instance,
+        _encryptionService = encryptionService ?? EncryptionService(),
+        _secureStorage = secureStorage ?? SecureStorageService();
 
   User? get currentUser => _auth.currentUser;
 
@@ -295,10 +305,13 @@ class AuthService {
         return 'The email address is not valid.';
       case 'user-disabled':
         return 'This account has been disabled.';
+
+      // SECURITY: Don't distinguish between user-not-found and wrong-password
+      // This prevents attackers from enumerating valid email addresses
       case 'user-not-found':
-        return 'No account found with this email.';
       case 'wrong-password':
-        return 'Incorrect password.';
+        return 'Invalid credentials. Please check and try again.';
+
       case 'too-many-requests':
         return 'Too many failed attempts. Please try again later.';
       case 'operation-not-allowed':

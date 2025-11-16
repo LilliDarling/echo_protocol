@@ -27,7 +27,7 @@ class Validators {
 
     // Check for dangerous characters that might indicate injection attempts
     if (RegExp(r'''[<>"';(){}\[\]\\]''').hasMatch(trimmedValue)) {
-      return 'Email contains invalid characters';
+      return 'Email contains invalid characters - please enter a valid email';
     }
 
     // Prevent email addresses with multiple @ symbols
@@ -89,23 +89,22 @@ class Validators {
 
     // Prevent common weak passwords
     final weakPasswords = [
-      'password123!',
-      'password1234',
-      'admin123456!',
-      'welcome12345',
-      '123456789abc',
-      'qwerty123456',
+      'password',
+      'admin',
+      'welcome',
+      'qwerty',
+      '123456',
     ];
 
     final lowerValue = value.toLowerCase();
     for (var weak in weakPasswords) {
-      if (lowerValue.contains(weak.toLowerCase())) {
+      if (lowerValue.contains(weak)) {
         return 'Password is too common. Please choose a stronger password';
       }
     }
 
-    // Check for sequential characters (prevents 123456, abcdef patterns)
-    if (RegExp(r'(012|123|234|345|456|567|678|789|abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz)', caseSensitive: false).hasMatch(value)) {
+    // Check for sequential characters (prevents 1234, abcd patterns - 4+ consecutive)
+    if (RegExp(r'(0123|1234|2345|3456|4567|5678|6789|abcd|bcde|cdef|defg|efgh|fghi|ghij|hijk|ijkl|jklm|klmn|lmno|mnop|nopq|opqr|pqrs|qrst|rstu|stuv|tuvw|uvwx|vwxy|wxyz)', caseSensitive: false).hasMatch(value)) {
       return 'Password contains sequential characters. Please use a more random pattern';
     }
 
