@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../services/auth.dart';
+import '../../services/two_factor.dart';
 import '../../utils/validators.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
-import '../home/home.dart';
+import 'two_factor_setup.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -19,6 +20,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _confirmPasswordController = TextEditingController();
   final _displayNameController = TextEditingController();
   final _authService = AuthService();
+  final _twoFactorService = TwoFactorService();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -49,24 +51,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _authService.signUpWithEmail(
+      final credential = await _authService.signUpWithEmail(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         displayName: _displayNameController.text.trim(),
       );
 
       if (mounted) {
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account created successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Navigate to home
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(
+            builder: (_) => TwoFactorSetupScreen(
+              userId: credential.user!.uid,
+              isOnboarding: true,
+            ),
+          ),
         );
       }
     } catch (e) {
@@ -89,12 +87,31 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _authService.signInWithGoogle();
+      final credential = await _authService.signInWithGoogle();
+      final userId = credential.user!.uid;
+
+      final is2FAEnabled = await _twoFactorService.is2FAEnabled(userId);
 
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+        if (is2FAEnabled) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => TwoFactorSetupScreen(
+                userId: userId,
+                isOnboarding: true,
+              ),
+            ),
+          );
+        } else {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => TwoFactorSetupScreen(
+                userId: userId,
+                isOnboarding: true,
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

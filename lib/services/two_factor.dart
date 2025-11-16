@@ -1,14 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:base32/base32.dart';
 import 'secure_storage.dart';
 
-/// Two-Factor Authentication service
-/// Provides TOTP (Time-based One-Time Password) for enhanced security
-/// Also supports backup codes for account recovery
 class TwoFactorService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -17,9 +16,6 @@ class TwoFactorService {
   static const int _totpWindowSeconds = 30;
   static const int _totpDigits = 6;
 
-  /// Enable 2FA for user account
-  /// Returns secret key and QR code data for authenticator app setup
-  /// SECURITY: Secrets are ONLY stored locally in secure storage, NEVER in Firestore
   Future<TwoFactorSetup> enable2FA(String userId) async {
     final secret = _generateSecret();
 
@@ -155,12 +151,10 @@ class TwoFactorService {
     });
   }
 
-  // Private helper methods
-
   String _generateSecret() {
     final random = Random.secure();
-    final bytes = List<int>.generate(32, (_) => random.nextInt(256));
-    return base64Url.encode(bytes).replaceAll('=', '');
+    final bytes = List<int>.generate(20, (_) => random.nextInt(256));
+    return base32.encode(Uint8List.fromList(bytes));
   }
 
   List<String> _generateBackupCodes(int count) {
@@ -196,25 +190,22 @@ class TwoFactorService {
   }
 
   String _generateTOTPCode(String secret, int timeWindow) {
-    final key = base64Url.decode(secret + '=' * (4 - secret.length % 4));
+    final key = base32.decode(secret);
 
     final timeBytes = <int>[];
     for (var i = 7; i >= 0; i--) {
       timeBytes.add((timeWindow >> (i * 8)) & 0xff);
     }
 
-    // HMAC-SHA1
-    final hmac = Hmac(sha256, key);
+    final hmac = Hmac(sha1, key);
     final hash = hmac.convert(timeBytes).bytes;
 
-    // Dynamic truncation
     final offset = hash[hash.length - 1] & 0x0f;
     final binary = ((hash[offset] & 0x7f) << 24) |
         ((hash[offset + 1] & 0xff) << 16) |
         ((hash[offset + 2] & 0xff) << 8) |
         (hash[offset + 3] & 0xff);
 
-    // Generate 6-digit code
     final code = binary % pow(10, _totpDigits).toInt();
     return code.toString().padLeft(_totpDigits, '0');
   }

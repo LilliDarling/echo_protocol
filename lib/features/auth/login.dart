@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../services/auth.dart';
+import '../../services/two_factor.dart';
 import '../../utils/validators.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
-import '../home/home.dart';
 import 'signup.dart';
+import 'two_factor_verify.dart';
+import 'two_factor_setup.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authService = AuthService();
+  final _twoFactorService = TwoFactorService();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -35,15 +38,31 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _authService.signInWithEmail(
+      final credential = await _authService.signInWithEmail(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
+      final userId = credential.user!.uid;
+      final is2FAEnabled = await _twoFactorService.is2FAEnabled(userId);
+
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+        if (is2FAEnabled) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => TwoFactorVerifyScreen(userId: userId),
+            ),
+          );
+        } else {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => TwoFactorSetupScreen(
+                userId: userId,
+                isOnboarding: false,
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -65,12 +84,27 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _authService.signInWithGoogle();
+      final credential = await _authService.signInWithGoogle();
+      final userId = credential.user!.uid;
+      final is2FAEnabled = await _twoFactorService.is2FAEnabled(userId);
 
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+        if (is2FAEnabled) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => TwoFactorVerifyScreen(userId: userId),
+            ),
+          );
+        } else {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => TwoFactorSetupScreen(
+                userId: userId,
+                isOnboarding: false,
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
