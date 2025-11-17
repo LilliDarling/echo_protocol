@@ -121,7 +121,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> {
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-                      Colors.black.withOpacity(0.8),
+                      Colors.black.withValues(alpha: 0.8),
                       Colors.transparent,
                     ],
                   ),
@@ -148,7 +148,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> {
                     Text(
                       'Make sure the QR code is well lit and centered',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 14,
                       ),
                       textAlign: TextAlign.center,
@@ -161,7 +161,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> {
           // Processing overlay
           if (_isProcessing)
             Container(
-              color: Colors.black.withOpacity(0.7),
+              color: Colors.black.withValues(alpha: 0.7),
               child: const Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,

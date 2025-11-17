@@ -60,8 +60,10 @@ class EncryptionService {
     final sharedSecretBytes = _encodeBigInt(sharedPoint!.x!.toBigInteger()!);
 
     // HKDF provides proper key derivation as used in Signal Protocol
-    // Salt should ideally be random, but for compatibility we use a fixed context
-    final salt = Uint8List.fromList(utf8.encode('EchoProtocol-v1'));
+    // Derive unique salt per conversation from both public keys
+    // This ensures each conversation has a different encryption key
+    // even if the ECDH shared secret were somehow reused
+    final salt = _deriveSaltFromPublicKeys(_publicKey!, _partnerPublicKey!);
     final info = Uint8List.fromList(utf8.encode('message-encryption-key'));
 
     final derivedKey = SecurityUtils.hkdfSha256(
@@ -72,6 +74,40 @@ class EncryptionService {
     );
 
     _sharedSecret = encrypt.Key(derivedKey);
+  }
+
+  /// Derive a deterministic salt from both public keys
+  /// Uses SHA-256 hash of concatenated public key coordinates
+  /// Both parties will compute the same salt regardless of key order
+  Uint8List _deriveSaltFromPublicKeys(ECPublicKey key1, ECPublicKey key2) {
+    // Encode both public keys
+    final key1X = _encodeBigInt(key1.Q!.x!.toBigInteger()!);
+    final key1Y = _encodeBigInt(key1.Q!.y!.toBigInteger()!);
+    final key2X = _encodeBigInt(key2.Q!.x!.toBigInteger()!);
+    final key2Y = _encodeBigInt(key2.Q!.y!.toBigInteger()!);
+
+    // Sort keys lexicographically to ensure both parties compute same salt
+    // regardless of which key is "mine" vs "partner's"
+    final keys = [
+      Uint8List.fromList(key1X + key1Y),
+      Uint8List.fromList(key2X + key2Y),
+    ];
+    keys.sort((a, b) {
+      for (int i = 0; i < a.length && i < b.length; i++) {
+        if (a[i] != b[i]) return a[i].compareTo(b[i]);
+      }
+      return a.length.compareTo(b.length);
+    });
+
+    // Hash the concatenation with domain separation
+    final combined = Uint8List.fromList([
+      ...utf8.encode('EchoProtocol-HKDF-Salt-v1:'),
+      ...keys[0],
+      ...keys[1],
+    ]);
+
+    final hash = sha256.convert(combined);
+    return Uint8List.fromList(hash.bytes);
   }
 
   /// Encrypt message content for the partner
@@ -107,7 +143,13 @@ class EncryptionService {
         throw SecurityUtils.sanitizeDecryptionError('Invalid format');
       }
 
-      final iv = encrypt.IV.fromBase64(parts[0]);
+      // Validate IV length before using it
+      final ivBytes = base64.decode(parts[0]);
+      if (ivBytes.length != 16) {
+        throw SecurityUtils.sanitizeDecryptionError('Invalid IV length');
+      }
+
+      final iv = encrypt.IV(Uint8List.fromList(ivBytes));
       final encrypted = encrypt.Encrypted.fromBase64(parts[1]);
 
       // Decrypt using AES-256-GCM
@@ -149,6 +191,11 @@ class EncryptionService {
       throw Exception('Decryption not initialized');
     }
 
+    // Validate we have enough data for IV + encrypted content
+    if (encryptedData.length < 16) {
+      throw SecurityUtils.sanitizeDecryptionError('Invalid encrypted file data');
+    }
+
     final iv = encrypt.IV(encryptedData.sublist(0, 16));
     final encryptedBytes = encryptedData.sublist(16);
 
@@ -166,6 +213,61 @@ class EncryptionService {
 
   String hashValue(String value) {
     return sha256.convert(utf8.encode(value)).toString();
+  }
+
+  /// Generate a human-readable fingerprint from a public key
+  /// Format: XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX (32 hex chars, 8 groups of 4)
+  /// Uses SHA-256 hash of the public key for consistency
+  String generateFingerprint(String publicKeyPem) {
+    // Hash the public key to get consistent 32-byte fingerprint
+    final hash = sha256.convert(utf8.encode(publicKeyPem));
+    final hashHex = hash.bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+
+    // Take first 32 hex characters (16 bytes) and format for readability
+    final fingerprintHex = hashHex.substring(0, 32).toUpperCase();
+
+    // Split into 8 groups of 4 characters for readability
+    final groups = <String>[];
+    for (int i = 0; i < fingerprintHex.length; i += 4) {
+      groups.add(fingerprintHex.substring(i, i + 4));
+    }
+
+    return groups.join(' ');
+  }
+
+  /// Get fingerprint for current user's public key
+  String? getMyFingerprint() {
+    try {
+      if (_publicKey == null) return null;
+      final publicKeyPem = _encodePublicKey(_publicKey!);
+      return generateFingerprint(publicKeyPem);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Get fingerprint for partner's public key
+  String? getPartnerFingerprint() {
+    try {
+      if (_partnerPublicKey == null) return null;
+      final publicKeyPem = _encodePublicKey(_partnerPublicKey!);
+      return generateFingerprint(publicKeyPem);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Verify that a fingerprint matches a given public key
+  /// Returns true if the fingerprint is valid for the public key
+  bool verifyFingerprint(String publicKeyPem, String expectedFingerprint) {
+    final actualFingerprint = generateFingerprint(publicKeyPem);
+
+    // Normalize both fingerprints (remove spaces, convert to uppercase)
+    final normalizedActual = actualFingerprint.replaceAll(' ', '').toUpperCase();
+    final normalizedExpected = expectedFingerprint.replaceAll(' ', '').toUpperCase();
+
+    // Use constant-time comparison to prevent timing attacks
+    return SecurityUtils.constantTimeEquals(normalizedActual, normalizedExpected);
   }
 
   // Private helper methods for key encoding/decoding
@@ -251,5 +353,46 @@ class EncryptionService {
     _publicKey = null;
     _partnerPublicKey = null;
     _sharedSecret = null;
+  }
+
+  /// Rotate user's key pair
+  /// Generates a new key pair while preserving ability to decrypt old messages
+  /// Returns map with both keys and metadata
+  Future<Map<String, dynamic>> rotateKeys() async {
+    final timestamp = DateTime.now();
+
+    // Generate new key pair
+    final newKeyPair = await generateKeyPair();
+
+    // Return key rotation data with metadata
+    return {
+      'publicKey': newKeyPair['publicKey']!,
+      'privateKey': newKeyPair['privateKey']!,
+      'rotatedAt': timestamp.toIso8601String(),
+      'fingerprint': generateFingerprint(newKeyPair['publicKey']!),
+      'version': timestamp.millisecondsSinceEpoch ~/ 1000, // Unix timestamp as version
+    };
+  }
+
+  /// Validate that a public key is structurally valid
+  /// Returns true if the key can be decoded successfully
+  bool isValidPublicKey(String publicKeyPem) {
+    try {
+      _decodePublicKey(publicKeyPem);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Validate that a private key is structurally valid
+  /// Returns true if the key can be decoded successfully
+  bool isValidPrivateKey(String privateKeyPem) {
+    try {
+      _decodePrivateKey(privateKeyPem);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 }

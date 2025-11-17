@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth.dart';
 import '../auth/login.dart';
+import '../profile/profile_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -12,6 +13,40 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final AuthService _authService = AuthService();
   int _currentIndex = 0;
+
+  late final List<Widget> _tabs;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = [
+      _buildPlaceholderTab('Messages', Icons.message),
+      _buildPlaceholderTab('Express', Icons.favorite),
+      _buildPlaceholderTab('Plans', Icons.calendar_today),
+      ProfileTab(),
+    ];
+  }
+
+  Widget _buildPlaceholderTab(String title, IconData icon) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 80, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text(
+            '$title Coming Soon',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'This feature is under development',
+            style: TextStyle(color: Colors.grey.shade600),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _handleSignOut() async {
     try {
@@ -38,48 +73,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final titles = ['Messages', 'Express', 'Plans', 'Profile'];
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Echo Protocol'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _handleSignOut,
-            tooltip: 'Sign Out',
-          ),
-        ],
+        title: Text(titles[_currentIndex]),
+        actions: _currentIndex != 3
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.logout),
+                  onPressed: _handleSignOut,
+                  tooltip: 'Sign Out',
+                ),
+              ]
+            : null,
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.favorite,
-              size: 80,
-              color: Colors.pink,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Welcome to Echo Protocol!',
-              style: Theme.of(context).textTheme.headlineMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Your secure messaging space\nTab $_currentIndex selected',
-              style: Theme.of(context).textTheme.bodyLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 32),
-              child: Text(
-                'Features coming soon:\n• Send messages\n• Share media\n• Plan dates\n• Track gift ideas',
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
-        ),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _tabs,
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,

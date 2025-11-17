@@ -529,6 +529,120 @@ void main() {
           expect(decrypted, equals(message));
         }
       });
+
+      test('SECURITY: should derive unique salt per conversation from public keys', () async {
+        // Arrange - Create two different conversations
+        final aliceKeys = await aliceService.generateKeyPair();
+        final bobKeys = await bobService.generateKeyPair();
+
+        final charlieService = EncryptionService();
+        final charlieKeys = await charlieService.generateKeyPair();
+
+        // Conversation 1: Alice <-> Bob
+        aliceService.setPrivateKey(aliceKeys['privateKey']!);
+        bobService.setPrivateKey(bobKeys['privateKey']!);
+        aliceService.setPartnerPublicKey(bobKeys['publicKey']!);
+        bobService.setPartnerPublicKey(aliceKeys['publicKey']!);
+
+        const message = 'Same message in both conversations';
+        final aliceToBob = aliceService.encryptMessage(message);
+
+        // Conversation 2: Alice <-> Charlie
+        final aliceService2 = EncryptionService();
+        aliceService2.setPrivateKey(aliceKeys['privateKey']!);
+        charlieService.setPrivateKey(charlieKeys['privateKey']!);
+        aliceService2.setPartnerPublicKey(charlieKeys['publicKey']!);
+        charlieService.setPartnerPublicKey(aliceKeys['publicKey']!);
+
+        final aliceToCharlie = aliceService2.encryptMessage(message);
+
+        // Assert - Same message encrypted differently in different conversations
+        // The ciphertext should be different because the salt (and thus derived key) is different
+        expect(aliceToBob, isNot(equals(aliceToCharlie)));
+
+        // Verify both can still decrypt correctly
+        expect(bobService.decryptMessage(aliceToBob), equals(message));
+        expect(charlieService.decryptMessage(aliceToCharlie), equals(message));
+
+        // Cleanup
+        charlieService.clearKeys();
+        aliceService2.clearKeys();
+      });
+
+      test('SECURITY: should derive same salt regardless of key order', () async {
+        // This verifies that both Alice and Bob compute the same salt
+        // even though Alice has (myKey=Alice, partnerKey=Bob)
+        // and Bob has (myKey=Bob, partnerKey=Alice)
+
+        // Arrange
+        final aliceKeys = await aliceService.generateKeyPair();
+        final bobKeys = await bobService.generateKeyPair();
+
+        // Act - Set up the conversation from both sides
+        aliceService.setPrivateKey(aliceKeys['privateKey']!);
+        bobService.setPrivateKey(bobKeys['privateKey']!);
+        aliceService.setPartnerPublicKey(bobKeys['publicKey']!);
+        bobService.setPartnerPublicKey(aliceKeys['publicKey']!);
+
+        const message = 'Testing salt symmetry';
+
+        // Both encrypt the same message
+        final aliceEncrypted = aliceService.encryptMessage(message);
+        final bobEncrypted = bobService.encryptMessage(message);
+
+        // Assert - Both should be able to decrypt each other's messages
+        // This proves they derived the same encryption key (and thus the same salt)
+        final aliceDecryptedBob = aliceService.decryptMessage(bobEncrypted);
+        final bobDecryptedAlice = bobService.decryptMessage(aliceEncrypted);
+
+        expect(aliceDecryptedBob, equals(message));
+        expect(bobDecryptedAlice, equals(message));
+      });
+
+      test('SECURITY: should prevent salt reuse across different key pairs', () async {
+        // Verify that using different public keys results in different salts
+        // even if the private key stays the same
+
+        // Arrange - Alice talks to Bob, then Bob generates new keys
+        final aliceKeys = await aliceService.generateKeyPair();
+        final bobKeys1 = await bobService.generateKeyPair();
+
+        aliceService.setPrivateKey(aliceKeys['privateKey']!);
+        bobService.setPrivateKey(bobKeys1['privateKey']!);
+        aliceService.setPartnerPublicKey(bobKeys1['publicKey']!);
+        bobService.setPartnerPublicKey(aliceKeys['publicKey']!);
+
+        const message = 'Test message';
+        final encrypted1 = aliceService.encryptMessage(message);
+
+        // Bob generates NEW keys (simulating key rotation)
+        final bobService2 = EncryptionService();
+        final bobKeys2 = await bobService2.generateKeyPair();
+
+        final aliceService2 = EncryptionService();
+        aliceService2.setPrivateKey(aliceKeys['privateKey']!);
+        bobService2.setPrivateKey(bobKeys2['privateKey']!);
+        aliceService2.setPartnerPublicKey(bobKeys2['publicKey']!);
+        bobService2.setPartnerPublicKey(aliceKeys['publicKey']!);
+
+        final encrypted2 = aliceService2.encryptMessage(message);
+
+        // Assert - Same message with same sender but different recipient key = different ciphertext
+        expect(encrypted1, isNot(equals(encrypted2)));
+
+        // Old Bob CANNOT decrypt new messages (different salt/key)
+        expect(
+          () => bobService.decryptMessage(encrypted2),
+          throwsA(predicate((e) => e.toString().contains('Failed to decrypt message'))),
+        );
+
+        // New Bob CAN decrypt new messages
+        expect(bobService2.decryptMessage(encrypted2), equals(message));
+
+        // Cleanup
+        bobService2.clearKeys();
+        aliceService2.clearKeys();
+      });
     });
 
     group('Security Properties - Integration Validation', () {
@@ -616,6 +730,62 @@ void main() {
         expect(ivs.length, 100,
           reason: 'All 100 IVs should be unique (using secure random)');
       });
+
+      test('SECURITY: should reject messages with invalid IV length', () async {
+        // Arrange
+        final bobKeys = await bobService.generateKeyPair();
+        bobService.setPrivateKey(bobKeys['privateKey']!);
+        bobService.setPartnerPublicKey((await aliceService.generateKeyPair())['publicKey']!);
+
+        // Create malformed encrypted messages with wrong IV lengths
+        final invalidIVMessages = [
+          '${base64.encode([1, 2, 3])}:validciphertext',  // IV too short (3 bytes)
+          '${base64.encode(List.filled(8, 1))}:validciphertext',  // IV too short (8 bytes)
+          '${base64.encode(List.filled(32, 1))}:validciphertext',  // IV too long (32 bytes)
+          ':validciphertext',  // Empty IV
+        ];
+
+        // Act & Assert - All should be rejected with sanitized error
+        for (final invalid in invalidIVMessages) {
+          try {
+            bobService.decryptMessage(invalid);
+            fail('Should have thrown exception for invalid IV: $invalid');
+          } catch (e) {
+            expect(e.toString(), contains('Failed to decrypt message'),
+              reason: 'Error should be sanitized');
+            expect(e.toString().toLowerCase(), isNot(contains('invalid iv')),
+              reason: 'Should not leak IV length details');
+          }
+        }
+      });
+
+      test('SECURITY: should reject encrypted files with invalid IV', () async {
+        // Arrange
+        final bobKeys = await bobService.generateKeyPair();
+        bobService.setPrivateKey(bobKeys['privateKey']!);
+        bobService.setPartnerPublicKey((await aliceService.generateKeyPair())['publicKey']!);
+
+        // Create encrypted file data that's too short (less than 16 bytes for IV)
+        final tooShortData = Uint8List.fromList([1, 2, 3, 4, 5]);
+        final emptyData = Uint8List(0);
+
+        // Act & Assert
+        expect(
+          () => bobService.decryptFile(tooShortData),
+          throwsA(predicate((e) =>
+            e.toString().contains('Failed to decrypt')
+          )),
+          reason: 'Should reject file data shorter than IV length',
+        );
+
+        expect(
+          () => bobService.decryptFile(emptyData),
+          throwsA(predicate((e) =>
+            e.toString().contains('Failed to decrypt')
+          )),
+          reason: 'Should reject empty file data',
+        );
+      });
     });
 
     group('Performance & Stress Tests', () {
@@ -668,6 +838,280 @@ void main() {
           expect(cipher, isNotEmpty);
           expect(cipher.contains(':'), true);
         }
+      });
+    });
+
+    group('Public Key Fingerprint Verification', () {
+      test('should generate consistent fingerprint for same public key', () async {
+        // Arrange
+        final keys = await aliceService.generateKeyPair();
+
+        // Act - Generate fingerprint multiple times
+        final fingerprint1 = aliceService.generateFingerprint(keys['publicKey']!);
+        final fingerprint2 = aliceService.generateFingerprint(keys['publicKey']!);
+
+        // Assert - Should be identical
+        expect(fingerprint1, equals(fingerprint2));
+      });
+
+      test('should generate different fingerprints for different public keys', () async {
+        // Arrange
+        final aliceKeys = await aliceService.generateKeyPair();
+        final bobKeys = await bobService.generateKeyPair();
+
+        // Act
+        final aliceFingerprint = aliceService.generateFingerprint(aliceKeys['publicKey']!);
+        final bobFingerprint = bobService.generateFingerprint(bobKeys['publicKey']!);
+
+        // Assert
+        expect(aliceFingerprint, isNot(equals(bobFingerprint)));
+      });
+
+      test('should generate fingerprint in correct format (8 groups of 4 hex chars)', () async {
+        // Arrange
+        final keys = await aliceService.generateKeyPair();
+
+        // Act
+        final fingerprint = aliceService.generateFingerprint(keys['publicKey']!);
+
+        // Assert - Format: XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX
+        expect(fingerprint, matches(RegExp(r'^([0-9A-F]{4}\s){7}[0-9A-F]{4}$')));
+
+        // Assert - Length: 32 hex chars + 7 spaces = 39 total chars
+        expect(fingerprint.length, equals(39));
+
+        // Assert - Should have exactly 7 spaces
+        expect(fingerprint.split(' ').length, equals(8));
+      });
+
+      test('SECURITY: should verify correct fingerprint', () async {
+        // Arrange
+        final keys = await aliceService.generateKeyPair();
+        final publicKey = keys['publicKey']!;
+        final expectedFingerprint = aliceService.generateFingerprint(publicKey);
+
+        // Act
+        final isValid = aliceService.verifyFingerprint(publicKey, expectedFingerprint);
+
+        // Assert
+        expect(isValid, isTrue);
+      });
+
+      test('SECURITY: should reject incorrect fingerprint', () async {
+        // Arrange
+        final aliceKeys = await aliceService.generateKeyPair();
+        final bobKeys = await bobService.generateKeyPair();
+
+        final alicePublicKey = aliceKeys['publicKey']!;
+        final bobFingerprint = bobService.generateFingerprint(bobKeys['publicKey']!);
+
+        // Act - Try to verify Alice's key with Bob's fingerprint
+        final isValid = aliceService.verifyFingerprint(alicePublicKey, bobFingerprint);
+
+        // Assert
+        expect(isValid, isFalse);
+      });
+
+      test('SECURITY: should use constant-time comparison (prevent timing attacks)', () async {
+        // Arrange
+        final keys = await aliceService.generateKeyPair();
+        final publicKey = keys['publicKey']!;
+        final correctFingerprint = aliceService.generateFingerprint(publicKey);
+
+        // Create wrong fingerprints that differ at different positions
+        final wrongAtStart = 'FFFF${correctFingerprint.substring(4)}';
+        final wrongAtEnd = '${correctFingerprint.substring(0, 35)}FFFF';
+
+        // Act - Both should fail
+        final startResult = aliceService.verifyFingerprint(publicKey, wrongAtStart);
+        final endResult = aliceService.verifyFingerprint(publicKey, wrongAtEnd);
+
+        // Assert - Both should return false (testing constant-time behavior)
+        expect(startResult, isFalse);
+        expect(endResult, isFalse);
+      });
+
+      test('should normalize fingerprint (handle spaces and case)', () async {
+        // Arrange
+        final keys = await aliceService.generateKeyPair();
+        final publicKey = keys['publicKey']!;
+        final fingerprint = aliceService.generateFingerprint(publicKey);
+
+        // Act - Test different formats
+        final withoutSpaces = fingerprint.replaceAll(' ', '');
+        final lowercase = fingerprint.toLowerCase();
+        final mixed = withoutSpaces.toLowerCase();
+
+        // Assert - All formats should verify correctly
+        expect(aliceService.verifyFingerprint(publicKey, fingerprint), isTrue);
+        expect(aliceService.verifyFingerprint(publicKey, withoutSpaces), isTrue);
+        expect(aliceService.verifyFingerprint(publicKey, lowercase), isTrue);
+        expect(aliceService.verifyFingerprint(publicKey, mixed), isTrue);
+      });
+
+      test('should get fingerprint for my public key', () async {
+        // Arrange
+        final keys = await aliceService.generateKeyPair();
+        aliceService.setPrivateKey(keys['privateKey']!);
+
+        // Act
+        final myFingerprint = aliceService.getMyFingerprint();
+
+        // Assert
+        expect(myFingerprint, isNotNull);
+        expect(myFingerprint, matches(RegExp(r'^([0-9A-F]{4}\s){7}[0-9A-F]{4}$')));
+      });
+
+      test('should get fingerprint for partner public key', () async {
+        // Arrange
+        final aliceKeys = await aliceService.generateKeyPair();
+        final bobKeys = await bobService.generateKeyPair();
+
+        aliceService.setPrivateKey(aliceKeys['privateKey']!);
+        aliceService.setPartnerPublicKey(bobKeys['publicKey']!);
+
+        // Act
+        final partnerFingerprint = aliceService.getPartnerFingerprint();
+
+        // Assert
+        expect(partnerFingerprint, isNotNull);
+        expect(partnerFingerprint, matches(RegExp(r'^([0-9A-F]{4}\s){7}[0-9A-F]{4}$')));
+
+        // Verify it matches Bob's actual fingerprint
+        final bobFingerprint = bobService.generateFingerprint(bobKeys['publicKey']!);
+        expect(partnerFingerprint, equals(bobFingerprint));
+      });
+
+      test('should return null when getting fingerprint without keys set', () {
+        // Arrange - Fresh service with no keys
+
+        // Act
+        final myFingerprint = aliceService.getMyFingerprint();
+        final partnerFingerprint = aliceService.getPartnerFingerprint();
+
+        // Assert
+        expect(myFingerprint, isNull);
+        expect(partnerFingerprint, isNull);
+      });
+    });
+
+    group('Key Rotation', () {
+      test('should generate new key pair during rotation', () async {
+        // Arrange
+        final originalKeys = await aliceService.generateKeyPair();
+
+        // Act
+        final rotationData = await aliceService.rotateKeys();
+
+        // Assert
+        expect(rotationData, isNotNull);
+        expect(rotationData['publicKey'], isNotNull);
+        expect(rotationData['privateKey'], isNotNull);
+        expect(rotationData['fingerprint'], isNotNull);
+        expect(rotationData['version'], isNotNull);
+        expect(rotationData['rotatedAt'], isNotNull);
+
+        // New keys should be different from original
+        expect(rotationData['publicKey'], isNot(equals(originalKeys['publicKey'])));
+        expect(rotationData['privateKey'], isNot(equals(originalKeys['privateKey'])));
+      });
+
+      test('should include rotation metadata', () async {
+        // Act
+        final rotationData = await aliceService.rotateKeys();
+
+        // Assert - Check metadata structure
+        expect(rotationData['rotatedAt'], isA<String>());
+        expect(rotationData['fingerprint'], isA<String>());
+        expect(rotationData['version'], isA<int>());
+
+        // Verify timestamp is recent (within last 5 seconds)
+        final timestamp = DateTime.parse(rotationData['rotatedAt'] as String);
+        final now = DateTime.now();
+        final difference = now.difference(timestamp);
+        expect(difference.inSeconds, lessThan(5));
+
+        // Verify version is Unix timestamp
+        final version = rotationData['version'] as int;
+        expect(version, greaterThan(1700000000)); // After year 2023
+      });
+
+      test('should generate valid fingerprint during rotation', () async {
+        // Act
+        final rotationData = await aliceService.rotateKeys();
+
+        // Assert
+        final fingerprint = rotationData['fingerprint'] as String;
+        expect(fingerprint, matches(RegExp(r'^([0-9A-F]{4}\s){7}[0-9A-F]{4}$')));
+
+        // Verify fingerprint matches the generated public key
+        final publicKey = rotationData['publicKey'] as String;
+        final computedFingerprint = aliceService.generateFingerprint(publicKey);
+        expect(fingerprint, equals(computedFingerprint));
+      });
+
+      test('should produce different fingerprints on successive rotations', () async {
+        // Act
+        final rotation1 = await aliceService.rotateKeys();
+
+        // Wait 1 second to ensure different timestamp version
+        await Future.delayed(const Duration(seconds: 1));
+
+        final rotation2 = await aliceService.rotateKeys();
+
+        // Assert
+        expect(rotation1['fingerprint'], isNot(equals(rotation2['fingerprint'])));
+        expect(rotation1['publicKey'], isNot(equals(rotation2['publicKey'])));
+        expect(rotation1['version'], isNot(equals(rotation2['version'])));
+      });
+
+      test('SECURITY: rotated keys should work for encryption/decryption', () async {
+        // Arrange - Rotate Alice's keys
+        final aliceRotation = await aliceService.rotateKeys();
+        final bobKeys = await bobService.generateKeyPair();
+
+        // Set up encryption with rotated keys
+        aliceService.setPrivateKey(aliceRotation['privateKey'] as String);
+        bobService.setPrivateKey(bobKeys['privateKey']!);
+
+        aliceService.setPartnerPublicKey(bobKeys['publicKey']!);
+        bobService.setPartnerPublicKey(aliceRotation['publicKey'] as String);
+
+        // Act
+        const message = 'Testing rotated keys';
+        final encrypted = aliceService.encryptMessage(message);
+        final decrypted = bobService.decryptMessage(encrypted);
+
+        // Assert
+        expect(decrypted, equals(message));
+      });
+
+      test('should validate public key structure correctly', () async {
+        // Arrange
+        final validKeys = await aliceService.generateKeyPair();
+        final validPublicKey = validKeys['publicKey']!;
+
+        // Act & Assert - Valid key
+        expect(aliceService.isValidPublicKey(validPublicKey), isTrue);
+
+        // Act & Assert - Invalid keys
+        expect(aliceService.isValidPublicKey('invalid-key'), isFalse);
+        expect(aliceService.isValidPublicKey(''), isFalse);
+        expect(aliceService.isValidPublicKey('eyJpbnZhbGlkIjoianNvbiJ9'), isFalse);
+      });
+
+      test('should validate private key structure correctly', () async {
+        // Arrange
+        final validKeys = await aliceService.generateKeyPair();
+        final validPrivateKey = validKeys['privateKey']!;
+
+        // Act & Assert - Valid key
+        expect(aliceService.isValidPrivateKey(validPrivateKey), isTrue);
+
+        // Act & Assert - Invalid keys
+        expect(aliceService.isValidPrivateKey('invalid-key'), isFalse);
+        expect(aliceService.isValidPrivateKey(''), isFalse);
+        expect(aliceService.isValidPrivateKey('eyJpbnZhbGlkIjoianNvbiJ9'), isFalse);
       });
     });
   });

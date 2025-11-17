@@ -242,6 +242,73 @@ class AuthService {
     }
   }
 
+  /// Rotate encryption keys for current user
+  /// Generates new key pair and completely replaces old keys
+  /// SECURITY: Old keys are overwritten - use only when no active conversations exist
+  /// WARNING: This will invalidate all existing encrypted conversations
+  Future<Map<String, String>> rotateEncryptionKeys() async {
+    final user = currentUser;
+    if (user == null) throw Exception('No user signed in');
+
+    try {
+      LoggerService.security('Key rotation initiated', {
+        'userId': user.uid,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+
+      // Get current public key fingerprint for audit logging
+      final oldPublicKey = await _secureStorage.getPublicKey();
+      final oldFingerprint = oldPublicKey != null
+          ? _encryptionService.generateFingerprint(oldPublicKey)
+          : 'none';
+
+      // Generate new key pair with rotation metadata
+      final rotationData = await _encryptionService.rotateKeys();
+
+      // Replace old keys with new keys (overwrites existing keys)
+      await _secureStorage.storePrivateKey(rotationData['privateKey'] as String);
+      await _secureStorage.storePublicKey(rotationData['publicKey'] as String);
+
+      // Update public key in Firestore with version tracking
+      await _db.collection('users').doc(user.uid).update({
+        'publicKey': rotationData['publicKey'],
+        'publicKeyVersion': rotationData['version'],
+        'publicKeyRotatedAt': rotationData['rotatedAt'],
+        'publicKeyFingerprint': rotationData['fingerprint'],
+      });
+
+      LoggerService.security('Key rotation completed', {
+        'userId': user.uid,
+        'oldFingerprint': oldFingerprint,
+        'newFingerprint': rotationData['fingerprint'],
+        'version': rotationData['version'],
+      });
+
+      return {
+        'publicKey': rotationData['publicKey'] as String,
+        'fingerprint': rotationData['fingerprint'] as String,
+      };
+    } catch (e) {
+      LoggerService.error('Key rotation failed');
+      throw Exception('Failed to rotate encryption keys');
+    }
+  }
+
+  /// Get the fingerprint of current user's public key
+  /// Used for out-of-band verification with conversation partners
+  Future<String?> getMyPublicKeyFingerprint() async {
+    final publicKey = await _secureStorage.getPublicKey();
+    if (publicKey == null) return null;
+
+    return _encryptionService.generateFingerprint(publicKey);
+  }
+
+  /// Verify partner's public key fingerprint
+  /// Returns true if the fingerprint matches the public key
+  bool verifyPartnerFingerprint(String publicKey, String expectedFingerprint) {
+    return _encryptionService.verifyFingerprint(publicKey, expectedFingerprint);
+  }
+
   // Private helper methods
 
   /// Generate and store encryption keys for new user
