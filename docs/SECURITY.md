@@ -27,6 +27,14 @@ Echo Protocol implements **end-to-end encryption (E2EE)** to ensure that all mes
 - When partners connect, they exchange public keys
 - A shared symmetric key is derived using ECDH key agreement
 - **Key Derivation**: HKDF-SHA256 (Signal Protocol standard) transforms the ECDH shared secret into a 256-bit AES key
+- **Per-Conversation Salt**: Unique salt derived from both public keys ensures each conversation has a different encryption key
+
+#### Public Key Fingerprint Verification
+- Each public key has a unique **fingerprint** (SHA-256 hash displayed as 32 hex characters)
+- Format: `1A2B 3C4D 5E6F 7A8B 9C0D 1E2F 3A4B 5C6D` (8 groups of 4)
+- Users can verify fingerprints **out-of-band** (in-person, video call, voice call) to confirm identity
+- Prevents man-in-the-middle attacks during key exchange
+- Accessible via: Profile → Security Code
 
 ### Message Encryption
 
@@ -88,6 +96,9 @@ Images, videos, and voice messages are encrypted before upload to Firebase Stora
 ✅ **Platform Security**: Leverages iOS Keychain / Android KeyStore
 ✅ **Industry-Standard Encryption**: AES-256-GCM + ECDH (secp256k1) + HKDF-SHA256
 ✅ **Signal Protocol Inspired**: Uses same key derivation approach as Signal
+✅ **Per-Conversation Isolation**: Unique salt per conversation prevents cross-conversation key reuse
+✅ **Fingerprint Verification**: Out-of-band verification prevents MITM attacks
+✅ **Key Rotation**: Users can generate new encryption keys when needed
 
 ### Threat Model
 
@@ -103,7 +114,7 @@ Images, videos, and voice messages are encrypted before upload to Firebase Stora
 - ❌ Compromised device (malware can read decrypted messages in memory)
 - ❌ Partner's device access (they can decrypt messages sent to them)
 - ❌ Metadata analysis (who/when communication occurs is visible)
-- ⚠️ Man-in-the-middle during key exchange (mitigated by out-of-band public key fingerprint verification - planned feature)
+- ✅ ~~Man-in-the-middle during key exchange~~ - **MITIGATED** by public key fingerprint verification (implemented)
 
 ## Implementation Notes
 
@@ -127,9 +138,39 @@ Images, videos, and voice messages are encrypted before upload to Firebase Stora
 ```
 
 ### Key Rotation
-- Keys are generated once and persist for account lifetime
-- If device is lost, messages on that device are unrecoverable
-- Partner linking requires re-exchange of public keys
+
+Users can rotate their encryption keys at any time for enhanced security:
+
+#### How to Rotate Keys
+1. Go to **Profile** → **Rotate Encryption Keys**
+2. Confirm the action (warns about invalidating existing conversations)
+3. System generates new EC key pair
+4. New public key uploaded to Firestore with version tracking
+5. Old keys are replaced (overwrites - no archival needed)
+
+#### When to Rotate Keys
+- Suspected device compromise
+- Security policy compliance (e.g., annual rotation)
+- After device loss/theft recovery
+- Periodic security hygiene
+
+#### Key Rotation Data
+Firestore stores rotation metadata:
+- `publicKey`: New public key
+- `publicKeyVersion`: Unix timestamp version
+- `publicKeyRotatedAt`: ISO 8601 timestamp
+- `publicKeyFingerprint`: New fingerprint
+
+#### Impact
+⚠️ **WARNING**: Key rotation invalidates all existing encrypted conversations. Partners must:
+1. Re-verify fingerprints out-of-band
+2. Existing message history remains encrypted with old keys (unreadable)
+3. New messages use new keys
+
+#### Security Benefits
+- Limits exposure window if keys were compromised
+- Fresh cryptographic material
+- Audit trail via security logging
 
 ## Two-Factor Authentication (2FA)
 
