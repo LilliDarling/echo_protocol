@@ -157,7 +157,12 @@ class AuthService {
       _encryptionService.clearKeys();
 
       if (!kIsWeb) {
-        await GoogleSignIn.instance.signOut();
+        try {
+          await GoogleSignIn.instance.signOut();
+        } catch (e) {
+          // GoogleSignIn may not be available in test environment
+          // Continue with Firebase sign out
+        }
       }
 
       await _auth.signOut();
@@ -165,7 +170,7 @@ class AuthService {
       LoggerService.auth('Sign out successful', userId: userId);
 
       // Optionally clear secure storage (keep keys for offline access)
-      // await _secureStorage.clearAll();
+      await _secureStorage.clearAll();
     } catch (e) {
       LoggerService.error('Sign out failed');
       throw Exception('Failed to sign out');

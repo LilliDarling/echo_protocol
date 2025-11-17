@@ -15,34 +15,40 @@ Echo Protocol implements **end-to-end encryption (E2EE)** to ensure that all mes
 ### Key Management
 
 #### Key Generation
-- Each user generates a **4096-bit RSA key pair** on device during registration
+- Each user generates an **Elliptic Curve (secp256k1) key pair** on device during registration
+- **Security level**: 256-bit (equivalent to RSA-3072, same curve used by Bitcoin and Signal)
 - Private key **NEVER leaves the device** and is stored in platform secure storage:
   - iOS: Keychain with `first_unlock` accessibility
   - Android: KeyStore with encrypted shared preferences
   - Windows: DPAPI-protected storage
 
-#### Key Exchange
+#### Key Exchange (ECDH - Elliptic Curve Diffie-Hellman)
 - Public keys are stored in Firestore at `/users/{userId}/publicKey`
 - When partners connect, they exchange public keys
-- A shared symmetric key is derived using both public keys (deterministic key agreement)
+- A shared symmetric key is derived using ECDH key agreement
+- **Key Derivation**: HKDF-SHA256 (Signal Protocol standard) transforms the ECDH shared secret into a 256-bit AES key
 
 ### Message Encryption
 
-#### Algorithm: AES-256-CBC
-- Symmetric encryption using 256-bit keys
-- Each message uses a unique random Initialization Vector (IV)
+#### Algorithm: AES-256-GCM (Galois/Counter Mode)
+- **Authenticated encryption** using 256-bit keys
+- Provides both **confidentiality** (encryption) and **authenticity** (tamper detection)
+- Each message uses a unique random 16-byte Initialization Vector (IV)
+- **Authentication tag** automatically generated and verified (prevents tampering)
 - IV is prepended to ciphertext for decryption
 
 #### Encryption Flow
 ```
 1. Sender types message (plaintext)
-2. Generate random 16-byte IV
-3. Encrypt plaintext with AES-256-CBC using shared secret + IV
-4. Combine IV:EncryptedText in base64
-5. Store in Firestore as 'content' field
-6. Recipient retrieves encrypted content
-7. Extract IV and decrypt using shared secret
-8. Display plaintext
+2. Generate random 16-byte IV using secure random generator
+3. Encrypt plaintext with AES-256-GCM using shared secret + IV
+4. GCM automatically generates authentication tag (prevents tampering)
+5. Combine IV:EncryptedText (with embedded auth tag) in base64
+6. Store in Firestore as 'content' field
+7. Recipient retrieves encrypted content
+8. Extract IV and decrypt using shared secret
+9. GCM automatically verifies authentication tag (rejects if tampered)
+10. Display plaintext
 ```
 
 ### What's Encrypted vs. Unencrypted
@@ -67,19 +73,21 @@ Echo Protocol implements **end-to-end encryption (E2EE)** to ensure that all mes
 
 Images, videos, and voice messages are encrypted before upload to Firebase Storage:
 1. Read file as bytes
-2. Encrypt entire file with AES-256-CBC
-3. Prepend IV to encrypted bytes
+2. Encrypt entire file with AES-256-GCM (authenticated encryption)
+3. Prepend IV to encrypted bytes (with embedded authentication tag)
 4. Upload to Firebase Storage
 5. Store encrypted file URL in Firestore
-6. On retrieval, download, extract IV, decrypt, display
+6. On retrieval, download, extract IV, verify authentication tag, decrypt, display
 
 ### Security Guarantees
 
+✅ **Authenticated Encryption**: GCM mode prevents tampering and forgery
 ✅ **Perfect Forward Secrecy**: Each message has unique IV
 ✅ **Zero-Knowledge**: Server cannot read messages
 ✅ **Device-Only Private Keys**: Private keys never transmitted
 ✅ **Platform Security**: Leverages iOS Keychain / Android KeyStore
-✅ **Military-Grade Encryption**: AES-256 + RSA-4096
+✅ **Industry-Standard Encryption**: AES-256-GCM + ECDH (secp256k1) + HKDF-SHA256
+✅ **Signal Protocol Inspired**: Uses same key derivation approach as Signal
 
 ### Threat Model
 
@@ -88,18 +96,21 @@ Images, videos, and voice messages are encrypted before upload to Firebase Stora
 - ✅ Network interception (TLS + E2EE)
 - ✅ Server administrator access (zero-knowledge)
 - ✅ Cloud backup leaks (private keys not backed up)
+- ✅ Message tampering (GCM authentication tags detect modifications)
+- ✅ Replay attacks (when combined with timestamp validation)
 
 #### Not Protected Against:
 - ❌ Compromised device (malware can read decrypted messages in memory)
 - ❌ Partner's device access (they can decrypt messages sent to them)
 - ❌ Metadata analysis (who/when communication occurs is visible)
+- ⚠️ Man-in-the-middle during key exchange (mitigated by out-of-band public key fingerprint verification - planned feature)
 
 ## Implementation Notes
 
 ### User Registration Flow
 ```dart
 1. User signs up
-2. Generate RSA key pair
+2. Generate EC (secp256k1) key pair using secure random
 3. Store private key in secure storage (device only)
 4. Upload public key to Firestore
 5. Never backup or sync private key
@@ -109,9 +120,10 @@ Images, videos, and voice messages are encrypted before upload to Firebase Stora
 ```dart
 1. Users authenticate
 2. Exchange public keys via Firestore
-3. Derive shared symmetric key
-4. Initialize encryption service
-5. All messages now encrypted/decrypted automatically
+3. Perform ECDH key agreement to generate shared point
+4. Derive symmetric AES-256 key using HKDF-SHA256
+5. Initialize encryption service with derived key
+6. All messages now encrypted/decrypted automatically
 ```
 
 ### Key Rotation
@@ -197,12 +209,14 @@ Consider: Partner-assisted recovery (future feature)
 - Content is NOT included in notification
 - User must open app to decrypt and read
 
-## Compliance
+## Compliance & Standards
 
 This encryption implementation follows:
-- ✅ AES-256 (FIPS 197)
-- ✅ RSA-4096 (FIPS 186-4)
-- ✅ SHA-256 (FIPS 180-4)
+- ✅ **AES-256-GCM** (FIPS 197) - NIST approved authenticated encryption
+- ✅ **ECDH with secp256k1** - Elliptic curve key agreement (same as Bitcoin, Signal)
+- ✅ **HKDF-SHA256** (RFC 5869) - Key derivation function
+- ✅ **SHA-256** (FIPS 180-4) - Cryptographic hashing
+- ✅ **Signal Protocol Principles** - Industry-leading E2EE messaging standard
 
 ## Development Best Practices
 

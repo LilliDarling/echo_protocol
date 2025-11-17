@@ -9,12 +9,20 @@ import 'package:base32/base32.dart';
 import 'secure_storage.dart';
 
 class TwoFactorService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final SecureStorageService _secureStorage = SecureStorageService();
+  final FirebaseFirestore _db;
+  final FirebaseAuth _auth;
+  final SecureStorageService _secureStorage;
 
   static const int _totpWindowSeconds = 30;
   static const int _totpDigits = 6;
+
+  TwoFactorService({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+    SecureStorageService? secureStorage,
+  })  : _db = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance,
+        _secureStorage = secureStorage ?? SecureStorageService();
 
   Future<TwoFactorSetup> enable2FA(String userId) async {
     final secret = _generateSecret();

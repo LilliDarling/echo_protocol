@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:crypto/crypto.dart';
 import 'package:base32/base32.dart';
-import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 

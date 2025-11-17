@@ -445,7 +445,7 @@ void main() {
         final invalidPublicKeys = [
           'not-base64!!!',
           '',
-          'valid-base64-but-wrong-size-' + base64.encode(Uint8List(10)),
+          'valid-base64-but-wrong-size-${base64.encode(Uint8List(10))}',
           'SGVsbG8gV29ybGQ=', // Valid base64 but not an EC point
         ];
 

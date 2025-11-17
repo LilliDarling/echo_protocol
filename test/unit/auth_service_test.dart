@@ -373,18 +373,18 @@ void main() {
 
         when(mockUserCredential.user).thenReturn(mockUser);
         when(mockUser.uid).thenReturn(userId);
-        when(mockUser.updateDisplayName(any)).thenAnswer((_) async => null);
+        when(mockUser.updateDisplayName(any)).thenAnswer((_) async {});
 
         when(mockEncryption.generateKeyPair()).thenAnswer(
           (_) async => {'publicKey': publicKey, 'privateKey': privateKey},
         );
 
         when(mockSecureStorage.storePrivateKey(privateKey))
-            .thenAnswer((_) async => null);
+            .thenAnswer((_) async {});
         when(mockSecureStorage.storePublicKey(publicKey))
-            .thenAnswer((_) async => null);
+            .thenAnswer((_) async {});
         when(mockSecureStorage.storeUserId(userId))
-            .thenAnswer((_) async => null);
+            .thenAnswer((_) async {});
 
         when(mockFirestore.collection('users')).thenReturn(mockCollection);
         when(mockCollection.doc(userId)).thenReturn(mockDocument);
@@ -428,22 +428,22 @@ void main() {
 
         when(mockUserCredential.user).thenReturn(mockUser);
         when(mockUser.uid).thenReturn(userId);
-        when(mockUser.updateDisplayName(any)).thenAnswer((_) async => null);
+        when(mockUser.updateDisplayName(any)).thenAnswer((_) async {});
 
         when(mockEncryption.generateKeyPair()).thenAnswer(
           (_) async => {'publicKey': publicKey, 'privateKey': privateKey},
         );
 
         when(mockSecureStorage.storePrivateKey(any))
-            .thenAnswer((_) async => null);
+            .thenAnswer((_) async {});
         when(mockSecureStorage.storePublicKey(any))
-            .thenAnswer((_) async => null);
+            .thenAnswer((_) async {});
         when(mockSecureStorage.storeUserId(any))
-            .thenAnswer((_) async => null);
+            .thenAnswer((_) async {});
 
         when(mockFirestore.collection('users')).thenReturn(mockCollection);
         when(mockCollection.doc(userId)).thenReturn(mockDocument);
-        when(mockDocument.set(any)).thenAnswer((_) async => null);
+        when(mockDocument.set(any)).thenAnswer((_) async {});
 
         // Act
         await authService.signUpWithEmail(
@@ -469,22 +469,22 @@ void main() {
 
         when(mockUserCredential.user).thenReturn(mockUser);
         when(mockUser.uid).thenReturn(userId);
-        when(mockUser.updateDisplayName(any)).thenAnswer((_) async => null);
+        when(mockUser.updateDisplayName(any)).thenAnswer((_) async {});
 
         when(mockEncryption.generateKeyPair()).thenAnswer(
           (_) async => {'publicKey': 'pub', 'privateKey': 'priv'},
         );
 
         when(mockSecureStorage.storePrivateKey(any))
-            .thenAnswer((_) async => null);
+            .thenAnswer((_) async {});
         when(mockSecureStorage.storePublicKey(any))
-            .thenAnswer((_) async => null);
+            .thenAnswer((_) async {});
         when(mockSecureStorage.storeUserId(any))
-            .thenAnswer((_) async => null);
+            .thenAnswer((_) async {});
 
         when(mockFirestore.collection('users')).thenReturn(mockCollection);
         when(mockCollection.doc(userId)).thenReturn(mockDocument);
-        when(mockDocument.set(any)).thenAnswer((_) async => null);
+        when(mockDocument.set(any)).thenAnswer((_) async {});
 
         // Act
         await authService.signUpWithEmail(
@@ -513,11 +513,11 @@ void main() {
         when(mockSecureStorage.getPrivateKey())
             .thenAnswer((_) async => privateKey);
         when(mockSecureStorage.storeUserId(userId))
-            .thenAnswer((_) async => null);
+            .thenAnswer((_) async {});
 
         when(mockFirestore.collection('users')).thenReturn(mockCollection);
         when(mockCollection.doc(userId)).thenReturn(mockDocument);
-        when(mockDocument.update(any)).thenAnswer((_) async => null);
+        when(mockDocument.update(any)).thenAnswer((_) async {});
 
         // Act
         await authService.signInWithEmail(
@@ -535,6 +535,9 @@ void main() {
 
       test('SECURITY: Sign out MUST clear encryption keys from memory', () async {
         // Arrange
+        when(mockAuth.currentUser).thenReturn(mockUser);
+        when(mockUser.uid).thenReturn('test-user-id');
+        when(mockEncryption.clearKeys()).thenReturn(null);
         when(mockAuth.signOut()).thenAnswer((_) async {});
 
         // Act
