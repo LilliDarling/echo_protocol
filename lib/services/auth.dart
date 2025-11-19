@@ -242,10 +242,6 @@ class AuthService {
     }
   }
 
-  /// Rotate encryption keys for current user
-  /// Generates new key pair and completely replaces old keys
-  /// SECURITY: Old keys are overwritten - use only when no active conversations exist
-  /// WARNING: This will invalidate all existing encrypted conversations
   Future<Map<String, String>> rotateEncryptionKeys() async {
     final user = currentUser;
     if (user == null) throw Exception('No user signed in');
@@ -256,23 +252,45 @@ class AuthService {
         'timestamp': DateTime.now().toIso8601String(),
       });
 
-      // Get current public key fingerprint for audit logging
       final oldPublicKey = await _secureStorage.getPublicKey();
+      final oldPrivateKey = await _secureStorage.getPrivateKey();
+      final oldVersion = await _secureStorage.getCurrentKeyVersion();
       final oldFingerprint = oldPublicKey != null
           ? _encryptionService.generateFingerprint(oldPublicKey)
           : 'none';
 
-      // Generate new key pair with rotation metadata
       final rotationData = await _encryptionService.rotateKeys();
+      final newVersion = rotationData['version'] as int;
 
-      // Replace old keys with new keys (overwrites existing keys)
+      if (oldPublicKey != null && oldPrivateKey != null && oldVersion != null) {
+        await _secureStorage.storeArchivedKeyPair(
+          version: oldVersion,
+          publicKey: oldPublicKey,
+          privateKey: oldPrivateKey,
+        );
+
+        await _db.collection('users').doc(user.uid)
+            .collection('keyHistory').doc(oldVersion.toString()).set({
+          'publicKey': oldPublicKey,
+          'version': oldVersion,
+          'fingerprint': oldFingerprint,
+          'archivedAt': DateTime.now().toIso8601String(),
+        });
+
+        LoggerService.security('Old keys archived', {
+          'userId': user.uid,
+          'archivedVersion': oldVersion,
+          'archivedFingerprint': oldFingerprint,
+        });
+      }
+
       await _secureStorage.storePrivateKey(rotationData['privateKey'] as String);
       await _secureStorage.storePublicKey(rotationData['publicKey'] as String);
+      await _secureStorage.storeCurrentKeyVersion(newVersion);
 
-      // Update public key in Firestore with version tracking
       await _db.collection('users').doc(user.uid).update({
         'publicKey': rotationData['publicKey'],
-        'publicKeyVersion': rotationData['version'],
+        'publicKeyVersion': newVersion,
         'publicKeyRotatedAt': rotationData['rotatedAt'],
         'publicKeyFingerprint': rotationData['fingerprint'],
       });
@@ -281,7 +299,8 @@ class AuthService {
         'userId': user.uid,
         'oldFingerprint': oldFingerprint,
         'newFingerprint': rotationData['fingerprint'],
-        'version': rotationData['version'],
+        'oldVersion': oldVersion,
+        'newVersion': newVersion,
       });
 
       return {
@@ -311,14 +330,13 @@ class AuthService {
 
   // Private helper methods
 
-  /// Generate and store encryption keys for new user
-  /// Returns the generated key pair to be stored in Firestore by caller
   Future<Map<String, String>> _generateAndStoreKeys(String userId) async {
     final keyPair = await _encryptionService.generateKeyPair();
+    final initialVersion = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-    // Store private key locally (NEVER sync to cloud)
     await _secureStorage.storePrivateKey(keyPair['privateKey']!);
     await _secureStorage.storePublicKey(keyPair['publicKey']!);
+    await _secureStorage.storeCurrentKeyVersion(initialVersion);
     await _secureStorage.storeUserId(userId);
 
     return keyPair;
@@ -344,12 +362,16 @@ class AuthService {
     String? photoUrl,
     required String publicKey,
   }) async {
+    final now = DateTime.now();
+    final initialVersion = now.millisecondsSinceEpoch ~/ 1000;
+    final fingerprint = _encryptionService.generateFingerprint(publicKey);
+
     final userModel = UserModel(
       id: userId,
       name: displayName,
       avatar: photoUrl ?? '',
-      createdAt: DateTime.now(),
-      lastActive: DateTime.now(),
+      createdAt: now,
+      lastActive: now,
       preferences: UserPreferences.defaultPreferences,
     );
 
@@ -357,6 +379,9 @@ class AuthService {
       ...userModel.toJson(),
       'email': email,
       'publicKey': publicKey,
+      'publicKeyVersion': initialVersion,
+      'publicKeyRotatedAt': now.toIso8601String(),
+      'publicKeyFingerprint': fingerprint,
       'linkedDevices': [],
     });
   }

@@ -22,7 +22,7 @@ Echo Protocol is a Flutter-based mobile application that provides a dedicated, i
 ### Security & Privacy
 - **End-to-End Encryption**: Military-grade AES-256-GCM encryption for all messages and files
 - **Public Key Fingerprint Verification**: Verify conversation partners via QR codes or security codes
-- **Key Rotation**: Generate new encryption keys on-demand for enhanced security
+- **Key Rotation with Backward Compatibility**: Rotate encryption keys without losing access to old messages
 - **Two-Factor Authentication**: TOTP-based 2FA with backup codes
 - **Device Management**: Link multiple devices with encrypted private key transfer
 - **Secure Storage**: Platform-specific secure storage (iOS Keychain, Android KeyStore)
@@ -87,9 +87,10 @@ See [SECURITY.md](docs/SECURITY.md) for complete security architecture details.
 
 ### Rotating Encryption Keys
 1. Go to **Profile** → **Rotate Encryption Keys**
-2. Confirm the warning dialog
-3. New keys generated automatically
-4. Share your new security code with partners
+2. Confirm the action
+3. New keys generated and old keys archived automatically
+4. All previous messages remain readable
+5. Share your new security code with partners
 
 ### Managing Linked Devices
 1. Go to **Profile** → **Linked Devices**
@@ -106,9 +107,10 @@ This project is currently in active development. Core features are being impleme
 - ✅ Two-factor authentication (TOTP)
 - ✅ End-to-end encryption (AES-256-GCM, ECDH, HKDF)
 - ✅ Public key fingerprint verification
-- ✅ Key rotation mechanism
+- ✅ Key rotation with backward compatibility
 - ✅ Device linking and management
-- ✅ Secure key storage
+- ✅ Secure key storage with versioning
+- ✅ Message encryption key version tracking
 
 ### In Progress
 - 🚧 Messaging interface

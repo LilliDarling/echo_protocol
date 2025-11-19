@@ -1267,10 +1267,15 @@ class MockEncryptionService extends _i1.Mock implements _i10.EncryptionService {
           as _i7.Future<Map<String, String>>);
 
   @override
-  void setPrivateKey(String? privateKeyPem) => super.noSuchMethod(
-    Invocation.method(#setPrivateKey, [privateKeyPem]),
-    returnValueForMissingStub: null,
-  );
+  void setPrivateKey(String? privateKeyPem, {int? keyVersion}) =>
+      super.noSuchMethod(
+        Invocation.method(
+          #setPrivateKey,
+          [privateKeyPem],
+          {#keyVersion: keyVersion},
+        ),
+        returnValueForMissingStub: null,
+      );
 
   @override
   void setPartnerPublicKey(String? publicKeyPem) => super.noSuchMethod(
@@ -1296,6 +1301,29 @@ class MockEncryptionService extends _i1.Mock implements _i10.EncryptionService {
             returnValue: _i8.dummyValue<String>(
               this,
               Invocation.method(#decryptMessage, [encryptedText]),
+            ),
+          )
+          as String);
+
+  @override
+  String decryptMessageWithKeyVersions({
+    required String? encryptedText,
+    required String? myPrivateKeyPem,
+    required String? partnerPublicKeyPem,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#decryptMessageWithKeyVersions, [], {
+              #encryptedText: encryptedText,
+              #myPrivateKeyPem: myPrivateKeyPem,
+              #partnerPublicKeyPem: partnerPublicKeyPem,
+            }),
+            returnValue: _i8.dummyValue<String>(
+              this,
+              Invocation.method(#decryptMessageWithKeyVersions, [], {
+                #encryptedText: encryptedText,
+                #myPrivateKeyPem: myPrivateKeyPem,
+                #partnerPublicKeyPem: partnerPublicKeyPem,
+              }),
             ),
           )
           as String);
@@ -1328,10 +1356,58 @@ class MockEncryptionService extends _i1.Mock implements _i10.EncryptionService {
           as String);
 
   @override
+  String generateFingerprint(String? publicKeyPem) =>
+      (super.noSuchMethod(
+            Invocation.method(#generateFingerprint, [publicKeyPem]),
+            returnValue: _i8.dummyValue<String>(
+              this,
+              Invocation.method(#generateFingerprint, [publicKeyPem]),
+            ),
+          )
+          as String);
+
+  @override
+  bool verifyFingerprint(String? publicKeyPem, String? expectedFingerprint) =>
+      (super.noSuchMethod(
+            Invocation.method(#verifyFingerprint, [
+              publicKeyPem,
+              expectedFingerprint,
+            ]),
+            returnValue: false,
+          )
+          as bool);
+
+  @override
   void clearKeys() => super.noSuchMethod(
     Invocation.method(#clearKeys, []),
     returnValueForMissingStub: null,
   );
+
+  @override
+  _i7.Future<Map<String, dynamic>> rotateKeys() =>
+      (super.noSuchMethod(
+            Invocation.method(#rotateKeys, []),
+            returnValue: _i7.Future<Map<String, dynamic>>.value(
+              <String, dynamic>{},
+            ),
+          )
+          as _i7.Future<Map<String, dynamic>>);
+
+  @override
+  bool isValidPublicKey(String? publicKeyPem) =>
+      (super.noSuchMethod(
+            Invocation.method(#isValidPublicKey, [publicKeyPem]),
+            returnValue: false,
+          )
+          as bool);
+
+  @override
+  bool isValidPrivateKey(String? privateKeyPem) =>
+      (super.noSuchMethod(
+            Invocation.method(#isValidPrivateKey, [privateKeyPem]),
+            returnValue: false,
+          )
+          as bool);
 }
 
 /// A class which mocks [SecureStorageService].
@@ -1512,6 +1588,64 @@ class MockSecureStorageService extends _i1.Mock
             returnValue: _i7.Future<String?>.value(),
           )
           as _i7.Future<String?>);
+
+  @override
+  _i7.Future<void> storeArchivedKeyPair({
+    required int? version,
+    required String? publicKey,
+    required String? privateKey,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeArchivedKeyPair, [], {
+              #version: version,
+              #publicKey: publicKey,
+              #privateKey: privateKey,
+            }),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getArchivedPrivateKey(int? version) =>
+      (super.noSuchMethod(
+            Invocation.method(#getArchivedPrivateKey, [version]),
+            returnValue: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<String?> getArchivedPublicKey(int? version) =>
+      (super.noSuchMethod(
+            Invocation.method(#getArchivedPublicKey, [version]),
+            returnValue: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<List<int>> getArchivedKeyVersions() =>
+      (super.noSuchMethod(
+            Invocation.method(#getArchivedKeyVersions, []),
+            returnValue: _i7.Future<List<int>>.value(<int>[]),
+          )
+          as _i7.Future<List<int>>);
+
+  @override
+  _i7.Future<void> storeCurrentKeyVersion(int? version) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeCurrentKeyVersion, [version]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<int?> getCurrentKeyVersion() =>
+      (super.noSuchMethod(
+            Invocation.method(#getCurrentKeyVersion, []),
+            returnValue: _i7.Future<int?>.value(),
+          )
+          as _i7.Future<int?>);
 }
 
 /// A class which mocks [CollectionReference].

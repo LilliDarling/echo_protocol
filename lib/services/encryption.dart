@@ -16,6 +16,8 @@ class EncryptionService {
 
   encrypt.Key? _sharedSecret;
 
+  int? _currentKeyVersion;
+
   /// Generate a new EC key pair for the current user
   /// Uses Curve25519 (X25519)
   Future<Map<String, String>> generateKeyPair() async {
@@ -36,13 +38,16 @@ class EncryptionService {
     };
   }
 
-  void setPrivateKey(String privateKeyPem) {
+  void setPrivateKey(String privateKeyPem, {int? keyVersion}) {
     _privateKey = _decodePrivateKey(privateKeyPem);
+    _currentKeyVersion = keyVersion;
 
     final ecDomainParameters = _privateKey!.parameters as ECDomainParameters;
     final Q = ecDomainParameters.G * _privateKey!.d;
     _publicKey = ECPublicKey(Q, ecDomainParameters);
   }
+
+  int? get currentKeyVersion => _currentKeyVersion;
 
   void setPartnerPublicKey(String publicKeyPem) {
     _partnerPublicKey = _decodePublicKey(publicKeyPem);
@@ -162,6 +167,57 @@ class EncryptionService {
       return encrypter.decrypt(encrypted, iv: iv);
     } catch (e) {
       // Don't expose details about why decryption failed (prevents oracle attacks)
+      throw SecurityUtils.sanitizeDecryptionError(e);
+    }
+  }
+
+  String decryptMessageWithKeyVersions({
+    required String encryptedText,
+    required String myPrivateKeyPem,
+    required String partnerPublicKeyPem,
+  }) {
+    try {
+      final tempPrivateKey = _decodePrivateKey(myPrivateKeyPem);
+      final tempPartnerPublicKey = _decodePublicKey(partnerPublicKeyPem);
+
+      final sharedPoint = tempPartnerPublicKey.Q! * tempPrivateKey.d!;
+      final sharedSecretBytes = _encodeBigInt(sharedPoint!.x!.toBigInteger()!);
+
+      final ecDomainParameters = tempPrivateKey.parameters as ECDomainParameters;
+      final Q = ecDomainParameters.G * tempPrivateKey.d;
+      final tempPublicKey = ECPublicKey(Q, ecDomainParameters);
+
+      final salt = _deriveSaltFromPublicKeys(tempPublicKey, tempPartnerPublicKey);
+      final info = Uint8List.fromList(utf8.encode('message-encryption-key'));
+
+      final derivedKey = SecurityUtils.hkdfSha256(
+        Uint8List.fromList(sharedSecretBytes),
+        salt,
+        info,
+        32,
+      );
+
+      final sharedSecret = encrypt.Key(derivedKey);
+
+      final parts = encryptedText.split(':');
+      if (parts.length != 2) {
+        throw SecurityUtils.sanitizeDecryptionError('Invalid format');
+      }
+
+      final ivBytes = base64.decode(parts[0]);
+      if (ivBytes.length != 16) {
+        throw SecurityUtils.sanitizeDecryptionError('Invalid IV length');
+      }
+
+      final iv = encrypt.IV(Uint8List.fromList(ivBytes));
+      final encrypted = encrypt.Encrypted.fromBase64(parts[1]);
+
+      final encrypter = encrypt.Encrypter(
+        encrypt.AES(sharedSecret, mode: encrypt.AESMode.gcm),
+      );
+
+      return encrypter.decrypt(encrypted, iv: iv);
+    } catch (e) {
       throw SecurityUtils.sanitizeDecryptionError(e);
     }
   }

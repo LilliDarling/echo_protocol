@@ -5,11 +5,13 @@ class EchoModel {
   final String id;
   final String senderId;
   final String recipientId;
-  final String content; // encrypted
+  final String content;
   final DateTime timestamp;
   final EchoType type;
   final EchoStatus status;
   final EchoMetadata metadata;
+  final int senderKeyVersion;
+  final int recipientKeyVersion;
 
   EchoModel({
     required this.id,
@@ -20,6 +22,8 @@ class EchoModel {
     required this.type,
     required this.status,
     required this.metadata,
+    required this.senderKeyVersion,
+    required this.recipientKeyVersion,
   });
 
   factory EchoModel.fromJson(String id, Map<String, dynamic> json) {
@@ -32,6 +36,8 @@ class EchoModel {
       type: EchoType.fromString(json['type'] as String),
       status: EchoStatus.fromString(json['status'] as String),
       metadata: EchoMetadata.fromJson(json['metadata'] as Map<String, dynamic>),
+      senderKeyVersion: json['senderKeyVersion'] as int? ?? 0,
+      recipientKeyVersion: json['recipientKeyVersion'] as int? ?? 0,
     );
   }
 
@@ -49,6 +55,8 @@ class EchoModel {
       'type': type.value,
       'status': status.value,
       'metadata': metadata.toJson(),
+      'senderKeyVersion': senderKeyVersion,
+      'recipientKeyVersion': recipientKeyVersion,
     };
   }
 
@@ -61,6 +69,8 @@ class EchoModel {
     EchoType? type,
     EchoStatus? status,
     EchoMetadata? metadata,
+    int? senderKeyVersion,
+    int? recipientKeyVersion,
   }) {
     return EchoModel(
       id: id ?? this.id,
@@ -71,6 +81,8 @@ class EchoModel {
       type: type ?? this.type,
       status: status ?? this.status,
       metadata: metadata ?? this.metadata,
+      senderKeyVersion: senderKeyVersion ?? this.senderKeyVersion,
+      recipientKeyVersion: recipientKeyVersion ?? this.recipientKeyVersion,
     );
   }
 

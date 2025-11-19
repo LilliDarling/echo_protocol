@@ -378,10 +378,14 @@ void main() {
         when(mockEncryption.generateKeyPair()).thenAnswer(
           (_) async => {'publicKey': publicKey, 'privateKey': privateKey},
         );
+        when(mockEncryption.generateFingerprint(any))
+            .thenReturn('AAAA BBBB CCCC DDDD EEEE FFFF 0000 1111');
 
         when(mockSecureStorage.storePrivateKey(privateKey))
             .thenAnswer((_) async {});
         when(mockSecureStorage.storePublicKey(publicKey))
+            .thenAnswer((_) async {});
+        when(mockSecureStorage.storeCurrentKeyVersion(any))
             .thenAnswer((_) async {});
         when(mockSecureStorage.storeUserId(userId))
             .thenAnswer((_) async {});
@@ -433,10 +437,14 @@ void main() {
         when(mockEncryption.generateKeyPair()).thenAnswer(
           (_) async => {'publicKey': publicKey, 'privateKey': privateKey},
         );
+        when(mockEncryption.generateFingerprint(any))
+            .thenReturn('AAAA BBBB CCCC DDDD EEEE FFFF 0000 1111');
 
         when(mockSecureStorage.storePrivateKey(any))
             .thenAnswer((_) async {});
         when(mockSecureStorage.storePublicKey(any))
+            .thenAnswer((_) async {});
+        when(mockSecureStorage.storeCurrentKeyVersion(any))
             .thenAnswer((_) async {});
         when(mockSecureStorage.storeUserId(any))
             .thenAnswer((_) async {});
@@ -474,8 +482,12 @@ void main() {
         when(mockEncryption.generateKeyPair()).thenAnswer(
           (_) async => {'publicKey': 'pub', 'privateKey': 'priv'},
         );
+        when(mockEncryption.generateFingerprint(any))
+            .thenReturn('AAAA BBBB CCCC DDDD EEEE FFFF 0000 1111');
 
         when(mockSecureStorage.storePrivateKey(any))
+            .thenAnswer((_) async {});
+        when(mockSecureStorage.storeCurrentKeyVersion(any))
             .thenAnswer((_) async {});
         when(mockSecureStorage.storePublicKey(any))
             .thenAnswer((_) async {});

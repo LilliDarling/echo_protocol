@@ -1431,6 +1431,64 @@ class MockSecureStorageService extends _i1.Mock
             returnValue: _i5.Future<String?>.value(),
           )
           as _i5.Future<String?>);
+
+  @override
+  _i5.Future<void> storeArchivedKeyPair({
+    required int? version,
+    required String? publicKey,
+    required String? privateKey,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeArchivedKeyPair, [], {
+              #version: version,
+              #publicKey: publicKey,
+              #privateKey: privateKey,
+            }),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<String?> getArchivedPrivateKey(int? version) =>
+      (super.noSuchMethod(
+            Invocation.method(#getArchivedPrivateKey, [version]),
+            returnValue: _i5.Future<String?>.value(),
+          )
+          as _i5.Future<String?>);
+
+  @override
+  _i5.Future<String?> getArchivedPublicKey(int? version) =>
+      (super.noSuchMethod(
+            Invocation.method(#getArchivedPublicKey, [version]),
+            returnValue: _i5.Future<String?>.value(),
+          )
+          as _i5.Future<String?>);
+
+  @override
+  _i5.Future<List<int>> getArchivedKeyVersions() =>
+      (super.noSuchMethod(
+            Invocation.method(#getArchivedKeyVersions, []),
+            returnValue: _i5.Future<List<int>>.value(<int>[]),
+          )
+          as _i5.Future<List<int>>);
+
+  @override
+  _i5.Future<void> storeCurrentKeyVersion(int? version) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeCurrentKeyVersion, [version]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<int?> getCurrentKeyVersion() =>
+      (super.noSuchMethod(
+            Invocation.method(#getCurrentKeyVersion, []),
+            returnValue: _i5.Future<int?>.value(),
+          )
+          as _i5.Future<int?>);
 }
 
 /// A class which mocks [CollectionReference].

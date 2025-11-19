@@ -122,4 +122,56 @@ class SecureStorageService {
   Future<String?> getDeviceId() async {
     return await _storage.read(key: 'device_id');
   }
+
+  Future<void> storeArchivedKeyPair({
+    required int version,
+    required String publicKey,
+    required String privateKey,
+  }) async {
+    await _storage.write(
+      key: 'archived_public_key_$version',
+      value: publicKey,
+    );
+    await _storage.write(
+      key: 'archived_private_key_$version',
+      value: privateKey,
+    );
+  }
+
+  Future<String?> getArchivedPrivateKey(int version) async {
+    return await _storage.read(key: 'archived_private_key_$version');
+  }
+
+  Future<String?> getArchivedPublicKey(int version) async {
+    return await _storage.read(key: 'archived_public_key_$version');
+  }
+
+  Future<List<int>> getArchivedKeyVersions() async {
+    final allKeys = await _storage.readAll();
+    final versions = <int>{};
+
+    for (final key in allKeys.keys) {
+      if (key.startsWith('archived_private_key_')) {
+        final versionStr = key.replaceFirst('archived_private_key_', '');
+        final version = int.tryParse(versionStr);
+        if (version != null) {
+          versions.add(version);
+        }
+      }
+    }
+
+    return versions.toList()..sort();
+  }
+
+  Future<void> storeCurrentKeyVersion(int version) async {
+    await _storage.write(
+      key: 'current_key_version',
+      value: version.toString(),
+    );
+  }
+
+  Future<int?> getCurrentKeyVersion() async {
+    final versionStr = await _storage.read(key: 'current_key_version');
+    return versionStr != null ? int.tryParse(versionStr) : null;
+  }
 }
