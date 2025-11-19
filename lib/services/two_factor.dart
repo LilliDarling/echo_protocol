@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:base32/base32.dart';
 import 'secure_storage.dart';
+import '../utils/security.dart';
 
 class TwoFactorService {
   final FirebaseFirestore _db;
@@ -54,6 +55,19 @@ class TwoFactorService {
     userId ??= _auth.currentUser?.uid;
     if (userId == null) return false;
 
+    final rateLimitKey = 'totp_verify_$userId';
+
+    if (!SecurityUtils.checkRateLimit(
+      rateLimitKey,
+      5,
+      const Duration(minutes: 5),
+    )) {
+      await _logFailedAttempt(userId, 'totp_rate_limit');
+      throw Exception(
+        'Too many verification attempts. Please try again in 5 minutes.',
+      );
+    }
+
     final secret = await _secureStorage.getTwoFactorSecret();
     if (secret == null) {
       await _logFailedAttempt(userId, 'totp_no_secret');
@@ -66,12 +80,31 @@ class TwoFactorService {
       await _logVerification(userId, 'totp');
     } else {
       await _logFailedAttempt(userId, 'totp');
+
+      final failedAttempts = SecurityUtils.getFailedAttempts(
+        rateLimitKey,
+        const Duration(minutes: 5),
+      );
+      await Future.delayed(Duration(seconds: min(failedAttempts * 2, 10)));
     }
 
     return isValid;
   }
 
   Future<bool> verifyBackupCode(String code, String userId) async {
+    final rateLimitKey = 'backup_verify_$userId';
+
+    if (!SecurityUtils.checkRateLimit(
+      rateLimitKey,
+      3,
+      const Duration(minutes: 5),
+    )) {
+      await _logFailedAttempt(userId, 'backup_code_rate_limit');
+      throw Exception(
+        'Too many backup code attempts. Please try again in 5 minutes.',
+      );
+    }
+
     final userDoc = await _db.collection('users').doc(userId).get();
     final hashedCodes = (userDoc.data()?['backupCodes'] as List?)?.cast<String>() ?? [];
 
@@ -93,6 +126,12 @@ class TwoFactorService {
     }
 
     await _logFailedAttempt(userId, 'backup_code');
+
+    final failedAttempts = SecurityUtils.getFailedAttempts(
+      rateLimitKey,
+      const Duration(minutes: 5),
+    );
+    await Future.delayed(Duration(seconds: min(failedAttempts * 3, 15)));
 
     return false;
   }

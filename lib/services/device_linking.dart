@@ -42,7 +42,7 @@ class DeviceLinkingService {
 
     final encryptedPrivateKey = encrypter.encrypt(privateKey, iv: iv);
 
-    final expiresAt = DateTime.now().add(const Duration(minutes: 5));
+    final expiresAt = DateTime.now().add(const Duration(minutes: 2));
     await _db.collection('deviceLinking').doc(linkToken).set({
       'userId': userId,
       'sessionKey': sessionKey,
@@ -139,11 +139,9 @@ class DeviceLinkingService {
 
       await _addLinkedDevice(userId);
 
-      Future.delayed(const Duration(minutes: 1), () {
-        _db.collection('deviceLinking').doc(linkToken).delete();
-      });
-
       await _logDeviceLink(userId, linkToken);
+
+      await _db.collection('deviceLinking').doc(linkToken).delete();
 
       return true;
     } catch (e) {

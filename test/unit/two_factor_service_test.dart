@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:echo_protocol/services/two_factor.dart';
 import 'package:echo_protocol/services/secure_storage.dart';
+import 'package:echo_protocol/utils/security.dart';
 import 'package:base32/base32.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:math';
@@ -43,6 +44,8 @@ void main() {
     late MockDocumentSnapshot mockDocumentSnapshot;
 
     setUp(() {
+      SecurityUtils.clearRateLimitCache();
+
       mockFirestore = MockFirebaseFirestore();
       mockAuth = MockFirebaseAuth();
       mockSecureStorage = MockSecureStorageService();

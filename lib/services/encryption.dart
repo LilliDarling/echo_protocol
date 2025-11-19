@@ -54,7 +54,6 @@ class EncryptionService {
     _deriveSharedSecret();
   }
 
-  /// SECURITY: Uses HKDF for proper key derivation (Signal Protocol standard)
   void _deriveSharedSecret() {
     if (_privateKey == null || _partnerPublicKey == null) {
       throw Exception('Keys not initialized');
@@ -135,8 +134,6 @@ class EncryptionService {
     return combined;
   }
 
-  /// Decrypt message content from partner
-  /// SECURITY: Uses GCM for authenticated decryption - prevents tampering
   String decryptMessage(String encryptedText) {
     if (_sharedSecret == null) {
       throw Exception('Decryption not initialized. Set partner public key first.');
@@ -148,25 +145,23 @@ class EncryptionService {
         throw SecurityUtils.sanitizeDecryptionError('Invalid format');
       }
 
-      // Validate IV length before using it
       final ivBytes = base64.decode(parts[0]);
       if (ivBytes.length != 16) {
         throw SecurityUtils.sanitizeDecryptionError('Invalid IV length');
       }
 
-      final iv = encrypt.IV(Uint8List.fromList(ivBytes));
-      final encrypted = encrypt.Encrypted.fromBase64(parts[1]);
+      final ciphertextBytes = base64.decode(parts[1]);
+      SecurityUtils.validateGcmCiphertext(ciphertextBytes);
 
-      // Decrypt using AES-256-GCM
-      // GCM will automatically verify authentication tag
-      // If data was tampered with, this will throw an exception
+      final iv = encrypt.IV(Uint8List.fromList(ivBytes));
+      final encrypted = encrypt.Encrypted(Uint8List.fromList(ciphertextBytes));
+
       final encrypter = encrypt.Encrypter(
         encrypt.AES(_sharedSecret!, mode: encrypt.AESMode.gcm),
       );
 
       return encrypter.decrypt(encrypted, iv: iv);
     } catch (e) {
-      // Don't expose details about why decryption failed (prevents oracle attacks)
       throw SecurityUtils.sanitizeDecryptionError(e);
     }
   }
@@ -209,8 +204,11 @@ class EncryptionService {
         throw SecurityUtils.sanitizeDecryptionError('Invalid IV length');
       }
 
+      final ciphertextBytes = base64.decode(parts[1]);
+      SecurityUtils.validateGcmCiphertext(ciphertextBytes);
+
       final iv = encrypt.IV(Uint8List.fromList(ivBytes));
-      final encrypted = encrypt.Encrypted.fromBase64(parts[1]);
+      final encrypted = encrypt.Encrypted(Uint8List.fromList(ciphertextBytes));
 
       final encrypter = encrypt.Encrypter(
         encrypt.AES(sharedSecret, mode: encrypt.AESMode.gcm),
@@ -247,13 +245,17 @@ class EncryptionService {
       throw Exception('Decryption not initialized');
     }
 
-    // Validate we have enough data for IV + encrypted content
-    if (encryptedData.length < 16) {
+    const int ivLength = 16;
+    const int gcmTagLength = 16;
+
+    if (encryptedData.length < ivLength + gcmTagLength) {
       throw SecurityUtils.sanitizeDecryptionError('Invalid encrypted file data');
     }
 
-    final iv = encrypt.IV(encryptedData.sublist(0, 16));
-    final encryptedBytes = encryptedData.sublist(16);
+    final iv = encrypt.IV(encryptedData.sublist(0, ivLength));
+    final ciphertextWithTag = encryptedData.sublist(ivLength);
+
+    SecurityUtils.validateGcmCiphertext(ciphertextWithTag);
 
     final encrypter = encrypt.Encrypter(
       encrypt.AES(_sharedSecret!, mode: encrypt.AESMode.gcm, padding: null),
@@ -261,7 +263,7 @@ class EncryptionService {
 
     return Uint8List.fromList(
       encrypter.decryptBytes(
-        encrypt.Encrypted(encryptedBytes),
+        encrypt.Encrypted(ciphertextWithTag),
         iv: iv,
       ),
     );
@@ -332,47 +334,188 @@ class EncryptionService {
     final x = _encodeBigInt(publicKey.Q!.x!.toBigInteger()!);
     final y = _encodeBigInt(publicKey.Q!.y!.toBigInteger()!);
 
-    final data = {
-      'x': base64Encode(x),
-      'y': base64Encode(y),
-      'curve': 'secp256k1',
-    };
+    final curveBytes = utf8.encode('secp256k1');
+    final curveLength = curveBytes.length;
 
-    return base64Encode(utf8.encode(jsonEncode(data)));
+    final buffer = <int>[
+      0x04,
+      0x01,
+      curveLength,
+      ...curveBytes,
+      x.length,
+      ...x,
+      y.length,
+      ...y,
+    ];
+
+    return base64Encode(buffer);
   }
 
   String _encodePrivateKey(ECPrivateKey privateKey) {
     final d = _encodeBigInt(privateKey.d!);
 
-    final data = {
-      'd': base64Encode(d),
-      'curve': 'secp256k1',
-    };
+    final curveBytes = utf8.encode('secp256k1');
+    final curveLength = curveBytes.length;
 
-    return base64Encode(utf8.encode(jsonEncode(data)));
+    final buffer = <int>[
+      0x04,
+      0x01,
+      curveLength,
+      ...curveBytes,
+      d.length,
+      ...d,
+    ];
+
+    return base64Encode(buffer);
   }
 
   ECPublicKey _decodePublicKey(String encoded) {
-    final jsonStr = utf8.decode(base64Decode(encoded));
-    final data = jsonDecode(jsonStr) as Map<String, dynamic>;
+    try {
+      final buffer = base64Decode(encoded);
 
-    final x = _decodeBigInt(base64Decode(data['x']));
-    final y = _decodeBigInt(base64Decode(data['y']));
+      if (buffer.isEmpty) {
+        throw Exception('Invalid public key: empty');
+      }
 
-    final ecDomainParameters = ECDomainParameters('secp256k1');
-    final point = ecDomainParameters.curve.createPoint(x, y);
+      if (buffer[0] == 0x7b) {
+        final jsonStr = utf8.decode(buffer);
+        final data = jsonDecode(jsonStr) as Map<String, dynamic>;
+        final x = _decodeBigInt(base64Decode(data['x']));
+        final y = _decodeBigInt(base64Decode(data['y']));
+        final ecDomainParameters = ECDomainParameters('secp256k1');
+        final point = ecDomainParameters.curve.createPoint(x, y);
+        return ECPublicKey(point, ecDomainParameters);
+      }
 
-    return ECPublicKey(point, ecDomainParameters);
+      if (buffer[0] != 0x04) {
+        throw Exception('Invalid public key format version');
+      }
+
+      if (buffer.length < 3) {
+        throw Exception('Invalid public key: too short');
+      }
+
+      int offset = 1;
+      final version = buffer[offset++];
+
+      if (version != 0x01) {
+        throw Exception('Unsupported public key version: $version');
+      }
+
+      final curveLength = buffer[offset++];
+      if (offset + curveLength > buffer.length) {
+        throw Exception('Invalid public key: curve name overflow');
+      }
+
+      final curveBytes = buffer.sublist(offset, offset + curveLength);
+      final curveName = utf8.decode(curveBytes);
+      offset += curveLength;
+
+      if (curveName != 'secp256k1') {
+        throw Exception('Unsupported curve: $curveName');
+      }
+
+      if (offset >= buffer.length) {
+        throw Exception('Invalid public key: missing x coordinate');
+      }
+
+      final xLength = buffer[offset++];
+      if (offset + xLength > buffer.length) {
+        throw Exception('Invalid public key: x coordinate overflow');
+      }
+
+      final xBytes = buffer.sublist(offset, offset + xLength);
+      offset += xLength;
+
+      if (offset >= buffer.length) {
+        throw Exception('Invalid public key: missing y coordinate');
+      }
+
+      final yLength = buffer[offset++];
+      if (offset + yLength > buffer.length) {
+        throw Exception('Invalid public key: y coordinate overflow');
+      }
+
+      final yBytes = buffer.sublist(offset, offset + yLength);
+
+      final x = _decodeBigInt(xBytes);
+      final y = _decodeBigInt(yBytes);
+
+      final ecDomainParameters = ECDomainParameters('secp256k1');
+      final point = ecDomainParameters.curve.createPoint(x, y);
+
+      return ECPublicKey(point, ecDomainParameters);
+    } catch (e) {
+      throw Exception('Invalid public key format');
+    }
   }
 
   ECPrivateKey _decodePrivateKey(String encoded) {
-    final jsonStr = utf8.decode(base64Decode(encoded));
-    final data = jsonDecode(jsonStr) as Map<String, dynamic>;
+    try {
+      final buffer = base64Decode(encoded);
 
-    final d = _decodeBigInt(base64Decode(data['d']));
-    final ecDomainParameters = ECDomainParameters('secp256k1');
+      if (buffer.isEmpty) {
+        throw Exception('Invalid private key: empty');
+      }
 
-    return ECPrivateKey(d, ecDomainParameters);
+      if (buffer[0] == 0x7b) {
+        final jsonStr = utf8.decode(buffer);
+        final data = jsonDecode(jsonStr) as Map<String, dynamic>;
+        final d = _decodeBigInt(base64Decode(data['d']));
+        final ecDomainParameters = ECDomainParameters('secp256k1');
+        return ECPrivateKey(d, ecDomainParameters);
+      }
+
+      if (buffer[0] != 0x04) {
+        throw Exception('Invalid private key format version');
+      }
+
+      if (buffer.length < 3) {
+        throw Exception('Invalid private key: too short');
+      }
+
+      int offset = 1;
+      final version = buffer[offset++];
+
+      if (version != 0x01) {
+        throw Exception('Unsupported private key version: $version');
+      }
+
+      final curveLength = buffer[offset++];
+      if (offset + curveLength > buffer.length) {
+        throw Exception('Invalid private key: curve name overflow');
+      }
+
+      final curveBytes = buffer.sublist(offset, offset + curveLength);
+      final curveName = utf8.decode(curveBytes);
+      offset += curveLength;
+
+      if (curveName != 'secp256k1') {
+        throw Exception('Unsupported curve: $curveName');
+      }
+
+      if (offset >= buffer.length) {
+        throw Exception('Invalid private key: missing d value');
+      }
+
+      final dLength = buffer[offset++];
+      if (offset + dLength > buffer.length) {
+        throw Exception('Invalid private key: d value overflow');
+      }
+
+      final dBytes = buffer.sublist(offset, offset + dLength);
+
+      final d = _decodeBigInt(dBytes);
+      final ecDomainParameters = ECDomainParameters('secp256k1');
+
+      if (d <= BigInt.zero || d >= ecDomainParameters.n) {
+        throw Exception('Invalid private key: d out of range');
+      }
+
+      return ECPrivateKey(d, ecDomainParameters);
+    } catch (e) {
+      throw Exception('Invalid private key format');
+    }
   }
 
   Uint8List _encodeBigInt(BigInt number) {
@@ -396,10 +539,16 @@ class EncryptionService {
   SecureRandom _getSecureRandom() {
     final secureRandom = FortunaRandom();
     final random = Random.secure();
+
     final seeds = <int>[];
-    for (int i = 0; i < 32; i++) {
+    for (int i = 0; i < 24; i++) {
       seeds.add(random.nextInt(256));
     }
+
+    final timestamp = DateTime.now().microsecondsSinceEpoch;
+    final timestampBytes = ByteData(8)..setInt64(0, timestamp, Endian.big);
+    seeds.addAll(timestampBytes.buffer.asUint8List());
+
     secureRandom.seed(KeyParameter(Uint8List.fromList(seeds)));
     return secureRandom;
   }

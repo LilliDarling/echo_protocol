@@ -5,11 +5,6 @@ import 'package:crypto/crypto.dart';
 /// Security utilities for Echo Protocol
 /// Provides constant-time operations and additional security hardening
 class SecurityUtils {
-  /// Constant-time string comparison
-  /// Prevents timing attacks when comparing secrets, tokens, or hashes
-  ///
-  /// SECURITY: Regular == comparison can leak information through timing
-  /// This compares every byte regardless of early mismatches
   static bool constantTimeEquals(String a, String b) {
     final bytesA = utf8.encode(a);
     final bytesB = utf8.encode(b);
@@ -17,8 +12,6 @@ class SecurityUtils {
     return constantTimeBytesEquals(bytesA, bytesB);
   }
 
-  /// Constant-time bytes comparison
-  /// Essential for comparing cryptographic hashes, MACs, and signatures
   static bool constantTimeBytesEquals(List<int> a, List<int> b) {
     if (a.length != b.length) {
       return false;
@@ -33,25 +26,16 @@ class SecurityUtils {
     return result == 0;
   }
 
-  /// Securely clear sensitive data from memory
-  /// Overwrites data with zeros before disposal
-  ///
-  /// IMPORTANT: Dart's garbage collector may delay cleanup
-  /// This provides best-effort clearing for sensitive data
   static void secureClear(Uint8List data) {
     for (int i = 0; i < data.length; i++) {
       data[i] = 0;
     }
   }
 
-  /// Validate IV (Initialization Vector) length
-  /// Ensures IV is proper size for AES-GCM (96 bits / 12 bytes recommended)
-  /// or 128 bits / 16 bytes (also acceptable)
   static bool isValidIVLength(int length) {
     return length == 12 || length == 16;
   }
 
-  /// Validate key length for AES
   static bool isValidKeyLength(int lengthInBytes) {
     return lengthInBytes == 16 || lengthInBytes == 24 || lengthInBytes == 32;
   }
@@ -71,8 +55,6 @@ class SecurityUtils {
     return '';
   }
 
-  /// Sanitize error messages to prevent information leakage
-  /// Cryptographic errors should be generic to prevent oracle attacks
   static String sanitizeError(String error) {
     final sensitivePatterns = [
       'key',
@@ -93,8 +75,6 @@ class SecurityUtils {
     return error;
   }
 
-  /// Validate that a timestamp is recent (prevents replay attacks)
-  /// Returns true if timestamp is within the acceptable window
   static bool isTimestampValid(
     DateTime timestamp, {
     Duration maxAge = const Duration(minutes: 5),
@@ -109,8 +89,6 @@ class SecurityUtils {
     return age <= maxAge;
   }
 
-  /// Validate message replay protection
-  /// Combines timestamp validation with nonce tracking
   static Future<bool> isMessageReplayProtected(
     String messageId,
     DateTime timestamp,
@@ -127,7 +105,6 @@ class SecurityUtils {
     return true;
   }
 
-  /// Derive a key using HKDF (HMAC-based Key Derivation Function)
   static Uint8List hkdfSha256(
     Uint8List inputKeyMaterial,
     Uint8List salt,
@@ -160,9 +137,8 @@ class SecurityUtils {
     return Exception('Failed to decrypt message');
   }
 
-  /// Rate limiting check (simple in-memory implementation)
-  /// For production, will use Redis or similar distributed cache
   static final Map<String, List<DateTime>> _rateLimitCache = {};
+  static DateTime? _lastCleanup;
 
   static bool checkRateLimit(
     String identifier,
@@ -171,6 +147,8 @@ class SecurityUtils {
   ) {
     final now = DateTime.now();
     final cutoff = now.subtract(window);
+
+    _periodicCleanup();
 
     final attempts = _rateLimitCache[identifier] ?? [];
 
@@ -186,6 +164,26 @@ class SecurityUtils {
     return true;
   }
 
+  static int getFailedAttempts(String identifier, Duration window) {
+    final now = DateTime.now();
+    final cutoff = now.subtract(window);
+
+    final attempts = _rateLimitCache[identifier] ?? [];
+    attempts.removeWhere((timestamp) => timestamp.isBefore(cutoff));
+
+    return attempts.length;
+  }
+
+  static void _periodicCleanup() {
+    final now = DateTime.now();
+
+    if (_lastCleanup == null ||
+        now.difference(_lastCleanup!) > const Duration(minutes: 10)) {
+      cleanupRateLimitCache();
+      _lastCleanup = now;
+    }
+  }
+
   static void cleanupRateLimitCache() {
     final now = DateTime.now();
     final cutoff = now.subtract(const Duration(hours: 1));
@@ -194,6 +192,11 @@ class SecurityUtils {
       attempts.removeWhere((timestamp) => timestamp.isBefore(cutoff));
       return attempts.isEmpty;
     });
+  }
+
+  static void clearRateLimitCache() {
+    _rateLimitCache.clear();
+    _lastCleanup = null;
   }
 
   static void validateEncryptionParams({
@@ -216,6 +219,16 @@ class SecurityUtils {
     if (mode.toLowerCase() != 'gcm') {
       throw ArgumentError(
         'Insecure encryption mode: $mode. Only GCM mode is allowed.',
+      );
+    }
+  }
+
+  static void validateGcmCiphertext(List<int> ciphertext) {
+    const int gcmTagLength = 16;
+
+    if (ciphertext.length < gcmTagLength) {
+      throw ArgumentError(
+        'Invalid ciphertext: too short to contain GCM authentication tag',
       );
     }
   }

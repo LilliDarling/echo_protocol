@@ -123,4 +123,38 @@ class Validators {
     }
     return null;
   }
+
+  // Display name validation with security hardening
+  static String? validateDisplayName(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Name is required';
+    }
+
+    final trimmedValue = value.trim();
+
+    if (trimmedValue.length < 2) {
+      return 'Name must be at least 2 characters';
+    }
+
+    if (trimmedValue.length > 50) {
+      return 'Name must be less than 50 characters';
+    }
+
+    // Block dangerous characters that could be used for XSS or injection
+    if (RegExp(r'[<>"\\;{}()\[\]]').hasMatch(trimmedValue)) {
+      return 'Name contains invalid characters';
+    }
+
+    // Block control characters and zero-width characters
+    if (RegExp(r'[\x00-\x1F\x7F\u200B-\u200D\uFEFF]').hasMatch(trimmedValue)) {
+      return 'Name contains invalid characters';
+    }
+
+    // Block standalone special characters
+    if (RegExp(r'^[^a-zA-Z0-9]+$').hasMatch(trimmedValue)) {
+      return 'Name must contain at least one letter or number';
+    }
+
+    return null;
+  }
 }

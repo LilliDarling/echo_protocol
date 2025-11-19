@@ -3,6 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/user.dart';
+import '../utils/validators.dart';
 import 'encryption.dart';
 import 'secure_storage.dart';
 import 'logger.dart';
@@ -37,12 +38,18 @@ class AuthService {
     required String displayName,
   }) async {
     try {
+      final nameValidation = Validators.validateDisplayName(displayName);
+      if (nameValidation != null) {
+        throw Exception(nameValidation);
+      }
+
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      await credential.user?.updateDisplayName(displayName);
+      final sanitizedName = displayName.trim();
+      await credential.user?.updateDisplayName(sanitizedName);
 
       final keyPair = await _generateAndStoreKeys(credential.user!.uid);
 
@@ -349,9 +356,7 @@ class AuthService {
       _encryptionService.setPrivateKey(privateKey);
       await _secureStorage.storeUserId(userId);
     } else {
-      // Keys not found - might be a new device
-      // User will need to link device or generate new keys
-      throw Exception('Encryption keys not found on this device');
+      throw Exception('Authentication failed. Please try again or contact support.');
     }
   }
 
@@ -403,8 +408,6 @@ class AuthService {
       case 'user-disabled':
         return 'This account has been disabled.';
 
-      // SECURITY: Don't distinguish between user-not-found and wrong-password
-      // This prevents attackers from enumerating valid email addresses
       case 'user-not-found':
       case 'wrong-password':
         return 'Invalid credentials. Please check and try again.';
