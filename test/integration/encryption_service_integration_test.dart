@@ -410,8 +410,9 @@ void main() {
         expect(decrypted1, equals(message));
         expect(decrypted2, equals(message));
 
-        // Note: In production, you'd use SecurityUtils.validateTimestamp()
-        // to prevent replay attacks
+        // Note: In production, use ReplayProtectionService and MessageEncryptionHelper
+        // with replay protection enabled to prevent replay attacks via sequence numbers
+        // and nonce tracking. See test/unit/replay_protection_test.dart for examples.
       });
 
       test('should clear keys securely', () async {

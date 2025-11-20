@@ -105,6 +105,27 @@ class SecurityUtils {
     return true;
   }
 
+  static bool isSequenceValid(int messageSequence, int lastSeenSequence) {
+    return messageSequence > lastSeenSequence;
+  }
+
+  static bool isMessageValid({
+    required DateTime timestamp,
+    required int sequenceNumber,
+    required int lastSequenceNumber,
+    Duration maxAge = const Duration(hours: 1),
+  }) {
+    if (!isTimestampValid(timestamp, maxAge: maxAge)) {
+      return false;
+    }
+
+    if (!isSequenceValid(sequenceNumber, lastSequenceNumber)) {
+      return false;
+    }
+
+    return true;
+  }
+
   static Uint8List hkdfSha256(
     Uint8List inputKeyMaterial,
     Uint8List salt,

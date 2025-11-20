@@ -12,6 +12,7 @@ class EchoModel {
   final EchoMetadata metadata;
   final int senderKeyVersion;
   final int recipientKeyVersion;
+  final int sequenceNumber;
 
   EchoModel({
     required this.id,
@@ -24,6 +25,7 @@ class EchoModel {
     required this.metadata,
     required this.senderKeyVersion,
     required this.recipientKeyVersion,
+    required this.sequenceNumber,
   });
 
   factory EchoModel.fromJson(String id, Map<String, dynamic> json) {
@@ -38,6 +40,7 @@ class EchoModel {
       metadata: EchoMetadata.fromJson(json['metadata'] as Map<String, dynamic>),
       senderKeyVersion: json['senderKeyVersion'] as int? ?? 0,
       recipientKeyVersion: json['recipientKeyVersion'] as int? ?? 0,
+      sequenceNumber: json['sequenceNumber'] as int? ?? 0,
     );
   }
 
@@ -57,6 +60,7 @@ class EchoModel {
       'metadata': metadata.toJson(),
       'senderKeyVersion': senderKeyVersion,
       'recipientKeyVersion': recipientKeyVersion,
+      'sequenceNumber': sequenceNumber,
     };
   }
 
@@ -71,6 +75,7 @@ class EchoModel {
     EchoMetadata? metadata,
     int? senderKeyVersion,
     int? recipientKeyVersion,
+    int? sequenceNumber,
   }) {
     return EchoModel(
       id: id ?? this.id,
@@ -83,6 +88,7 @@ class EchoModel {
       metadata: metadata ?? this.metadata,
       senderKeyVersion: senderKeyVersion ?? this.senderKeyVersion,
       recipientKeyVersion: recipientKeyVersion ?? this.recipientKeyVersion,
+      sequenceNumber: sequenceNumber ?? this.sequenceNumber,
     );
   }
 

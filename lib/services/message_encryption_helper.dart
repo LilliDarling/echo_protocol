@@ -2,24 +2,49 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/echo.dart';
 import 'encryption.dart';
 import 'secure_storage.dart';
+import 'replay_protection_service.dart';
+import 'message_rate_limiter.dart';
 
 class MessageEncryptionHelper {
   final EncryptionService _encryptionService;
   final SecureStorageService _secureStorage;
   final FirebaseFirestore _db;
+  final ReplayProtectionService? _replayProtection;
+  final MessageRateLimiter? _rateLimiter;
 
   MessageEncryptionHelper({
     required EncryptionService encryptionService,
     required SecureStorageService secureStorage,
     FirebaseFirestore? firestore,
+    ReplayProtectionService? replayProtection,
+    MessageRateLimiter? rateLimiter,
   })  : _encryptionService = encryptionService,
         _secureStorage = secureStorage,
-        _db = firestore ?? FirebaseFirestore.instance;
+        _db = firestore ?? FirebaseFirestore.instance,
+        _replayProtection = replayProtection,
+        _rateLimiter = rateLimiter;
 
   Future<Map<String, dynamic>> encryptMessage({
     required String plaintext,
     required String partnerId,
+    required String senderId,
   }) async {
+    if (_rateLimiter != null) {
+      final delay = await _rateLimiter.checkRateLimit(
+        userId: senderId,
+        partnerId: partnerId,
+      );
+
+      if (delay > Duration.zero) {
+        await Future.delayed(delay);
+      }
+
+      _rateLimiter.recordAttempt(
+        userId: senderId,
+        partnerId: partnerId,
+      );
+    }
+
     final myKeyVersion = await _secureStorage.getCurrentKeyVersion();
     if (myKeyVersion == null) {
       throw Exception('Current key version not found');
@@ -33,10 +58,16 @@ class MessageEncryptionHelper {
 
     final encryptedContent = _encryptionService.encryptMessage(plaintext);
 
+    int sequenceNumber = 0;
+    if (_replayProtection != null) {
+      sequenceNumber = await _replayProtection.getNextSequenceNumber(senderId, partnerId);
+    }
+
     return {
       'content': encryptedContent,
       'senderKeyVersion': myKeyVersion,
       'recipientKeyVersion': partnerKeyVersion,
+      'sequenceNumber': sequenceNumber,
     };
   }
 
@@ -45,6 +76,20 @@ class MessageEncryptionHelper {
     required String myUserId,
     required String partnerId,
   }) async {
+    if (_replayProtection != null) {
+      final isValid = await _replayProtection.validateMessage(
+        messageId: message.id,
+        senderId: message.senderId,
+        recipientId: message.recipientId,
+        sequenceNumber: message.sequenceNumber,
+        timestamp: message.timestamp,
+      );
+
+      if (!isValid) {
+        throw Exception('Replay attack detected: message failed validation');
+      }
+    }
+
     final bool isSender = message.senderId == myUserId;
     final int myKeyVersionNeeded = isSender
         ? message.senderKeyVersion
@@ -58,8 +103,7 @@ class MessageEncryptionHelper {
       if (currentKeyVersion == myKeyVersionNeeded) {
         return _encryptionService.decryptMessage(message.content);
       }
-    } catch (e) {
-      // Fall through to archived keys
+    } catch (_) {
     }
 
     return await _decryptWithArchivedKeys(

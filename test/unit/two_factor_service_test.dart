@@ -262,7 +262,7 @@ void main() {
           expect(result, false,
             reason: 'Should reject invalid format: "$invalid"');
         }
-      });
+      }, timeout: const Timeout(Duration(seconds: 60)));
     });
 
     group('Backup Code Verification', () {

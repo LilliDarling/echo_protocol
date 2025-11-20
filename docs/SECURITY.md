@@ -91,6 +91,8 @@ Images, videos, and voice messages are encrypted before upload to Firebase Stora
 
 ✅ **Authenticated Encryption**: GCM mode prevents tampering and forgery
 ✅ **Perfect Forward Secrecy**: Each message has unique IV
+✅ **Replay Attack Protection**: Per-conversation sequence numbers and nonce tracking prevent message replay
+✅ **Rate Limiting**: Soft blocking with exponential backoff prevents spam and abuse
 ✅ **Zero-Knowledge**: Server cannot read messages
 ✅ **Device-Only Private Keys**: Private keys never transmitted
 ✅ **Platform Security**: Leverages iOS Keychain / Android KeyStore
@@ -108,7 +110,8 @@ Images, videos, and voice messages are encrypted before upload to Firebase Stora
 - ✅ Server administrator access (zero-knowledge)
 - ✅ Cloud backup leaks (private keys not backed up)
 - ✅ Message tampering (GCM authentication tags detect modifications)
-- ✅ Replay attacks (when combined with timestamp validation)
+- ✅ Replay attacks (sequence numbers + nonce tracking with 1-hour window)
+- ✅ Message flooding/spam (rate limiting: 30 msg/min, 500/hour with soft blocking)
 
 #### Not Protected Against:
 - ❌ Compromised device (malware can read decrypted messages in memory)
@@ -171,6 +174,177 @@ Firestore stores rotation metadata:
 - Limits exposure window if keys were compromised
 - Fresh cryptographic material
 - Audit trail via security logging
+
+## Replay Attack Protection
+
+### Overview
+
+Replay attacks occur when an attacker intercepts and retransmits valid encrypted messages. Even though the attacker can't read the content, retransmitting old messages can cause confusion or manipulate conversation context.
+
+### Protection Mechanisms
+
+Echo Protocol implements **multi-layered replay protection**:
+
+#### 1. Per-Conversation Sequence Numbers
+- Each conversation maintains a strictly incrementing sequence counter
+- Messages must arrive in order with no gaps or duplicates
+- Bidirectional: Alice↔Bob share the same sequence space
+- Stored locally on device (survives app restarts)
+
+#### 2. Message Nonce Tracking
+- Each message ID is tracked for 1-hour window
+- Duplicate message IDs are rejected automatically
+- Nonces expire after 1 hour to prevent unbounded storage
+
+#### 3. Timestamp Validation
+- Messages must be timestamped within 1-hour window
+- 2-minute clock skew tolerance for time synchronization issues
+- Rejects messages too old or too far in future
+
+### How It Works
+
+```
+Sender Side:
+1. Get next sequence number for conversation (e.g., seq=5)
+2. Create message with unique ID and timestamp
+3. Encrypt message content
+4. Store message with sequenceNumber=5
+
+Receiver Side:
+1. Receive message (id="msg-123", seq=5, timestamp=now)
+2. Check if nonce "msg-123" seen before → reject if yes
+3. Check if seq=5 > lastSeenSeq → reject if not advancing
+4. Check if timestamp within 1-hour window → reject if expired
+5. Store nonce and update lastSeenSeq=5
+6. Decrypt and display message
+```
+
+### Attack Scenarios Prevented
+
+✅ **Exact Message Replay**: Same message ID detected and rejected
+✅ **Out-of-Order Delivery**: Non-advancing sequence numbers rejected
+✅ **Delayed Message Attack**: Old timestamps outside window rejected
+✅ **Crafted Messages**: Must have valid, advancing sequence number
+
+### Storage and Performance
+
+- **Sequence Numbers**: ~8 bytes per conversation (permanent)
+- **Nonces**: ~100 bytes per message ID (1-hour TTL)
+- **Cleanup**: Automatic removal of expired nonces every 10 minutes
+- **Lookup**: O(1) constant time validation
+
+### Configuration
+
+```dart
+Time Window: 1 hour (configurable)
+Clock Skew Tolerance: 2 minutes
+Nonce Expiry: 1 hour
+Storage: Local (SharedPreferences)
+```
+
+## Rate Limiting
+
+### Overview
+
+Rate limiting prevents message spam, flooding attacks, and abuse by enforcing send limits with soft blocking and progressive delays.
+
+### Dual-Layer Protection
+
+#### 1. Global User Limits
+- **30 messages per minute** across all conversations
+- **500 messages per hour** across all conversations
+- Applies to single user's total sending capacity
+
+#### 2. Per-Conversation Limits
+- **20 messages per minute** to specific partner
+- **300 messages per hour** to specific partner
+- Prevents targeting/harassment of single contact
+
+### Enforcement Strategy: Soft Blocking
+
+Rather than hard rejections, rate limiting uses **progressive delays**:
+
+```
+Messages 1-20: No delay (instant send)
+Message 21: 100ms delay
+Message 22: 150ms delay
+Message 23: 225ms delay
+...
+Message 30+: Up to 30 seconds delay (capped)
+```
+
+**Exponential Backoff**: Delay increases by 1.5x per excess message
+
+### How It Works
+
+```
+1. User attempts to send message
+2. Check global and per-conversation limits
+3. Calculate required delay (if any)
+4. Apply delay (blocks send temporarily)
+5. Record message attempt
+6. Allow send to proceed
+```
+
+### Rate Limit Stats
+
+Users can query their current usage:
+
+```dart
+stats = {
+  'global': {
+    'lastMinute': 15,
+    'lastHour': 120,
+    'percentageMinute': 50,  // 50% of limit used
+    'percentageHour': 24     // 24% of limit used
+  },
+  'conversation': {
+    'lastMinute': 5,
+    'lastHour': 45,
+    'percentageMinute': 25,
+    'percentageHour': 15
+  }
+}
+```
+
+### Benefits
+
+✅ **Prevents Spam**: Automatic throttling of excessive sending
+✅ **Abuse Mitigation**: Makes flooding attacks impractical
+✅ **Soft UX**: No hard errors, just progressive delays
+✅ **Fair Usage**: Legitimate users unaffected by normal usage
+✅ **Resource Protection**: Reduces server and database load
+
+### Attack Scenarios Prevented
+
+✅ **Message Flooding**: Rate limits prevent rapid-fire spam
+✅ **Harassment**: Per-conversation limits protect recipients
+✅ **Resource Exhaustion**: Server load distributed over time
+✅ **DoS Attempts**: Exponential backoff makes attacks costly
+
+### Storage and Performance
+
+- **Attempts Tracking**: In-memory with 1-hour window
+- **Cleanup**: Automatic removal every 10 minutes
+- **Lookup**: O(1) constant time
+- **Memory**: ~50 bytes per tracked attempt
+
+### Configuration
+
+```dart
+Global Limits:
+  - 30 messages/minute
+  - 500 messages/hour
+
+Per-Conversation Limits:
+  - 20 messages/minute
+  - 300 messages/hour
+
+Backoff:
+  - Min delay: 100ms
+  - Max delay: 30 seconds
+  - Multiplier: 1.5x
+```
 
 ## Two-Factor Authentication (2FA)
 
@@ -364,15 +538,18 @@ If your device is compromised:
 
 ## Future Enhancements
 
-- [ ] Add public key fingerprint verification (prevent MITM)
-- [ ] Implement key rotation mechanism
+- [x] Add public key fingerprint verification (prevent MITM)
+- [x] Implement key rotation mechanism
+- [x] Replay attack protection (sequence numbers + nonce tracking)
+- [x] Rate limiting (dual-layer with soft blocking)
+- [x] Two-factor authentication (2FA)
+- [x] Device linking via QR code
+- [x] Device access audit log (in security log collection)
 - [ ] Add message self-destruct timer
 - [ ] Screenshot detection and warnings
 - [ ] Biometric authentication for app access
-- [x] Two-factor authentication (2FA)
-- [x] Device linking via QR code
 - [ ] Remote key revocation
-- [x] Device access audit log (in security log collection)
+- [ ] Cross-device sequence synchronization
 
 ---
 
