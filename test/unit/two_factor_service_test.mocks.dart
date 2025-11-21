@@ -4,18 +4,21 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'dart:async' as _i5;
-import 'dart:typed_data' as _i9;
+import 'dart:typed_data' as _i11;
 
 import 'package:cloud_firestore/cloud_firestore.dart' as _i4;
 import 'package:cloud_firestore_platform_interface/cloud_firestore_platform_interface.dart'
     as _i3;
-import 'package:echo_protocol/services/secure_storage.dart' as _i10;
+import 'package:cloud_functions/cloud_functions.dart' as _i9;
+import 'package:cloud_functions_platform_interface/cloud_functions_platform_interface.dart'
+    as _i8;
+import 'package:echo_protocol/services/secure_storage.dart' as _i12;
 import 'package:firebase_auth/firebase_auth.dart' as _i7;
 import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart'
     as _i6;
 import 'package:firebase_core/firebase_core.dart' as _i2;
 import 'package:mockito/mockito.dart' as _i1;
-import 'package:mockito/src/dummies.dart' as _i8;
+import 'package:mockito/src/dummies.dart' as _i10;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -100,47 +103,70 @@ class _FakeConfirmationResult_11 extends _i1.SmartFake
     : super(parent, parentInvocation);
 }
 
-class _FakeUserMetadata_12 extends _i1.SmartFake implements _i6.UserMetadata {
-  _FakeUserMetadata_12(Object parent, Invocation parentInvocation)
+class _FakeFirebaseFunctionsPlatform_12 extends _i1.SmartFake
+    implements _i8.FirebaseFunctionsPlatform {
+  _FakeFirebaseFunctionsPlatform_12(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeMultiFactor_13 extends _i1.SmartFake implements _i7.MultiFactor {
-  _FakeMultiFactor_13(Object parent, Invocation parentInvocation)
+class _FakeHttpsCallable_13 extends _i1.SmartFake implements _i9.HttpsCallable {
+  _FakeHttpsCallable_13(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeIdTokenResult_14 extends _i1.SmartFake implements _i6.IdTokenResult {
-  _FakeIdTokenResult_14(Object parent, Invocation parentInvocation)
+class _FakeUserMetadata_14 extends _i1.SmartFake implements _i6.UserMetadata {
+  _FakeUserMetadata_14(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeUser_15 extends _i1.SmartFake implements _i7.User {
-  _FakeUser_15(Object parent, Invocation parentInvocation)
+class _FakeMultiFactor_15 extends _i1.SmartFake implements _i7.MultiFactor {
+  _FakeMultiFactor_15(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeFirebaseFirestore_16 extends _i1.SmartFake
+class _FakeIdTokenResult_16 extends _i1.SmartFake implements _i6.IdTokenResult {
+  _FakeIdTokenResult_16(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeUser_17 extends _i1.SmartFake implements _i7.User {
+  _FakeUser_17(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeHttpsCallablePlatform_18 extends _i1.SmartFake
+    implements _i8.HttpsCallablePlatform {
+  _FakeHttpsCallablePlatform_18(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeHttpsCallableResult_19<T1> extends _i1.SmartFake
+    implements _i9.HttpsCallableResult<T1> {
+  _FakeHttpsCallableResult_19(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeFirebaseFirestore_20 extends _i1.SmartFake
     implements _i4.FirebaseFirestore {
-  _FakeFirebaseFirestore_16(Object parent, Invocation parentInvocation)
+  _FakeFirebaseFirestore_20(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeAggregateQuery_17 extends _i1.SmartFake
+class _FakeAggregateQuery_21 extends _i1.SmartFake
     implements _i4.AggregateQuery {
-  _FakeAggregateQuery_17(Object parent, Invocation parentInvocation)
+  _FakeAggregateQuery_21(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeDocumentSnapshot_18<T extends Object?> extends _i1.SmartFake
+class _FakeDocumentSnapshot_22<T extends Object?> extends _i1.SmartFake
     implements _i4.DocumentSnapshot<T> {
-  _FakeDocumentSnapshot_18(Object parent, Invocation parentInvocation)
+  _FakeDocumentSnapshot_22(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeSnapshotMetadata_19 extends _i1.SmartFake
+class _FakeSnapshotMetadata_23 extends _i1.SmartFake
     implements _i4.SnapshotMetadata {
-  _FakeSnapshotMetadata_19(Object parent, Invocation parentInvocation)
+  _FakeSnapshotMetadata_23(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
@@ -164,7 +190,7 @@ class MockFirebaseFirestore extends _i1.Mock implements _i4.FirebaseFirestore {
   String get databaseURL =>
       (super.noSuchMethod(
             Invocation.getter(#databaseURL),
-            returnValue: _i8.dummyValue<String>(
+            returnValue: _i10.dummyValue<String>(
               this,
               Invocation.getter(#databaseURL),
             ),
@@ -175,7 +201,7 @@ class MockFirebaseFirestore extends _i1.Mock implements _i4.FirebaseFirestore {
   String get databaseId =>
       (super.noSuchMethod(
             Invocation.getter(#databaseId),
-            returnValue: _i8.dummyValue<String>(
+            returnValue: _i10.dummyValue<String>(
               this,
               Invocation.getter(#databaseId),
             ),
@@ -264,7 +290,7 @@ class MockFirebaseFirestore extends _i1.Mock implements _i4.FirebaseFirestore {
           as _i5.Future<void>);
 
   @override
-  _i4.LoadBundleTask loadBundle(_i9.Uint8List? bundle) =>
+  _i4.LoadBundleTask loadBundle(_i11.Uint8List? bundle) =>
       (super.noSuchMethod(
             Invocation.method(#loadBundle, [bundle]),
             returnValue: _FakeLoadBundleTask_4(
@@ -405,8 +431,8 @@ class MockFirebaseFirestore extends _i1.Mock implements _i4.FirebaseFirestore {
               {#timeout: timeout, #maxAttempts: maxAttempts},
             ),
             returnValue:
-                _i8.ifNotNull(
-                  _i8.dummyValueOrNull<T>(
+                _i10.ifNotNull(
+                  _i10.dummyValueOrNull<T>(
                     this,
                     Invocation.method(
                       #runTransaction,
@@ -866,7 +892,7 @@ class MockFirebaseAuth extends _i1.Mock implements _i7.FirebaseAuth {
       (super.noSuchMethod(
             Invocation.method(#verifyPasswordResetCode, [code]),
             returnValue: _i5.Future<String>.value(
-              _i8.dummyValue<String>(
+              _i10.dummyValue<String>(
                 this,
                 Invocation.method(#verifyPasswordResetCode, [code]),
               ),
@@ -928,6 +954,114 @@ class MockFirebaseAuth extends _i1.Mock implements _i7.FirebaseAuth {
           as _i5.Future<void>);
 }
 
+/// A class which mocks [FirebaseFunctions].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockFirebaseFunctions extends _i1.Mock implements _i9.FirebaseFunctions {
+  MockFirebaseFunctions() {
+    _i1.throwOnMissingStub(this);
+  }
+
+  @override
+  _i8.FirebaseFunctionsPlatform get delegate =>
+      (super.noSuchMethod(
+            Invocation.getter(#delegate),
+            returnValue: _FakeFirebaseFunctionsPlatform_12(
+              this,
+              Invocation.getter(#delegate),
+            ),
+          )
+          as _i8.FirebaseFunctionsPlatform);
+
+  @override
+  _i2.FirebaseApp get app =>
+      (super.noSuchMethod(
+            Invocation.getter(#app),
+            returnValue: _FakeFirebaseApp_0(this, Invocation.getter(#app)),
+          )
+          as _i2.FirebaseApp);
+
+  @override
+  Map<dynamic, dynamic> get pluginConstants =>
+      (super.noSuchMethod(
+            Invocation.getter(#pluginConstants),
+            returnValue: <dynamic, dynamic>{},
+          )
+          as Map<dynamic, dynamic>);
+
+  @override
+  _i9.HttpsCallable httpsCallable(
+    String? name, {
+    _i8.HttpsCallableOptions? options,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#httpsCallable, [name], {#options: options}),
+            returnValue: _FakeHttpsCallable_13(
+              this,
+              Invocation.method(#httpsCallable, [name], {#options: options}),
+            ),
+          )
+          as _i9.HttpsCallable);
+
+  @override
+  _i9.HttpsCallable httpsCallableFromUrl(
+    String? url, {
+    _i8.HttpsCallableOptions? options,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #httpsCallableFromUrl,
+              [url],
+              {#options: options},
+            ),
+            returnValue: _FakeHttpsCallable_13(
+              this,
+              Invocation.method(
+                #httpsCallableFromUrl,
+                [url],
+                {#options: options},
+              ),
+            ),
+          )
+          as _i9.HttpsCallable);
+
+  @override
+  _i9.HttpsCallable httpsCallableFromUri(
+    Uri? uri, {
+    _i8.HttpsCallableOptions? options,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #httpsCallableFromUri,
+              [uri],
+              {#options: options},
+            ),
+            returnValue: _FakeHttpsCallable_13(
+              this,
+              Invocation.method(
+                #httpsCallableFromUri,
+                [uri],
+                {#options: options},
+              ),
+            ),
+          )
+          as _i9.HttpsCallable);
+
+  @override
+  void useFunctionsEmulator(
+    String? host,
+    int? port, {
+    bool? automaticHostMapping = true,
+  }) => super.noSuchMethod(
+    Invocation.method(
+      #useFunctionsEmulator,
+      [host, port],
+      {#automaticHostMapping: automaticHostMapping},
+    ),
+    returnValueForMissingStub: null,
+  );
+}
+
 /// A class which mocks [User].
 ///
 /// See the documentation for Mockito's code generation for more information.
@@ -950,7 +1084,7 @@ class MockUser extends _i1.Mock implements _i7.User {
   _i6.UserMetadata get metadata =>
       (super.noSuchMethod(
             Invocation.getter(#metadata),
-            returnValue: _FakeUserMetadata_12(
+            returnValue: _FakeUserMetadata_14(
               this,
               Invocation.getter(#metadata),
             ),
@@ -969,7 +1103,7 @@ class MockUser extends _i1.Mock implements _i7.User {
   String get uid =>
       (super.noSuchMethod(
             Invocation.getter(#uid),
-            returnValue: _i8.dummyValue<String>(this, Invocation.getter(#uid)),
+            returnValue: _i10.dummyValue<String>(this, Invocation.getter(#uid)),
           )
           as String);
 
@@ -977,7 +1111,7 @@ class MockUser extends _i1.Mock implements _i7.User {
   _i7.MultiFactor get multiFactor =>
       (super.noSuchMethod(
             Invocation.getter(#multiFactor),
-            returnValue: _FakeMultiFactor_13(
+            returnValue: _FakeMultiFactor_15(
               this,
               Invocation.getter(#multiFactor),
             ),
@@ -1008,7 +1142,7 @@ class MockUser extends _i1.Mock implements _i7.User {
       (super.noSuchMethod(
             Invocation.method(#getIdTokenResult, [forceRefresh]),
             returnValue: _i5.Future<_i6.IdTokenResult>.value(
-              _FakeIdTokenResult_14(
+              _FakeIdTokenResult_16(
                 this,
                 Invocation.method(#getIdTokenResult, [forceRefresh]),
               ),
@@ -1164,7 +1298,7 @@ class MockUser extends _i1.Mock implements _i7.User {
       (super.noSuchMethod(
             Invocation.method(#unlink, [providerId]),
             returnValue: _i5.Future<_i7.User>.value(
-              _FakeUser_15(this, Invocation.method(#unlink, [providerId])),
+              _FakeUser_17(this, Invocation.method(#unlink, [providerId])),
             ),
           )
           as _i5.Future<_i7.User>);
@@ -1244,20 +1378,11 @@ class MockUser extends _i1.Mock implements _i7.User {
           as _i5.Future<void>);
 }
 
-/// A class which mocks [UserCredential].
-///
-/// See the documentation for Mockito's code generation for more information.
-class MockUserCredential extends _i1.Mock implements _i7.UserCredential {
-  MockUserCredential() {
-    _i1.throwOnMissingStub(this);
-  }
-}
-
 /// A class which mocks [SecureStorageService].
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockSecureStorageService extends _i1.Mock
-    implements _i10.SecureStorageService {
+    implements _i12.SecureStorageService {
   MockSecureStorageService() {
     _i1.throwOnMissingStub(this);
   }
@@ -1491,6 +1616,65 @@ class MockSecureStorageService extends _i1.Mock
           as _i5.Future<int?>);
 }
 
+/// A class which mocks [HttpsCallable].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockHttpsCallable extends _i1.Mock implements _i9.HttpsCallable {
+  MockHttpsCallable() {
+    _i1.throwOnMissingStub(this);
+  }
+
+  @override
+  _i8.HttpsCallablePlatform get delegate =>
+      (super.noSuchMethod(
+            Invocation.getter(#delegate),
+            returnValue: _FakeHttpsCallablePlatform_18(
+              this,
+              Invocation.getter(#delegate),
+            ),
+          )
+          as _i8.HttpsCallablePlatform);
+
+  @override
+  _i5.Future<_i9.HttpsCallableResult<T>> call<T>([dynamic parameters]) =>
+      (super.noSuchMethod(
+            Invocation.method(#call, [parameters]),
+            returnValue: _i5.Future<_i9.HttpsCallableResult<T>>.value(
+              _FakeHttpsCallableResult_19<T>(
+                this,
+                Invocation.method(#call, [parameters]),
+              ),
+            ),
+          )
+          as _i5.Future<_i9.HttpsCallableResult<T>>);
+
+  @override
+  _i5.Stream<_i9.StreamResponse> stream<T, R>([Object? input]) =>
+      (super.noSuchMethod(
+            Invocation.method(#stream, [input]),
+            returnValue: _i5.Stream<_i9.StreamResponse>.empty(),
+          )
+          as _i5.Stream<_i9.StreamResponse>);
+}
+
+/// A class which mocks [HttpsCallableResult].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockHttpsCallableResult<T> extends _i1.Mock
+    implements _i9.HttpsCallableResult<T> {
+  MockHttpsCallableResult() {
+    _i1.throwOnMissingStub(this);
+  }
+
+  @override
+  T get data =>
+      (super.noSuchMethod(
+            Invocation.getter(#data),
+            returnValue: _i10.dummyValue<T>(this, Invocation.getter(#data)),
+          )
+          as T);
+}
+
 /// A class which mocks [CollectionReference].
 ///
 /// See the documentation for Mockito's code generation for more information.
@@ -1505,7 +1689,7 @@ class MockCollectionReference extends _i1.Mock
   String get id =>
       (super.noSuchMethod(
             Invocation.getter(#id),
-            returnValue: _i8.dummyValue<String>(this, Invocation.getter(#id)),
+            returnValue: _i10.dummyValue<String>(this, Invocation.getter(#id)),
           )
           as String);
 
@@ -1513,7 +1697,10 @@ class MockCollectionReference extends _i1.Mock
   String get path =>
       (super.noSuchMethod(
             Invocation.getter(#path),
-            returnValue: _i8.dummyValue<String>(this, Invocation.getter(#path)),
+            returnValue: _i10.dummyValue<String>(
+              this,
+              Invocation.getter(#path),
+            ),
           )
           as String);
 
@@ -1521,7 +1708,7 @@ class MockCollectionReference extends _i1.Mock
   _i4.FirebaseFirestore get firestore =>
       (super.noSuchMethod(
             Invocation.getter(#firestore),
-            returnValue: _FakeFirebaseFirestore_16(
+            returnValue: _FakeFirebaseFirestore_20(
               this,
               Invocation.getter(#firestore),
             ),
@@ -1806,7 +1993,7 @@ class MockCollectionReference extends _i1.Mock
   _i4.AggregateQuery count() =>
       (super.noSuchMethod(
             Invocation.method(#count, []),
-            returnValue: _FakeAggregateQuery_17(
+            returnValue: _FakeAggregateQuery_21(
               this,
               Invocation.method(#count, []),
             ),
@@ -1879,7 +2066,7 @@ class MockCollectionReference extends _i1.Mock
               aggregateField29,
               aggregateField30,
             ]),
-            returnValue: _FakeAggregateQuery_17(
+            returnValue: _FakeAggregateQuery_21(
               this,
               Invocation.method(#aggregate, [
                 aggregateField1,
@@ -1932,7 +2119,7 @@ class MockDocumentReference extends _i1.Mock
   _i4.FirebaseFirestore get firestore =>
       (super.noSuchMethod(
             Invocation.getter(#firestore),
-            returnValue: _FakeFirebaseFirestore_16(
+            returnValue: _FakeFirebaseFirestore_20(
               this,
               Invocation.getter(#firestore),
             ),
@@ -1943,7 +2130,7 @@ class MockDocumentReference extends _i1.Mock
   String get id =>
       (super.noSuchMethod(
             Invocation.getter(#id),
-            returnValue: _i8.dummyValue<String>(this, Invocation.getter(#id)),
+            returnValue: _i10.dummyValue<String>(this, Invocation.getter(#id)),
           )
           as String);
 
@@ -1962,7 +2149,10 @@ class MockDocumentReference extends _i1.Mock
   String get path =>
       (super.noSuchMethod(
             Invocation.getter(#path),
-            returnValue: _i8.dummyValue<String>(this, Invocation.getter(#path)),
+            returnValue: _i10.dummyValue<String>(
+              this,
+              Invocation.getter(#path),
+            ),
           )
           as String);
 
@@ -2005,7 +2195,7 @@ class MockDocumentReference extends _i1.Mock
             Invocation.method(#get, [options]),
             returnValue:
                 _i5.Future<_i4.DocumentSnapshot<Map<String, dynamic>>>.value(
-                  _FakeDocumentSnapshot_18<Map<String, dynamic>>(
+                  _FakeDocumentSnapshot_22<Map<String, dynamic>>(
                     this,
                     Invocation.method(#get, [options]),
                   ),
@@ -2071,7 +2261,7 @@ class MockDocumentSnapshot extends _i1.Mock
   String get id =>
       (super.noSuchMethod(
             Invocation.getter(#id),
-            returnValue: _i8.dummyValue<String>(this, Invocation.getter(#id)),
+            returnValue: _i10.dummyValue<String>(this, Invocation.getter(#id)),
           )
           as String);
 
@@ -2090,7 +2280,7 @@ class MockDocumentSnapshot extends _i1.Mock
   _i4.SnapshotMetadata get metadata =>
       (super.noSuchMethod(
             Invocation.getter(#metadata),
-            returnValue: _FakeSnapshotMetadata_19(
+            returnValue: _FakeSnapshotMetadata_23(
               this,
               Invocation.getter(#metadata),
             ),

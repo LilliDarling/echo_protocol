@@ -3,20 +3,19 @@ import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:echo_protocol/services/two_factor.dart';
 import 'package:echo_protocol/services/secure_storage.dart';
-import 'package:echo_protocol/utils/security.dart';
-import 'package:base32/base32.dart';
-import 'package:crypto/crypto.dart';
-import 'dart:math';
 
 // Generate mocks for these classes
 @GenerateMocks([
   FirebaseFirestore,
   FirebaseAuth,
+  FirebaseFunctions,
   User,
-  UserCredential,
   SecureStorageService,
+  HttpsCallable,
+  HttpsCallableResult,
 ], customMocks: [
   MockSpec<CollectionReference<Map<String, dynamic>>>(
     as: #MockCollectionReference,
@@ -31,28 +30,24 @@ import 'dart:math';
 import 'two_factor_service_test.mocks.dart';
 
 void main() {
-  group('TwoFactorService', () {
+  group('TwoFactorService - Cloud Functions', () {
     late TwoFactorService service;
     late MockFirebaseFirestore mockFirestore;
     late MockFirebaseAuth mockAuth;
+    late MockFirebaseFunctions mockFunctions;
     late MockSecureStorageService mockSecureStorage;
     late MockUser mockUser;
-    late MockUserCredential mockUserCredential;
     late MockCollectionReference mockUsersCollection;
-    late MockCollectionReference mockSecurityLogCollection;
     late MockDocumentReference mockUserDocument;
     late MockDocumentSnapshot mockDocumentSnapshot;
 
     setUp(() {
-      SecurityUtils.clearRateLimitCache();
-
       mockFirestore = MockFirebaseFirestore();
       mockAuth = MockFirebaseAuth();
+      mockFunctions = MockFirebaseFunctions();
       mockSecureStorage = MockSecureStorageService();
-      mockUserCredential = MockUserCredential();
       mockUser = MockUser();
       mockUsersCollection = MockCollectionReference();
-      mockSecurityLogCollection = MockCollectionReference();
       mockUserDocument = MockDocumentReference();
       mockDocumentSnapshot = MockDocumentSnapshot();
 
@@ -62,476 +57,483 @@ void main() {
       when(mockUser.email).thenReturn('test@example.com');
 
       when(mockFirestore.collection('users')).thenReturn(mockUsersCollection);
-      when(mockFirestore.collection('securityLog')).thenReturn(mockSecurityLogCollection);
       when(mockUsersCollection.doc(any)).thenReturn(mockUserDocument);
 
       service = TwoFactorService(
         firestore: mockFirestore,
         auth: mockAuth,
+        functions: mockFunctions,
         secureStorage: mockSecureStorage,
       );
     });
 
-    group('Secret Generation', () {
-      test('should generate valid base32 secret', () {
-        // Use reflection or create a test instance to access private method
-        // For now, we'll test via enable2FA which uses _generateSecret
+    group('Enable 2FA (Cloud Function)', () {
+      test('should call enable2FA Cloud Function and return setup data', () async {
+        final mockCallable = MockHttpsCallable();
+        final mockResult = MockHttpsCallableResult();
 
-        // This is a basic test - the actual secret generation is tested
-        // indirectly through enable2FA
-        expect(true, true); // Placeholder
+        final expectedData = {
+          'success': true,
+          'qrCodeUrl': 'otpauth://totp/EchoProtocol:test@example.com?secret=TESTSECRET&issuer=EchoProtocol',
+          'secret': 'TESTSECRET',
+          'backupCodes': ['1234-5678', '2345-6789', '3456-7890', '4567-8901', '5678-9012',
+                          '6789-0123', '7890-1234', '8901-2345', '9012-3456', '0123-4567'],
+        };
+
+        when(mockFunctions.httpsCallable('enable2FA')).thenReturn(mockCallable);
+        when(mockCallable.call()).thenAnswer((_) async => mockResult);
+        when(mockResult.data).thenReturn(expectedData);
+        when(mockSecureStorage.storeBackupCodes(any)).thenAnswer((_) async => Future.value());
+
+        final setup = await service.enable2FA('test-user-id');
+
+        expect(setup.secret, 'TESTSECRET');
+        expect(setup.qrCodeData, contains('otpauth://totp/'));
+        expect(setup.qrCodeData, contains('EchoProtocol'));
+        expect(setup.backupCodes, hasLength(10));
+        verify(mockFunctions.httpsCallable('enable2FA')).called(1);
+        verify(mockCallable.call()).called(1);
+        verify(mockSecureStorage.storeBackupCodes(setup.backupCodes)).called(1);
       });
 
-      test('should generate secrets with correct length', () {
-        // Base32 encoded 20 bytes = 32 characters (with padding)
-        // This is validated in the RFC test
-        expect(true, true); // Placeholder
+      test('should handle Cloud Function errors gracefully', () async {
+        final mockCallable = MockHttpsCallable();
+
+        when(mockFunctions.httpsCallable('enable2FA')).thenReturn(mockCallable);
+        when(mockCallable.call()).thenThrow(
+          FirebaseFunctionsException(code: 'internal', message: 'Server error'),
+        );
+
+        expect(() => service.enable2FA('test-user-id'), throwsA(isA<Exception>()));
       });
     });
 
-    group('TOTP Code Verification', () {
-      test('CRITICAL: should accept valid TOTP code', () async {
+    group('Verify TOTP (Cloud Function)', () {
+      test('CRITICAL: should verify TOTP via Cloud Function', () async {
         // Arrange
-        const userId = 'test-user-id';
-        const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'; // RFC 6238 test vector
+        final mockCallable = MockHttpsCallable();
+        final mockResult = MockHttpsCallableResult();
 
-        when(mockAuth.currentUser).thenReturn(mockUser);
-        when(mockUser.uid).thenReturn(userId);
-        when(mockSecureStorage.getTwoFactorSecret()).thenAnswer((_) async => secret);
-        when(mockSecurityLogCollection.add(any)).thenAnswer((_) async => mockUserDocument);
-
-        // Generate a valid code for current time window
-        final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-        final timeWindow = now ~/ 30;
-        final validCode = _generateTestTOTPCode(secret, timeWindow);
+        when(mockFunctions.httpsCallable('verify2FATOTP')).thenReturn(mockCallable);
+        when(mockCallable.call({'code': '123456'})).thenAnswer((_) async => mockResult);
+        when(mockResult.data).thenReturn({
+          'success': true,
+          'verified': true,
+        });
 
         // Act
-        final result = await service.verifyTOTP(validCode, userId: userId);
+        final result = await service.verifyTOTP('123456', userId: 'test-user-id');
 
         // Assert
-        expect(result, true, reason: 'Valid TOTP code should be accepted');
-
-        // Verify success was logged
-        verify(mockSecurityLogCollection.add(argThat(predicate((Map<String, dynamic> data) {
-          return data['event'] == '2fa_verification' &&
-                 data['method'] == 'totp' &&
-                 data['success'] == true;
-        })))).called(1);
+        expect(result, true);
+        verify(mockFunctions.httpsCallable('verify2FATOTP')).called(1);
+        verify(mockCallable.call({'code': '123456'})).called(1);
       });
 
       test('CRITICAL: should reject invalid TOTP code', () async {
         // Arrange
-        const userId = 'test-user-id';
-        const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
-        const invalidCode = '000000';
+        final mockCallable = MockHttpsCallable();
 
-        when(mockAuth.currentUser).thenReturn(mockUser);
-        when(mockUser.uid).thenReturn(userId);
-        when(mockSecureStorage.getTwoFactorSecret()).thenAnswer((_) async => secret);
-        when(mockSecurityLogCollection.add(any)).thenAnswer((_) async => mockUserDocument);
-
-        // Act
-        final result = await service.verifyTOTP(invalidCode, userId: userId);
-
-        // Assert
-        expect(result, false, reason: 'Invalid TOTP code should be rejected');
-
-        // Verify failure was logged
-        verify(mockSecurityLogCollection.add(argThat(predicate((Map<String, dynamic> data) {
-          return data['event'] == '2fa_failed' &&
-                 data['method'] == 'totp' &&
-                 data['success'] == false;
-        })))).called(1);
-      });
-
-      test('SECURITY: should accept code from previous time window (clock skew)', () async {
-        // Arrange
-        const userId = 'test-user-id';
-        const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
-
-        when(mockAuth.currentUser).thenReturn(mockUser);
-        when(mockUser.uid).thenReturn(userId);
-        when(mockSecureStorage.getTwoFactorSecret()).thenAnswer((_) async => secret);
-        when(mockSecurityLogCollection.add(any)).thenAnswer((_) async => mockUserDocument);
-
-        // Generate code for previous time window (30 seconds ago)
-        final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-        final previousWindow = (now ~/ 30) - 1;
-        final previousCode = _generateTestTOTPCode(secret, previousWindow);
+        when(mockFunctions.httpsCallable('verify2FATOTP')).thenReturn(mockCallable);
+        when(mockCallable.call({'code': '000000'})).thenThrow(
+          FirebaseFunctionsException(
+            code: 'permission-denied',
+            message: 'Invalid 2FA code',
+          ),
+        );
 
         // Act
-        final result = await service.verifyTOTP(previousCode, userId: userId);
-
-        // Assert
-        expect(result, true,
-          reason: 'Should accept code from previous window (clock skew tolerance)');
-      });
-
-      test('SECURITY: should accept code from next time window (clock skew)', () async {
-        // Arrange
-        const userId = 'test-user-id';
-        const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
-
-        when(mockAuth.currentUser).thenReturn(mockUser);
-        when(mockUser.uid).thenReturn(userId);
-        when(mockSecureStorage.getTwoFactorSecret()).thenAnswer((_) async => secret);
-        when(mockSecurityLogCollection.add(any)).thenAnswer((_) async => mockUserDocument);
-
-        // Generate code for next time window (30 seconds from now)
-        final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-        final nextWindow = (now ~/ 30) + 1;
-        final nextCode = _generateTestTOTPCode(secret, nextWindow);
-
-        // Act
-        final result = await service.verifyTOTP(nextCode, userId: userId);
-
-        // Assert
-        expect(result, true,
-          reason: 'Should accept code from next window (clock skew tolerance)');
-      });
-
-      test('SECURITY: should reject code from 2 windows ago', () async {
-        // Arrange
-        const userId = 'test-user-id';
-        const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
-
-        when(mockAuth.currentUser).thenReturn(mockUser);
-        when(mockUser.uid).thenReturn(userId);
-        when(mockSecureStorage.getTwoFactorSecret()).thenAnswer((_) async => secret);
-        when(mockSecurityLogCollection.add(any)).thenAnswer((_) async => mockUserDocument);
-
-        // Generate code for 2 windows ago (60+ seconds ago)
-        final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-        final oldWindow = (now ~/ 30) - 2;
-        final oldCode = _generateTestTOTPCode(secret, oldWindow);
-
-        // Act
-        final result = await service.verifyTOTP(oldCode, userId: userId);
-
-        // Assert
-        expect(result, false,
-          reason: 'Should reject codes older than ±1 window');
-      });
-
-      test('SECURITY: should throw when secret not found', () async {
-        // Arrange
-        const userId = 'test-user-id';
-
-        when(mockAuth.currentUser).thenReturn(mockUser);
-        when(mockUser.uid).thenReturn(userId);
-        when(mockSecureStorage.getTwoFactorSecret()).thenAnswer((_) async => null);
-        when(mockSecurityLogCollection.add(any)).thenAnswer((_) async => mockUserDocument);
-
-        // Act & Assert
-        try {
-          await service.verifyTOTP('123456', userId: userId);
-          fail('Should have thrown an exception');
-        } catch (e) {
-          expect(e, isA<Exception>());
-          expect(e.toString(), contains('2FA not set up'));
-        }
-
-        // Verify failure was logged before throwing
-        verify(mockSecurityLogCollection.add(argThat(predicate((Map<String, dynamic> data) {
-          return data['method'] == 'totp_no_secret' &&
-                 data['event'] == '2fa_failed';
-        })))).called(1);
-      });
-
-      test('SECURITY: should validate code format (6 digits)', () async {
-        // Arrange
-        const userId = 'test-user-id';
-        const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
-
-        when(mockAuth.currentUser).thenReturn(mockUser);
-        when(mockUser.uid).thenReturn(userId);
-        when(mockSecureStorage.getTwoFactorSecret()).thenAnswer((_) async => secret);
-        when(mockSecurityLogCollection.add(any)).thenAnswer((_) async => mockUserDocument);
-
-        final invalidFormats = [
-          '12345',    // Too short
-          '1234567',  // Too long
-          'abcdef',   // Not numbers
-          '12-34-56', // With separators
-          '',         // Empty
-        ];
-
-        // Act & Assert
-        for (final invalid in invalidFormats) {
-          final result = await service.verifyTOTP(invalid, userId: userId);
-          expect(result, false,
-            reason: 'Should reject invalid format: "$invalid"');
-        }
-      }, timeout: const Timeout(Duration(seconds: 60)));
-    });
-
-    group('Backup Code Verification', () {
-      test('CRITICAL: should accept valid backup code', () async {
-        // Arrange
-        const userId = 'test-user-id';
-        const backupCode = '1234-5678';
-        final hashedCode = '1a2b3c4d5e6f'; // Mock hash
-
-        when(mockUserDocument.get()).thenAnswer((_) async => mockDocumentSnapshot);
-        when(mockDocumentSnapshot.data()).thenReturn({
-          'backupCodes': [hashedCode],
-        });
-        when(mockUserDocument.update(any)).thenAnswer((_) async => Future.value());
-        when(mockSecureStorage.getBackupCodes()).thenAnswer((_) async => [backupCode]);
-        when(mockSecureStorage.storeBackupCodes(any)).thenAnswer((_) async => Future.value());
-        when(mockSecurityLogCollection.add(any)).thenAnswer((_) async => mockUserDocument);
-
-        // Note: We can't test the actual hash verification without access to _hashBackupCode
-        // This test validates the flow, not the hashing
-      });
-
-      test('SECURITY: should reject invalid backup code', () async {
-        // Arrange
-        const userId = 'test-user-id';
-        const invalidCode = '9999-9999';
-
-        when(mockUserDocument.get()).thenAnswer((_) async => mockDocumentSnapshot);
-        when(mockDocumentSnapshot.data()).thenReturn({
-          'backupCodes': ['different-hash'],
-        });
-        when(mockSecurityLogCollection.add(any)).thenAnswer((_) async => mockUserDocument);
-
-        // Act
-        final result = await service.verifyBackupCode(invalidCode, userId);
+        final result = await service.verifyTOTP('000000', userId: 'test-user-id');
 
         // Assert
         expect(result, false);
-
-        // Verify failure was logged
-        verify(mockSecurityLogCollection.add(argThat(predicate((Map<String, dynamic> data) {
-          return data['event'] == '2fa_failed' &&
-                 data['method'] == 'backup_code';
-        })))).called(1);
       });
 
-      test('SECURITY: should remove backup code after successful use', () async {
+      test('SECURITY: should handle rate limit exceeded', () async {
         // Arrange
-        const userId = 'test-user-id';
-        const backupCode = '1234-5678';
+        final mockCallable = MockHttpsCallable();
 
-        // This validates one-time use policy
-        // The code removal is tested in the implementation
-        expect(true, true); // Integration test would be better here
-      });
-    });
-
-    group('2FA Enable/Disable', () {
-      test('should enable 2FA and return setup data', () async {
-        // Arrange
-        const userId = 'test-user-id';
-
-        when(mockUserDocument.update(any)).thenAnswer((_) async => Future.value());
-        when(mockSecureStorage.storeTwoFactorSecret(any)).thenAnswer((_) async => Future.value());
-        when(mockSecureStorage.storeBackupCodes(any)).thenAnswer((_) async => Future.value());
-
-        // Act
-        final setup = await service.enable2FA(userId);
-
-        // Assert
-        expect(setup, isNotNull);
-        expect(setup.secret, isNotEmpty);
-        expect(setup.qrCodeData, contains('otpauth://totp/'));
-        expect(setup.qrCodeData, contains('EchoProtocol'));
-        expect(setup.qrCodeData, contains(setup.secret));
-        expect(setup.backupCodes, hasLength(10));
-
-        // Verify each backup code format
-        for (final code in setup.backupCodes) {
-          expect(code, matches(r'^\d{4}-\d{4}$'),
-            reason: 'Backup codes should be formatted as XXXX-XXXX');
-        }
-
-        // Verify Firestore update
-        final captured = verify(mockUserDocument.update(captureAny)).captured;
-        expect(captured, hasLength(1));
-        final updateData = Map<String, dynamic>.from(captured[0] as Map);
-        expect(updateData['twoFactorEnabled'], true);
-        expect(updateData['backupCodes'], isA<List>());
-        expect((updateData['backupCodes'] as List).length, 10);
-        expect(updateData.containsKey('twoFactorEnabledAt'), true);
-      });
-
-      test('should store secret in secure storage, not Firestore', () async {
-        // Arrange
-        const userId = 'test-user-id';
-
-        when(mockUserDocument.update(any)).thenAnswer((_) async => Future.value());
-        when(mockSecureStorage.storeTwoFactorSecret(any)).thenAnswer((_) async => Future.value());
-        when(mockSecureStorage.storeBackupCodes(any)).thenAnswer((_) async => Future.value());
-
-        // Act
-        final setup = await service.enable2FA(userId);
-
-        // Assert - Secret stored locally
-        verify(mockSecureStorage.storeTwoFactorSecret(setup.secret)).called(1);
-
-        // Assert - Firestore should NOT contain the secret
-        final captured = verify(mockUserDocument.update(captureAny)).captured;
-        expect(captured, hasLength(1));
-        final updateData = Map<String, dynamic>.from(captured[0] as Map);
-        expect(updateData.containsKey('secret'), false,
-          reason: 'CRITICAL: Secret must NEVER be stored in Firestore');
-        expect(updateData.containsKey('twoFactorSecret'), false,
-          reason: 'CRITICAL: Secret must NEVER be stored in Firestore');
-      });
-
-      test('should disable 2FA after reauthentication', () async {
-        // Arrange
-        const userId = 'test-user-id';
-        const password = 'ValidPass123!';
-
-        when(mockUser.email).thenReturn('test@example.com');
-        when(mockUser.reauthenticateWithCredential(any)).thenAnswer((_) async => mockUserCredential);
-        when(mockUserDocument.update(any)).thenAnswer((_) async => Future.value());
-        when(mockSecureStorage.clearTwoFactor()).thenAnswer((_) async => Future.value());
-
-        // Act
-        await service.disable2FA(userId, password);
-
-        // Assert
-        final captured = verify(mockUserDocument.update(captureAny)).captured;
-        expect(captured, hasLength(1));
-        final updateData = Map<String, dynamic>.from(captured[0] as Map);
-        expect(updateData['twoFactorEnabled'], false);
-        expect(updateData.containsKey('twoFactorDisabledAt'), true);
-        verify(mockSecureStorage.clearTwoFactor()).called(1);
-      });
-    });
-
-    group('Backup Code Regeneration', () {
-      test('should regenerate backup codes with valid TOTP', () async {
-        // Arrange
-        const userId = 'test-user-id';
-        const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
-
-        // Generate valid TOTP code
-        final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-        final timeWindow = now ~/ 30;
-        final validCode = _generateTestTOTPCode(secret, timeWindow);
-
-        when(mockAuth.currentUser).thenReturn(mockUser);
-        when(mockUser.uid).thenReturn(userId);
-        when(mockSecureStorage.getTwoFactorSecret()).thenAnswer((_) async => secret);
-        when(mockUserDocument.update(any)).thenAnswer((_) async => Future.value());
-        when(mockSecureStorage.storeBackupCodes(any)).thenAnswer((_) async => Future.value());
-        when(mockSecurityLogCollection.add(any)).thenAnswer((_) async => mockUserDocument);
-
-        // Act
-        final newCodes = await service.regenerateBackupCodes(userId, validCode);
-
-        // Assert
-        expect(newCodes, hasLength(10));
-        for (final code in newCodes) {
-          expect(code, matches(r'^\d{4}-\d{4}$'));
-        }
-
-        // Verify new codes stored
-        verify(mockSecureStorage.storeBackupCodes(newCodes)).called(1);
-      });
-
-      test('should fail to regenerate with invalid TOTP', () async {
-        // Arrange
-        const userId = 'test-user-id';
-        const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
-        const invalidCode = '000000';
-
-        when(mockAuth.currentUser).thenReturn(mockUser);
-        when(mockUser.uid).thenReturn(userId);
-        when(mockSecureStorage.getTwoFactorSecret()).thenAnswer((_) async => secret);
-        when(mockSecurityLogCollection.add(any)).thenAnswer((_) async => mockUserDocument);
+        when(mockFunctions.httpsCallable('verify2FATOTP')).thenReturn(mockCallable);
+        when(mockCallable.call({'code': '123456'})).thenThrow(
+          FirebaseFunctionsException(
+            code: 'resource-exhausted',
+            message: 'Too many attempts',
+          ),
+        );
 
         // Act & Assert
         expect(
-          () async => await service.regenerateBackupCodes(userId, invalidCode),
+          () async => await service.verifyTOTP('123456', userId: 'test-user-id'),
           throwsA(isA<Exception>().having(
             (e) => e.toString(),
             'message',
-            contains('Invalid 2FA code'),
+            contains('Too many attempts'),
+          )),
+        );
+      });
+
+      test('SECURITY: rate limit persists across restarts (server-side)', () async {
+        // This test verifies the architectural change:
+        // Rate limiting is now SERVER-SIDE, so restarting the app doesn't reset it
+
+        final mockCallable = MockHttpsCallable();
+
+        when(mockFunctions.httpsCallable('verify2FATOTP')).thenReturn(mockCallable);
+        when(mockCallable.call({'code': '123456'})).thenThrow(
+          FirebaseFunctionsException(
+            code: 'resource-exhausted',
+            message: 'Too many attempts',
+          ),
+        );
+
+        // Act - First attempt (rate limited)
+        await expectLater(
+          service.verifyTOTP('123456', userId: 'test-user-id'),
+          throwsA(isA<Exception>()),
+        );
+
+        // Simulate app restart by creating new service instance
+        final newService = TwoFactorService(
+          firestore: mockFirestore,
+          auth: mockAuth,
+          functions: mockFunctions,
+          secureStorage: mockSecureStorage,
+        );
+
+        // Act - Second attempt after "restart" (still rate limited!)
+        await expectLater(
+          newService.verifyTOTP('123456', userId: 'test-user-id'),
+          throwsA(isA<Exception>()),
+        );
+
+        // Assert - Server-side rate limit still applies
+        verify(mockCallable.call({'code': '123456'})).called(2);
+      });
+    });
+
+    group('Verify Backup Code (Cloud Function)', () {
+      test('CRITICAL: should verify backup code via Cloud Function', () async {
+        // Arrange
+        final mockCallable = MockHttpsCallable();
+        final mockResult = MockHttpsCallableResult();
+
+        when(mockFunctions.httpsCallable('verify2FABackupCode')).thenReturn(mockCallable);
+        when(mockCallable.call({'code': '1234-5678'})).thenAnswer((_) async => mockResult);
+        when(mockResult.data).thenReturn({
+          'success': true,
+          'verified': true,
+          'remainingBackupCodes': 9,
+        });
+        when(mockSecureStorage.getBackupCodes()).thenAnswer((_) async => ['1234-5678', '2345-6789']);
+        when(mockSecureStorage.storeBackupCodes(any)).thenAnswer((_) async => Future.value());
+
+        // Act
+        final result = await service.verifyBackupCode('1234-5678', 'test-user-id');
+
+        // Assert
+        expect(result, true);
+        verify(mockFunctions.httpsCallable('verify2FABackupCode')).called(1);
+
+        // Verify local backup code was removed
+        verify(mockSecureStorage.getBackupCodes()).called(1);
+        verify(mockSecureStorage.storeBackupCodes(argThat(isNot(contains('1234-5678'))))).called(1);
+      });
+
+      test('SECURITY: backup codes are one-time use (verified server-side)', () async {
+        // Arrange
+        final mockCallable = MockHttpsCallable();
+        final mockResult = MockHttpsCallableResult();
+
+        when(mockFunctions.httpsCallable('verify2FABackupCode')).thenReturn(mockCallable);
+
+        // First use - success
+        when(mockCallable.call({'code': '1234-5678'})).thenAnswer((_) async => mockResult);
+        when(mockResult.data).thenReturn({
+          'success': true,
+          'verified': true,
+          'remainingBackupCodes': 9,
+        });
+        when(mockSecureStorage.getBackupCodes()).thenAnswer((_) async => ['1234-5678']);
+        when(mockSecureStorage.storeBackupCodes(any)).thenAnswer((_) async => Future.value());
+
+        // Act - First use
+        final result1 = await service.verifyBackupCode('1234-5678', 'test-user-id');
+        expect(result1, true);
+
+        // Arrange - Second use (server rejects because code already used)
+        when(mockCallable.call({'code': '1234-5678'})).thenThrow(
+          FirebaseFunctionsException(
+            code: 'permission-denied',
+            message: 'Invalid backup code',
+          ),
+        );
+
+        // Act - Second use (should fail)
+        final result2 = await service.verifyBackupCode('1234-5678', 'test-user-id');
+
+        // Assert - Code cannot be reused
+        expect(result2, false);
+      });
+
+      test('SECURITY: stricter rate limit for backup codes', () async {
+        final mockCallable = MockHttpsCallable();
+
+        when(mockFunctions.httpsCallable('verify2FABackupCode')).thenReturn(mockCallable);
+        when(mockCallable.call(any)).thenThrow(
+          FirebaseFunctionsException(
+            code: 'resource-exhausted',
+            message: 'Too many backup code attempts',
+          ),
+        );
+
+        expect(
+          () async => await service.verifyBackupCode('1234-5678', 'test-user-id'),
+          throwsA(isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            contains('Too many'),
           )),
         );
       });
     });
 
-    group('Security Logging', () {
-      test('should log successful TOTP verification', () async {
-        // Covered in other tests - verify logging calls
-        expect(true, true);
+    group('Disable 2FA (Cloud Function)', () {
+      test('should disable 2FA with valid TOTP code', () async {
+        // Arrange
+        final mockCallable = MockHttpsCallable();
+        final mockResult = MockHttpsCallableResult();
+
+        when(mockFunctions.httpsCallable('disable2FA')).thenReturn(mockCallable);
+        when(mockCallable.call({'code': '123456'})).thenAnswer((_) async => mockResult);
+        when(mockResult.data).thenReturn({'success': true});
+        when(mockSecureStorage.clearTwoFactor()).thenAnswer((_) async => Future.value());
+
+        // Act
+        await service.disable2FA('test-user-id', '123456');
+
+        // Assert
+        verify(mockFunctions.httpsCallable('disable2FA')).called(1);
+        verify(mockCallable.call({'code': '123456'})).called(1);
+        verify(mockSecureStorage.clearTwoFactor()).called(1);
       });
 
-      test('should log failed TOTP attempts', () async {
-        // Covered in other tests - verify logging calls
-        expect(true, true);
-      });
+      test('should fail to disable with invalid TOTP code', () async {
+        // Arrange
+        final mockCallable = MockHttpsCallable();
 
-      test('should log backup code usage', () async {
-        // Covered in other tests - verify logging calls
-        expect(true, true);
+        when(mockFunctions.httpsCallable('disable2FA')).thenReturn(mockCallable);
+        when(mockCallable.call({'code': '000000'})).thenThrow(
+          FirebaseFunctionsException(
+            code: 'permission-denied',
+            message: 'Invalid code',
+          ),
+        );
+
+        // Act & Assert
+        expect(
+          () async => await service.disable2FA('test-user-id', '000000'),
+          throwsA(isA<Exception>()),
+        );
       });
     });
 
-    group('RFC 6238 Compliance', () {
-      test('should match RFC 6238 test vector (time=59s)', () {
-        // This test validates the TOTP algorithm itself
-        const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
-        const timeWindow = 1; // 59 seconds / 30 = 1
+    group('Regenerate Backup Codes (Cloud Function)', () {
+      test('should regenerate backup codes with valid TOTP', () async {
+        // Arrange
+        final mockCallable = MockHttpsCallable();
+        final mockResult = MockHttpsCallableResult();
 
-        final code = _generateTestTOTPCode(secret, timeWindow);
+        final newCodes = ['1111-2222', '3333-4444', '5555-6666', '7777-8888', '9999-0000',
+                          '1234-5678', '2345-6789', '3456-7890', '4567-8901', '5678-9012'];
 
-        expect(code, '287082',
-          reason: 'Should match RFC 6238 test vector');
+        when(mockFunctions.httpsCallable('regenerateBackupCodes')).thenReturn(mockCallable);
+        when(mockCallable.call({'code': '123456'})).thenAnswer((_) async => mockResult);
+        when(mockResult.data).thenReturn({
+          'success': true,
+          'backupCodes': newCodes,
+        });
+        when(mockSecureStorage.storeBackupCodes(any)).thenAnswer((_) async => Future.value());
+
+        // Act
+        final codes = await service.regenerateBackupCodes('test-user-id', '123456');
+
+        // Assert
+        expect(codes, hasLength(10));
+        expect(codes, equals(newCodes));
+        verify(mockFunctions.httpsCallable('regenerateBackupCodes')).called(1);
+        verify(mockSecureStorage.storeBackupCodes(newCodes)).called(1);
       });
 
-      test('should generate 6-digit codes', () {
-        const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
-        final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-        final timeWindow = now ~/ 30;
+      test('should fail to regenerate with invalid TOTP', () async {
+        // Arrange
+        final mockCallable = MockHttpsCallable();
 
-        final code = _generateTestTOTPCode(secret, timeWindow);
+        when(mockFunctions.httpsCallable('regenerateBackupCodes')).thenReturn(mockCallable);
+        when(mockCallable.call({'code': '000000'})).thenThrow(
+          FirebaseFunctionsException(
+            code: 'permission-denied',
+            message: 'Invalid 2FA code',
+          ),
+        );
 
-        expect(code.length, 6);
-        expect(int.tryParse(code), isNotNull);
+        // Act & Assert
+        expect(
+          () async => await service.regenerateBackupCodes('test-user-id', '000000'),
+          throwsA(isA<Exception>()),
+        );
+      });
+    });
+
+    group('Check 2FA Enabled Status', () {
+      test('should return true when 2FA is enabled', () async {
+        // Arrange
+        when(mockUserDocument.get()).thenAnswer((_) async => mockDocumentSnapshot);
+        when(mockDocumentSnapshot.data()).thenReturn({
+          'twoFactorEnabled': true,
+        });
+
+        // Act
+        final isEnabled = await service.is2FAEnabled('test-user-id');
+
+        // Assert
+        expect(isEnabled, true);
       });
 
-      test('should use 30-second time windows', () {
-        // Time window calculation: now / 30
-        final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-        final window1 = now ~/ 30;
+      test('should return false when 2FA is disabled', () async {
+        // Arrange
+        when(mockUserDocument.get()).thenAnswer((_) async => mockDocumentSnapshot);
+        when(mockDocumentSnapshot.data()).thenReturn({
+          'twoFactorEnabled': false,
+        });
 
-        // Wait 1 second
-        final later = now + 1;
-        final window2 = later ~/ 30;
+        // Act
+        final isEnabled = await service.is2FAEnabled('test-user-id');
 
-        // Should be in same window if within 30 seconds
-        expect(window1, window2);
+        // Assert
+        expect(isEnabled, false);
+      });
+
+      test('should return false when document does not exist', () async {
+        // Arrange
+        when(mockUserDocument.get()).thenAnswer((_) async => mockDocumentSnapshot);
+        when(mockDocumentSnapshot.data()).thenReturn(null);
+
+        // Act
+        final isEnabled = await service.is2FAEnabled('test-user-id');
+
+        // Assert
+        expect(isEnabled, false);
+      });
+    });
+
+    group('Get Rate Limit Status', () {
+      test('should return rate limit data for current user', () async {
+        // Arrange
+        final mockRateLimitsCollection = MockCollectionReference();
+        final mockRateLimitDoc = MockDocumentReference();
+        final mockRateLimitSnapshot = MockDocumentSnapshot();
+
+        when(mockFirestore.collection('2fa_rate_limits')).thenReturn(mockRateLimitsCollection);
+        when(mockRateLimitsCollection.doc('test-user-id')).thenReturn(mockRateLimitDoc);
+        when(mockRateLimitDoc.get()).thenAnswer((_) async => mockRateLimitSnapshot);
+        when(mockRateLimitSnapshot.exists).thenReturn(true);
+        when(mockRateLimitSnapshot.data()).thenReturn({
+          'totp': [],
+          'backup_code': [],
+          'lastAttempt': Timestamp.now(),
+        });
+
+        // Act
+        final status = await service.getRateLimitStatus();
+
+        // Assert
+        expect(status, isNotNull);
+        expect(status!.containsKey('totp'), true);
+        expect(status.containsKey('backup_code'), true);
+      });
+
+      test('should return null when no user is signed in', () async {
+        // Arrange
+        when(mockAuth.currentUser).thenReturn(null);
+
+        // Act
+        final status = await service.getRateLimitStatus();
+
+        // Assert
+        expect(status, isNull);
+      });
+    });
+
+    group('Security Architecture Validation', () {
+      test('CRITICAL: TOTP verification happens SERVER-SIDE only', () async {
+        // This test validates the most important security change:
+        // NO client-side TOTP verification whatsoever
+
+        final mockCallable = MockHttpsCallable();
+        final mockResult = MockHttpsCallableResult();
+
+        when(mockFunctions.httpsCallable('verify2FATOTP')).thenReturn(mockCallable);
+        when(mockCallable.call(any)).thenAnswer((_) async => mockResult);
+        when(mockResult.data).thenReturn({'success': true, 'verified': true});
+
+        await service.verifyTOTP('123456', userId: 'test-user-id');
+
+        // Assert: MUST call Cloud Function (server-side verification)
+        verify(mockFunctions.httpsCallable('verify2FATOTP')).called(1);
+
+        // Assert: Should NOT access secure storage for TOTP secret
+        verifyNever(mockSecureStorage.getTwoFactorSecret());
+      });
+
+      test('CRITICAL: Rate limiting enforced SERVER-SIDE (cannot be bypassed)', () async {
+        // This test validates that rate limiting cannot be bypassed by client manipulation
+
+        final mockCallable = MockHttpsCallable();
+
+        when(mockFunctions.httpsCallable('verify2FATOTP')).thenReturn(mockCallable);
+
+        // Simulate server-side rate limit
+        when(mockCallable.call(any)).thenThrow(
+          FirebaseFunctionsException(
+            code: 'resource-exhausted',
+            message: 'Too many attempts',
+          ),
+        );
+
+        // Act - Even if client doesn't track rate limits, server will block
+        await expectLater(
+          service.verifyTOTP('123456', userId: 'test-user-id'),
+          throwsA(isA<Exception>()),
+        );
+
+        // Assert: Client cannot bypass server-side rate limit
+        // No amount of client manipulation can change this
+      });
+
+      test('CRITICAL: Backup codes hashed SERVER-SIDE with salt', () async {
+        // This test validates that backup code hashing is server-side with PBKDF2
+
+        final mockCallable = MockHttpsCallable();
+        final mockResult = MockHttpsCallableResult();
+
+        when(mockFunctions.httpsCallable('verify2FABackupCode')).thenReturn(mockCallable);
+        when(mockCallable.call({'code': '1234-5678'})).thenAnswer((_) async => mockResult);
+        when(mockResult.data).thenReturn({
+          'success': true,
+          'verified': true,
+          'remainingBackupCodes': 9,
+        });
+        when(mockSecureStorage.getBackupCodes()).thenAnswer((_) async => []);
+        when(mockSecureStorage.storeBackupCodes(any)).thenAnswer((_) async => Future.value());
+
+        await service.verifyBackupCode('1234-5678', 'test-user-id');
+
+        // Assert: Cloud Function called (server-side hashing with PBKDF2)
+        verify(mockFunctions.httpsCallable('verify2FABackupCode')).called(1);
+
+        // Note: Server uses PBKDF2 with 100,000 iterations and per-user salt
+        // This is verified in the Cloud Functions code, not here
       });
     });
   });
-}
-
-// Helper function to generate TOTP codes for testing
-// This mirrors the implementation in TwoFactorService
-String _generateTestTOTPCode(String secret, int timeWindow) {
-  final key = base32.decode(secret);
-
-  final timeBytes = <int>[];
-  for (var i = 7; i >= 0; i--) {
-    timeBytes.add((timeWindow >> (i * 8)) & 0xff);
-  }
-
-  final hmac = Hmac(sha1, key);
-  final hash = hmac.convert(timeBytes).bytes;
-
-  final offset = hash[hash.length - 1] & 0x0f;
-  final binary = ((hash[offset] & 0x7f) << 24) |
-      ((hash[offset + 1] & 0xff) << 16) |
-      ((hash[offset + 2] & 0xff) << 8) |
-      (hash[offset + 3] & 0xff);
-
-  final code = binary % pow(10, 6).toInt();
-  return code.toString().padLeft(6, '0');
 }

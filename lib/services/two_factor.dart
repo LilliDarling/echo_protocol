@@ -1,263 +1,174 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:math';
-import 'dart:typed_data';
-import 'package:crypto/crypto.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:base32/base32.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'secure_storage.dart';
-import '../utils/security.dart';
+import 'logger.dart';
 
+/// Two-Factor Authentication Service (Server-Side via Cloud Functions)
 class TwoFactorService {
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
   final SecureStorageService _secureStorage;
-
-  static const int _totpWindowSeconds = 30;
-  static const int _totpDigits = 6;
+  final FirebaseFunctions _functions;
 
   TwoFactorService({
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
     SecureStorageService? secureStorage,
+    FirebaseFunctions? functions,
   })  : _db = firestore ?? FirebaseFirestore.instance,
         _auth = auth ?? FirebaseAuth.instance,
-        _secureStorage = secureStorage ?? SecureStorageService();
+        _secureStorage = secureStorage ?? SecureStorageService(),
+        _functions = functions ?? FirebaseFunctions.instance;
 
   Future<TwoFactorSetup> enable2FA(String userId) async {
-    final secret = _generateSecret();
+    try {
+      final callable = _functions.httpsCallable('enable2FA');
+      final result = await callable.call();
+      final data = result.data as Map<String, dynamic>;
 
-    final backupCodes = _generateBackupCodes(10);
+      final backupCodes = List<String>.from(data['backupCodes'] as List);
+      await _secureStorage.storeBackupCodes(backupCodes);
 
-    await _db.collection('users').doc(userId).update({
-      'twoFactorEnabled': true,
-      'backupCodes': backupCodes.map((code) => _hashBackupCode(code)).toList(),
-      'twoFactorEnabledAt': FieldValue.serverTimestamp(),
-    });
+      LoggerService.auth('2FA enabled via Cloud Function', userId: userId);
 
-    await _secureStorage.storeTwoFactorSecret(secret);
-    await _secureStorage.storeBackupCodes(backupCodes);
-
-    final user = _auth.currentUser;
-    final issuer = 'EchoProtocol';
-    final accountName = user?.email ?? userId;
-    final otpauthUrl = 'otpauth://totp/$issuer:$accountName?secret=$secret&issuer=$issuer';
-
-    return TwoFactorSetup(
-      secret: secret,
-      qrCodeData: otpauthUrl,
-      backupCodes: backupCodes,
-    );
+      return TwoFactorSetup(
+        secret: data['secret'] as String,
+        qrCodeData: data['qrCodeUrl'] as String,
+        backupCodes: backupCodes,
+      );
+    } on FirebaseFunctionsException catch (e) {
+      LoggerService.error('Failed to enable 2FA: ${e.code}');
+      throw _handleFunctionsException(e);
+    } catch (e) {
+      throw Exception('Failed to enable 2FA: $e');
+    }
   }
 
   Future<bool> verifyTOTP(String code, {String? userId}) async {
     userId ??= _auth.currentUser?.uid;
     if (userId == null) return false;
 
-    final rateLimitKey = 'totp_verify_$userId';
+    try {
+      final callable = _functions.httpsCallable('verify2FATOTP');
+      final result = await callable.call({'code': code});
+      final data = result.data as Map<String, dynamic>;
+      final verified = data['verified'] as bool? ?? false;
 
-    if (!SecurityUtils.checkRateLimit(
-      rateLimitKey,
-      5,
-      const Duration(minutes: 5),
-    )) {
-      await _logFailedAttempt(userId, 'totp_rate_limit');
-      throw Exception(
-        'Too many verification attempts. Please try again in 5 minutes.',
-      );
+      if (verified) {
+        LoggerService.auth('2FA TOTP verified', userId: userId);
+      }
+
+      return verified;
+    } on FirebaseFunctionsException catch (e) {
+      if (e.code == 'resource-exhausted') {
+        throw Exception(e.message ?? 'Too many attempts. Try again later.');
+      } else if (e.code == 'permission-denied') {
+        return false;
+      }
+      throw _handleFunctionsException(e);
     }
-
-    final secret = await _secureStorage.getTwoFactorSecret();
-    if (secret == null) {
-      await _logFailedAttempt(userId, 'totp_no_secret');
-      throw Exception('2FA not set up on this device. Please use a backup code or contact support.');
-    }
-
-    final isValid = _verifyTOTPCode(code, secret);
-
-    if (isValid) {
-      await _logVerification(userId, 'totp');
-    } else {
-      await _logFailedAttempt(userId, 'totp');
-
-      final failedAttempts = SecurityUtils.getFailedAttempts(
-        rateLimitKey,
-        const Duration(minutes: 5),
-      );
-      await Future.delayed(Duration(seconds: min(failedAttempts * 2, 10)));
-    }
-
-    return isValid;
   }
 
   Future<bool> verifyBackupCode(String code, String userId) async {
-    final rateLimitKey = 'backup_verify_$userId';
+    try {
+      final callable = _functions.httpsCallable('verify2FABackupCode');
+      final result = await callable.call({'code': code});
+      final data = result.data as Map<String, dynamic>;
+      final verified = data['verified'] as bool? ?? false;
+      final remaining = data['remainingBackupCodes'] as int? ?? 0;
 
-    if (!SecurityUtils.checkRateLimit(
-      rateLimitKey,
-      3,
-      const Duration(minutes: 5),
-    )) {
-      await _logFailedAttempt(userId, 'backup_code_rate_limit');
-      throw Exception(
-        'Too many backup code attempts. Please try again in 5 minutes.',
-      );
+      if (verified) {
+        final localCodes = await _secureStorage.getBackupCodes() ?? [];
+        localCodes.remove(code);
+        localCodes.removeWhere((c) => c.replaceAll('-', '') == code.replaceAll('-', ''));
+        await _secureStorage.storeBackupCodes(localCodes);
+        LoggerService.auth('2FA backup code verified ($remaining remaining)', userId: userId);
+      }
+
+      return verified;
+    } on FirebaseFunctionsException catch (e) {
+      if (e.code == 'resource-exhausted') {
+        throw Exception(e.message ?? 'Too many attempts. Try again later.');
+      } else if (e.code == 'permission-denied') {
+        return false;
+      }
+      throw _handleFunctionsException(e);
     }
-
-    final userDoc = await _db.collection('users').doc(userId).get();
-    final hashedCodes = (userDoc.data()?['backupCodes'] as List?)?.cast<String>() ?? [];
-
-    final hashedInput = _hashBackupCode(code);
-
-    if (hashedCodes.contains(hashedInput)) {
-      hashedCodes.remove(hashedInput);
-      await _db.collection('users').doc(userId).update({
-        'backupCodes': hashedCodes,
-      });
-
-      final localCodes = await _secureStorage.getBackupCodes() ?? [];
-      localCodes.remove(code);
-      await _secureStorage.storeBackupCodes(localCodes);
-
-      await _logVerification(userId, 'backup_code');
-
-      return true;
-    }
-
-    await _logFailedAttempt(userId, 'backup_code');
-
-    final failedAttempts = SecurityUtils.getFailedAttempts(
-      rateLimitKey,
-      const Duration(minutes: 5),
-    );
-    await Future.delayed(Duration(seconds: min(failedAttempts * 3, 15)));
-
-    return false;
   }
 
-  Future<void> disable2FA(String userId, String password) async {
-    final user = _auth.currentUser;
-    if (user?.email == null) throw Exception('User not authenticated');
-
-    final credential = EmailAuthProvider.credential(
-      email: user!.email!,
-      password: password,
-    );
-
-    await user.reauthenticateWithCredential(credential);
-
-    await _db.collection('users').doc(userId).update({
-      'twoFactorEnabled': false,
-      'backupCodes': FieldValue.delete(),
-      'twoFactorDisabledAt': FieldValue.serverTimestamp(),
-    });
-
-    await _secureStorage.clearTwoFactor();
-  }
-
-  Future<bool> is2FAEnabled(String userId) async {
-    final userDoc = await _db.collection('users').doc(userId).get();
-    return userDoc.data()?['twoFactorEnabled'] == true;
+  Future<void> disable2FA(String userId, String totpCode) async {
+    try {
+      final callable = _functions.httpsCallable('disable2FA');
+      await callable.call({'code': totpCode});
+      await _secureStorage.clearTwoFactor();
+      LoggerService.auth('2FA disabled', userId: userId);
+    } on FirebaseFunctionsException catch (e) {
+      throw _handleFunctionsException(e);
+    }
   }
 
   Future<List<String>> regenerateBackupCodes(String userId, String totpCode) async {
-    if (!await verifyTOTP(totpCode, userId: userId)) {
-      throw Exception('Invalid 2FA code');
+    try {
+      final callable = _functions.httpsCallable('regenerateBackupCodes');
+      final result = await callable.call({'code': totpCode});
+      final data = result.data as Map<String, dynamic>;
+      final backupCodes = List<String>.from(data['backupCodes'] as List);
+
+      await _secureStorage.storeBackupCodes(backupCodes);
+      LoggerService.auth('Backup codes regenerated', userId: userId);
+
+      return backupCodes;
+    } on FirebaseFunctionsException catch (e) {
+      throw _handleFunctionsException(e);
     }
-
-    final newCodes = _generateBackupCodes(10);
-
-    await _db.collection('users').doc(userId).update({
-      'backupCodes': newCodes.map((code) => _hashBackupCode(code)).toList(),
-      'backupCodesRegeneratedAt': FieldValue.serverTimestamp(),
-    });
-
-    await _secureStorage.storeBackupCodes(newCodes);
-
-    return newCodes;
   }
 
-  Future<void> _logVerification(String userId, String method) async {
-    await _db.collection('securityLog').add({
-      'userId': userId,
-      'event': '2fa_verification',
-      'method': method,
-      'timestamp': FieldValue.serverTimestamp(),
-      'success': true,
-    });
-  }
-
-  Future<void> _logFailedAttempt(String userId, String method) async {
-    await _db.collection('securityLog').add({
-      'userId': userId,
-      'event': '2fa_failed',
-      'method': method,
-      'timestamp': FieldValue.serverTimestamp(),
-      'success': false,
-    });
-  }
-
-  String _generateSecret() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(20, (_) => random.nextInt(256));
-    return base32.encode(Uint8List.fromList(bytes));
-  }
-
-  List<String> _generateBackupCodes(int count) {
-    final random = Random.secure();
-    final codes = <String>[];
-
-    for (var i = 0; i < count; i++) {
-      final code = List<int>.generate(8, (_) => random.nextInt(10)).join();
-      codes.add('${code.substring(0, 4)}-${code.substring(4, 8)}');
+  Future<bool> is2FAEnabled(String userId) async {
+    try {
+      final userDoc = await _db.collection('users').doc(userId).get();
+      return userDoc.data()?['twoFactorEnabled'] as bool? ?? false;
+    } catch (e) {
+      return false;
     }
-
-    return codes;
   }
 
-  String _hashBackupCode(String code) {
-    return sha256.convert(utf8.encode(code)).toString();
-  }
+  Future<Map<String, dynamic>?> getRateLimitStatus() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
 
-  bool _verifyTOTPCode(String code, String secret) {
-    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final timeWindow = now ~/ _totpWindowSeconds;
-
-    for (var i = -1; i <= 1; i++) {
-      final window = timeWindow + i;
-      final generatedCode = _generateTOTPCode(secret, window);
-
-      if (code == generatedCode) {
-        return true;
-      }
+    try {
+      final doc = await _db.collection('2fa_rate_limits').doc(user.uid).get();
+      return doc.exists ? doc.data() : null;
+    } catch (e) {
+      return null;
     }
-
-    return false;
   }
 
-  String _generateTOTPCode(String secret, int timeWindow) {
-    final key = base32.decode(secret);
-
-    final timeBytes = <int>[];
-    for (var i = 7; i >= 0; i--) {
-      timeBytes.add((timeWindow >> (i * 8)) & 0xff);
+  Exception _handleFunctionsException(FirebaseFunctionsException e) {
+    switch (e.code) {
+      case 'unauthenticated':
+        return Exception('You must be signed in to use 2FA');
+      case 'permission-denied':
+        return Exception('Invalid 2FA code');
+      case 'resource-exhausted':
+        return Exception('Too many attempts. Please try again later.');
+      case 'failed-precondition':
+        return Exception(e.message ?? '2FA is not properly configured');
+      case 'not-found':
+        return Exception('2FA secret not found. Please re-enable 2FA.');
+      case 'invalid-argument':
+        return Exception(e.message ?? 'Invalid input');
+      case 'internal':
+        return Exception('Server error. Please try again later.');
+      default:
+        return Exception(e.message ?? 'An error occurred');
     }
-
-    final hmac = Hmac(sha1, key);
-    final hash = hmac.convert(timeBytes).bytes;
-
-    final offset = hash[hash.length - 1] & 0x0f;
-    final binary = ((hash[offset] & 0x7f) << 24) |
-        ((hash[offset + 1] & 0xff) << 16) |
-        ((hash[offset + 2] & 0xff) << 8) |
-        (hash[offset + 3] & 0xff);
-
-    final code = binary % pow(10, _totpDigits).toInt();
-    return code.toString().padLeft(_totpDigits, '0');
   }
 }
 
+/// Result of 2FA setup (enable2FA)
 class TwoFactorSetup {
   final String secret;
   final String qrCodeData;
@@ -269,4 +180,3 @@ class TwoFactorSetup {
     required this.backupCodes,
   });
 }
-
