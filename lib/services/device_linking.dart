@@ -33,6 +33,25 @@ class DeviceLinkingService {
       throw Exception('No public key found on this device');
     }
 
+    final keyVersion = await _secureStorage.getCurrentKeyVersion();
+    if (keyVersion == null) {
+      throw Exception('No key version found on this device');
+    }
+
+    // Get archived key pairs for historical message decryption
+    final archivedVersions = await _secureStorage.getArchivedKeyVersions();
+    final archivedKeys = <String, dynamic>{};
+    for (final version in archivedVersions) {
+      final archivedPrivateKey = await _secureStorage.getArchivedPrivateKey(version);
+      final archivedPublicKey = await _secureStorage.getArchivedPublicKey(version);
+      if (archivedPrivateKey != null && archivedPublicKey != null) {
+        archivedKeys['v$version'] = {
+          'privateKey': archivedPrivateKey,
+          'publicKey': archivedPublicKey,
+        };
+      }
+    }
+
     // Using AES-256-GCM for authenticated encryption (prevents tampering)
     final key = encrypt.Key.fromBase64(sessionKey + '=' * (4 - sessionKey.length % 4));
     final iv = encrypt.IV.fromSecureRandom(16);
@@ -42,12 +61,20 @@ class DeviceLinkingService {
 
     final encryptedPrivateKey = encrypter.encrypt(privateKey, iv: iv);
 
+    // Encrypt archived keys bundle
+    final archivedKeysJson = jsonEncode(archivedKeys);
+    final encryptedArchivedKeys = archivedKeys.isEmpty
+        ? null
+        : encrypter.encrypt(archivedKeysJson, iv: iv);
+
     final expiresAt = DateTime.now().add(const Duration(minutes: 2));
     await _db.collection('deviceLinking').doc(linkToken).set({
       'userId': userId,
       'sessionKey': sessionKey,
       'encryptedPrivateKey': encryptedPrivateKey.base64,
       'publicKey': publicKey,
+      'keyVersion': keyVersion,
+      'encryptedArchivedKeys': encryptedArchivedKeys?.base64,
       'iv': iv.base64,
       'createdAt': FieldValue.serverTimestamp(),
       'expiresAt': Timestamp.fromDate(expiresAt),
@@ -114,6 +141,8 @@ class DeviceLinkingService {
       final sessionKey = linkData['sessionKey'] as String;
       final encryptedPrivateKey = linkData['encryptedPrivateKey'] as String;
       final publicKey = linkData['publicKey'] as String;
+      final keyVersion = linkData['keyVersion'] as int;
+      final encryptedArchivedKeys = linkData['encryptedArchivedKeys'] as String?;
       final ivBase64 = linkData['iv'] as String;
 
       // Decrypt private key using session key with AES-256-GCM
@@ -127,9 +156,39 @@ class DeviceLinkingService {
       final encrypted = encrypt.Encrypted.fromBase64(encryptedPrivateKey);
       final privateKey = encrypter.decrypt(encrypted, iv: iv);
 
+      // Store current key and version
       await _secureStorage.storePrivateKey(privateKey);
       await _secureStorage.storePublicKey(publicKey);
+      await _secureStorage.storeCurrentKeyVersion(keyVersion);
       await _secureStorage.storeUserId(userId);
+
+      // Decrypt and store archived keys for historical message access
+      if (encryptedArchivedKeys != null && encryptedArchivedKeys.isNotEmpty) {
+        try {
+          final encryptedArchived = encrypt.Encrypted.fromBase64(encryptedArchivedKeys);
+          final archivedKeysJson = encrypter.decrypt(encryptedArchived, iv: iv);
+          final archivedKeys = jsonDecode(archivedKeysJson) as Map<String, dynamic>;
+
+          for (final entry in archivedKeys.entries) {
+            final versionStr = entry.key.replaceFirst('v', '');
+            final version = int.tryParse(versionStr);
+            if (version != null) {
+              final keyData = entry.value as Map<String, dynamic>;
+              final archivedPrivateKey = keyData['privateKey'] as String;
+              final archivedPublicKey = keyData['publicKey'] as String;
+
+              await _secureStorage.storeArchivedKeyPair(
+                version: version,
+                publicKey: archivedPublicKey,
+                privateKey: archivedPrivateKey,
+              );
+            }
+          }
+        } catch (e) {
+          LoggerService.warning('Failed to restore archived keys during device linking');
+          // Continue anyway - current key is sufficient for new messages
+        }
+      }
 
       await _db.collection('deviceLinking').doc(linkToken).update({
         'used': true,

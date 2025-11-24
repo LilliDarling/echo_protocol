@@ -14,9 +14,6 @@ void main() {
     final timeWindow = 59 ~/ 30; // = 1
 
     final code = generateTOTPCode(secret, timeWindow);
-    print('Generated code: $code');
-    print('Expected code: 287082');
-
     expect(code, '287082');
   });
 
@@ -24,9 +21,6 @@ void main() {
     final random = Random.secure();
     final bytes = List<int>.generate(20, (_) => random.nextInt(256));
     final secret = base32.encode(Uint8List.fromList(bytes));
-
-    print('Generated secret: $secret');
-    print('Secret length: ${secret.length}');
 
     // Should be able to decode it
     final decoded = base32.decode(secret);
@@ -37,7 +31,6 @@ void main() {
     final timeWindow = now ~/ 30;
     final code = generateTOTPCode(secret, timeWindow);
 
-    print('Generated TOTP code: $code');
     expect(code.length, 6);
   });
 }

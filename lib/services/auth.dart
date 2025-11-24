@@ -110,12 +110,7 @@ class AuthService {
         userCredential = await _auth.signInWithPopup(googleProvider);
       } else {
         // Mobile/Desktop: Use google_sign_in package
-        final GoogleSignInAccount? googleUser = await GoogleSignIn.instance.authenticate();
-
-        if (googleUser == null) {
-          throw Exception('Google sign-in was cancelled');
-        }
-
+        final GoogleSignInAccount googleUser = await GoogleSignIn.instance.authenticate();
         final GoogleSignInAuthentication googleAuth = googleUser.authentication;
 
         if (googleAuth.idToken == null) {

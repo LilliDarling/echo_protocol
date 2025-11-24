@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/auth.dart';
 import '../auth/login.dart';
 import '../profile/profile_tab.dart';
+import '../messages/messages_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,7 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _tabs = [
-      _buildPlaceholderTab('Messages', Icons.message),
+      const MessagesTab(),
       _buildPlaceholderTab('Express', Icons.favorite),
       _buildPlaceholderTab('Plans', Icons.calendar_today),
       ProfileTab(),

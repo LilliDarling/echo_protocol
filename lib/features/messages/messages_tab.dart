@@ -1,0 +1,300 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../services/partner_service.dart';
+import 'partner_linking_screen.dart';
+import 'conversation_screen.dart';
+
+/// Main messages tab that shows either partner linking or conversation
+class MessagesTab extends StatefulWidget {
+  const MessagesTab({super.key});
+
+  @override
+  State<MessagesTab> createState() => _MessagesTabState();
+}
+
+class _MessagesTabState extends State<MessagesTab> {
+  final PartnerService _partnerService = PartnerService();
+
+  bool _isLoading = true;
+  PartnerInfo? _partner;
+  String? _conversationId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPartnerInfo();
+  }
+
+  Future<void> _loadPartnerInfo() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final partner = await _partnerService.getPartner();
+      final conversationId = await _partnerService.getConversationId();
+
+      if (partner != null) {
+        await _partnerService.initializePartnerEncryption();
+      }
+
+      if (mounted) {
+        setState(() {
+          _partner = partner;
+          _conversationId = conversationId;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _onPartnerLinked() {
+    _loadPartnerInfo();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    // No partner linked - show linking screen
+    if (_partner == null) {
+      return PartnerLinkingScreen(
+        onPartnerLinked: _onPartnerLinked,
+      );
+    }
+
+    // Partner linked - show conversation preview
+    return _ConversationPreview(
+      partner: _partner!,
+      conversationId: _conversationId!,
+    );
+  }
+}
+
+/// Widget showing the conversation preview with partner info
+class _ConversationPreview extends StatelessWidget {
+  final PartnerInfo partner;
+  final String conversationId;
+
+  const _ConversationPreview({
+    required this.partner,
+    required this.conversationId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('conversations')
+          .doc(conversationId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final conversationData = snapshot.data?.data() as Map<String, dynamic>?;
+        final lastMessage = conversationData?['lastMessage'] as String?;
+        final lastMessageAt = conversationData?['lastMessageAt'] as Timestamp?;
+        final unreadCounts =
+            conversationData?['unreadCount'] as Map<String, dynamic>?;
+        final myUnreadCount = unreadCounts?[currentUserId] as int? ?? 0;
+
+        return Column(
+          children: [
+            Expanded(
+              child: ListView(
+                children: [
+                  _buildConversationTile(
+                    context,
+                    lastMessage: lastMessage,
+                    lastMessageAt: lastMessageAt,
+                    unreadCount: myUnreadCount,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildConversationTile(
+    BuildContext context, {
+    String? lastMessage,
+    Timestamp? lastMessageAt,
+    int unreadCount = 0,
+  }) {
+    return Card(
+      margin: const EdgeInsets.all(16),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ConversationScreen(
+                partner: partner,
+                conversationId: conversationId,
+              ),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              // Partner avatar
+              Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: Colors.pink.shade100,
+                    backgroundImage: partner.avatar != null
+                        ? NetworkImage(partner.avatar!)
+                        : null,
+                    child: partner.avatar == null
+                        ? Text(
+                            partner.name.isNotEmpty
+                                ? partner.name[0].toUpperCase()
+                                : '?',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.pink.shade700,
+                            ),
+                          )
+                        : null,
+                  ),
+                  // Online indicator
+                  if (partner.isOnline)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 16),
+              // Partner name and last message
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            partner.name,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (lastMessageAt != null)
+                          Text(
+                            _formatTimestamp(lastMessageAt.toDate()),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            lastMessage ?? 'Start a conversation',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: lastMessage != null
+                                  ? Colors.grey.shade700
+                                  : Colors.grey.shade400,
+                              fontStyle: lastMessage == null
+                                  ? FontStyle.italic
+                                  : FontStyle.normal,
+                            ),
+                          ),
+                        ),
+                        if (unreadCount > 0) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).primaryColor,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              unreadCount > 99 ? '99+' : unreadCount.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right,
+                color: Colors.grey.shade400,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatTimestamp(DateTime timestamp) {
+    final now = DateTime.now();
+    final diff = now.difference(timestamp);
+
+    if (diff.inDays == 0) {
+      // Today - show time
+      final hour = timestamp.hour;
+      final minute = timestamp.minute.toString().padLeft(2, '0');
+      final period = hour >= 12 ? 'PM' : 'AM';
+      final hour12 = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+      return '$hour12:$minute $period';
+    } else if (diff.inDays == 1) {
+      return 'Yesterday';
+    } else if (diff.inDays < 7) {
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return days[timestamp.weekday - 1];
+    } else {
+      return '${timestamp.month}/${timestamp.day}';
+    }
+  }
+}
