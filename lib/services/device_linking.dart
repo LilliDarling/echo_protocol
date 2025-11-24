@@ -12,9 +12,6 @@ class DeviceLinkingService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final SecureStorageService _secureStorage = SecureStorageService();
 
-  /// Generate QR code data for device linking
-  /// This creates a temporary secure token that the new device will use
-  /// to authenticate and receive the encrypted private key
   Future<DeviceLinkData> generateLinkQRCode(String userId) async {
     final random = Random.secure();
     final tokenBytes = List<int>.generate(32, (_) => random.nextInt(256));
@@ -38,7 +35,6 @@ class DeviceLinkingService {
       throw Exception('No key version found on this device');
     }
 
-    // Get archived key pairs for historical message decryption
     final archivedVersions = await _secureStorage.getArchivedKeyVersions();
     final archivedKeys = <String, dynamic>{};
     for (final version in archivedVersions) {
@@ -52,7 +48,6 @@ class DeviceLinkingService {
       }
     }
 
-    // Using AES-256-GCM for authenticated encryption (prevents tampering)
     final key = encrypt.Key.fromBase64(sessionKey + '=' * (4 - sessionKey.length % 4));
     final iv = encrypt.IV.fromSecureRandom(16);
     final encrypter = encrypt.Encrypter(
@@ -61,7 +56,6 @@ class DeviceLinkingService {
 
     final encryptedPrivateKey = encrypter.encrypt(privateKey, iv: iv);
 
-    // Encrypt archived keys bundle
     final archivedKeysJson = jsonEncode(archivedKeys);
     final encryptedArchivedKeys = archivedKeys.isEmpty
         ? null
@@ -82,8 +76,6 @@ class DeviceLinkingService {
       'initiatingDeviceId': await _getDeviceId(),
     });
 
-    // QR code contains: linking token
-    // New device will use this to fetch encrypted key from Firestore
     final qrData = jsonEncode({
       'type': 'echo_protocol_device_link',
       'version': 1,
@@ -99,8 +91,6 @@ class DeviceLinkingService {
     );
   }
 
-  /// Link new device by scanning QR code
-  /// This retrieves and decrypts the private key from the linking session
   Future<bool> linkDeviceFromQRCode(String qrData) async {
     try {
       final data = jsonDecode(qrData) as Map<String, dynamic>;
@@ -145,8 +135,6 @@ class DeviceLinkingService {
       final encryptedArchivedKeys = linkData['encryptedArchivedKeys'] as String?;
       final ivBase64 = linkData['iv'] as String;
 
-      // Decrypt private key using session key with AES-256-GCM
-      // GCM mode provides authentication - will throw if data was tampered with
       final key = encrypt.Key.fromBase64(sessionKey + '=' * (4 - sessionKey.length % 4));
       final iv = encrypt.IV.fromBase64(ivBase64);
       final encrypter = encrypt.Encrypter(
@@ -156,13 +144,11 @@ class DeviceLinkingService {
       final encrypted = encrypt.Encrypted.fromBase64(encryptedPrivateKey);
       final privateKey = encrypter.decrypt(encrypted, iv: iv);
 
-      // Store current key and version
       await _secureStorage.storePrivateKey(privateKey);
       await _secureStorage.storePublicKey(publicKey);
       await _secureStorage.storeCurrentKeyVersion(keyVersion);
       await _secureStorage.storeUserId(userId);
 
-      // Decrypt and store archived keys for historical message access
       if (encryptedArchivedKeys != null && encryptedArchivedKeys.isNotEmpty) {
         try {
           final encryptedArchived = encrypt.Encrypted.fromBase64(encryptedArchivedKeys);
@@ -186,7 +172,6 @@ class DeviceLinkingService {
           }
         } catch (e) {
           LoggerService.warning('Failed to restore archived keys during device linking');
-          // Continue anyway - current key is sufficient for new messages
         }
       }
 
@@ -222,8 +207,6 @@ class DeviceLinkingService {
     }).toList();
   }
 
-  /// Remove a linked device
-  /// WARNING: If removed device was the only one with the key, messages become unreadable
   Future<void> removeLinkedDevice(String userId, String deviceId) async {
     final currentDeviceId = await _getDeviceId();
 
@@ -245,8 +228,6 @@ class DeviceLinkingService {
     await _logDeviceRemoval(userId, deviceId);
   }
 
-  // Private helper methods
-  
   Future<String> _getDeviceId() async {
     var deviceId = await _secureStorage.getDeviceId();
 

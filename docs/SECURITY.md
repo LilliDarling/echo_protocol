@@ -163,12 +163,14 @@ Firestore stores rotation metadata:
 - `publicKeyVersion`: Unix timestamp version
 - `publicKeyRotatedAt`: ISO 8601 timestamp
 - `publicKeyFingerprint`: New fingerprint
+- `keyHistory/{version}`: Archived public keys for decryption
 
 #### Impact
-⚠️ **WARNING**: Key rotation invalidates all existing encrypted conversations. Partners must:
-1. Re-verify fingerprints out-of-band
-2. Existing message history remains encrypted with old keys (unreadable)
+✅ **Backward Compatible**: Message history remains accessible:
+1. Old keys archived locally and in Firestore
+2. Existing messages decrypt using archived keys
 3. New messages use new keys
+4. Device linking transfers all key versions
 
 #### Security Benefits
 - Limits exposure window if keys were compromised
@@ -454,20 +456,32 @@ For maximum security without cloud backup:
 ```
 1. Open app on Device A (existing device with keys)
 2. Go to Settings → Link New Device
-3. Device A generates encrypted QR code containing private key
+3. Device A generates encrypted QR code containing private key + archived keys
 4. Open app on Device B (new device)
 5. Select "Link to Existing Account"
 6. Scan QR code with Device B
-7. Private key transferred directly device-to-device
-8. No cloud storage of private key
+7. All keys transferred directly device-to-device (encrypted with AES-256-GCM)
+8. No cloud storage of private keys
 ```
 
-**Security Benefits**:
-- ✅ Private key never stored in cloud
-- ✅ No password to remember/forget
-- ✅ Direct device-to-device transfer
-- ✅ Works offline
+**Security Features**:
+- ✅ Private keys never stored in cloud
+- ✅ All historical keys transferred (archived key pairs included)
+- ✅ AES-256-GCM authenticated encryption for transfer
+- ✅ 2-minute expiration window (configurable)
+- ✅ One-time use tokens (automatically invalidated)
+- ✅ Immediate Firestore cleanup after successful link
+- ✅ Session keys with 256-bit entropy
+- ✅ Strict Firestore security rules prevent unauthorized access
+- ✅ Key version tracking for backward compatibility
 - ⚠️ Requires physical access to both devices simultaneously
+
+**Access Control**:
+- Only authenticated users can read linking sessions
+- Users can only read their own sessions OR valid unused sessions
+- Self-linking is prevented (cannot link to your own session)
+- Expired or used sessions are inaccessible
+- Comprehensive field validation prevents malformed data
 
 **Note**: If you lose all devices with your private key, messages become unrecoverable. This is the trade-off for maximum security.
 
