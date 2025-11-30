@@ -143,6 +143,7 @@ class EchoMetadata {
   final String? fileUrl;
   final String? thumbnailUrl;
   final LinkPreview? linkPreview;
+  final bool isEncrypted;
 
   EchoMetadata({
     this.senderName,
@@ -150,6 +151,7 @@ class EchoMetadata {
     this.fileUrl,
     this.thumbnailUrl,
     this.linkPreview,
+    this.isEncrypted = false,
   });
 
   factory EchoMetadata.fromJson(Map<String, dynamic> json) {
@@ -161,6 +163,7 @@ class EchoMetadata {
       linkPreview: json['linkPreview'] != null
           ? LinkPreview.fromJson(json['linkPreview'] as Map<String, dynamic>)
           : null,
+      isEncrypted: json['isEncrypted'] as bool? ?? false,
     );
   }
 
@@ -171,6 +174,7 @@ class EchoMetadata {
       if (fileUrl != null) 'fileUrl': fileUrl,
       if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
       if (linkPreview != null) 'linkPreview': linkPreview!.toJson(),
+      'isEncrypted': isEncrypted,
     };
   }
 
@@ -180,6 +184,7 @@ class EchoMetadata {
     String? fileUrl,
     String? thumbnailUrl,
     LinkPreview? linkPreview,
+    bool? isEncrypted,
   }) {
     return EchoMetadata(
       senderName: senderName ?? this.senderName,
@@ -187,6 +192,7 @@ class EchoMetadata {
       fileUrl: fileUrl ?? this.fileUrl,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       linkPreview: linkPreview ?? this.linkPreview,
+      isEncrypted: isEncrypted ?? this.isEncrypted,
     );
   }
 

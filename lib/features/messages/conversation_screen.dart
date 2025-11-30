@@ -10,6 +10,7 @@ import '../../services/secure_storage.dart';
 import '../../services/message_encryption_helper.dart';
 import '../../services/message_rate_limiter.dart';
 import '../../services/replay_protection_service.dart';
+import '../../services/media_encryption_service.dart';
 import '../settings/fingerprint_verification.dart';
 import '../../widgets/message_bubble.dart';
 import '../../widgets/message_input.dart';
@@ -40,6 +41,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   late final MessageEncryptionHelper _encryptionHelper;
   late final MessageRateLimiter _rateLimiter;
   late final ReplayProtectionService _replayProtection;
+  MediaEncryptionService? _mediaEncryptionService;
 
   List<EchoModel> _messages = [];
   final Map<String, String> _decryptedContent = {};
@@ -88,6 +90,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
       replayProtection: _replayProtection,
       rateLimiter: _rateLimiter,
     );
+
+    // Create media encryption service for encrypted file uploads/downloads
+    _mediaEncryptionService = MediaEncryptionService(
+      encryptionService: _encryptionService,
+    );
+
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _subscribeToMessages() {
@@ -387,6 +398,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
             onSend: _sendMessage,
             isSending: _isSending,
             partnerId: widget.partner.id,
+            mediaEncryptionService: _mediaEncryptionService,
           ),
         ],
       ),
@@ -455,6 +467,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               decryptedContent: decryptedText,
               isMe: isMe,
               partnerName: widget.partner.name,
+              mediaEncryptionService: _mediaEncryptionService,
             ),
           ],
         );

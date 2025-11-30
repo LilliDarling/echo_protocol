@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/echo.dart';
+import '../services/media_encryption_service.dart';
 import 'message_status.dart';
 import 'media_message.dart';
 import 'link_preview_widget.dart';
@@ -10,6 +11,7 @@ class MessageBubble extends StatelessWidget {
   final String decryptedContent;
   final bool isMe;
   final String partnerName;
+  final MediaEncryptionService? mediaEncryptionService;
 
   const MessageBubble({
     super.key,
@@ -17,6 +19,7 @@ class MessageBubble extends StatelessWidget {
     required this.decryptedContent,
     required this.isMe,
     required this.partnerName,
+    this.mediaEncryptionService,
   });
 
   @override
@@ -75,6 +78,7 @@ class MessageBubble extends StatelessWidget {
             MediaMessage(
               message: message,
               isMe: isMe,
+              encryptionService: mediaEncryptionService,
             ),
             if (decryptedContent.isNotEmpty && decryptedContent != '[Media]')
               Padding(

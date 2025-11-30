@@ -3,18 +3,22 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/echo.dart';
 import '../services/media_upload_service.dart';
+import '../services/media_encryption_service.dart';
 
 /// Message input widget with text field and send button
+/// Supports encrypted media uploads when mediaEncryptionService is provided
 class MessageInput extends StatefulWidget {
   final Future<void> Function(String text, {EchoType type, EchoMetadata? metadata}) onSend;
   final bool isSending;
   final String partnerId;
+  final MediaEncryptionService? mediaEncryptionService;
 
   const MessageInput({
     super.key,
     required this.onSend,
     required this.isSending,
     required this.partnerId,
+    this.mediaEncryptionService,
   });
 
   @override
@@ -25,10 +29,31 @@ class _MessageInputState extends State<MessageInput> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   final ImagePicker _imagePicker = ImagePicker();
-  final MediaUploadService _uploadService = MediaUploadService();
+
+  late MediaUploadService _uploadService;
 
   bool _isUploading = false;
   bool get _hasText => _controller.text.trim().isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    _initUploadService();
+  }
+
+  @override
+  void didUpdateWidget(MessageInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.mediaEncryptionService != widget.mediaEncryptionService) {
+      _initUploadService();
+    }
+  }
+
+  void _initUploadService() {
+    _uploadService = MediaUploadService(
+      encryptionService: widget.mediaEncryptionService,
+    );
+  }
 
   @override
   void dispose() {
@@ -118,6 +143,7 @@ class _MessageInputState extends State<MessageInput> {
           fileUrl: result['fileUrl']!,
           thumbnailUrl: result['thumbnailUrl']!,
           fileName: result['fileName'],
+          isEncrypted: result['isEncrypted'] == 'true',
         );
 
         await widget.onSend(
@@ -192,6 +218,7 @@ class _MessageInputState extends State<MessageInput> {
           fileUrl: result['fileUrl']!,
           thumbnailUrl: result['thumbnailUrl'],
           fileName: result['fileName'],
+          isEncrypted: result['isEncrypted'] == 'true',
         );
 
         await widget.onSend(
