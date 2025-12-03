@@ -166,17 +166,22 @@ export const checkMessageRateLimit = onCall<MessageRateLimitRequest>(
       
               userAttempts.push(now);
               convAttempts.push(now);
-      
+
+              const expireAt = admin.firestore.Timestamp.fromMillis(
+                now.toMillis() + 2 * 60 * 60 * 1000
+              );
+
               transaction.set(
                 userRateLimitRef,
                 {
                   attempts: userAttempts,
                   lastAttempt: now,
                   userId: userId,
+                  expireAt: expireAt,
                 },
                 {merge: true}
               );
-      
+
               transaction.set(
                 convRateLimitRef,
                 {
@@ -185,6 +190,7 @@ export const checkMessageRateLimit = onCall<MessageRateLimitRequest>(
                   conversationId: conversationId,
                   userId: userId,
                   recipientId: recipientId,
+                  expireAt: expireAt,
                 },
                 {merge: true}
               );

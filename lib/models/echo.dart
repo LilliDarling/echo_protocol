@@ -13,6 +13,8 @@ class EchoModel {
   final int senderKeyVersion;
   final int recipientKeyVersion;
   final int sequenceNumber;
+  final String? validationToken;
+  final String? conversationId;
 
   EchoModel({
     required this.id,
@@ -26,6 +28,8 @@ class EchoModel {
     required this.senderKeyVersion,
     required this.recipientKeyVersion,
     required this.sequenceNumber,
+    this.validationToken,
+    this.conversationId,
   });
 
   factory EchoModel.fromJson(String id, Map<String, dynamic> json) {
@@ -41,6 +45,8 @@ class EchoModel {
       senderKeyVersion: json['senderKeyVersion'] as int? ?? 0,
       recipientKeyVersion: json['recipientKeyVersion'] as int? ?? 0,
       sequenceNumber: json['sequenceNumber'] as int? ?? 0,
+      validationToken: json['validationToken'] as String?,
+      conversationId: json['conversationId'] as String?,
     );
   }
 
@@ -61,6 +67,8 @@ class EchoModel {
       'senderKeyVersion': senderKeyVersion,
       'recipientKeyVersion': recipientKeyVersion,
       'sequenceNumber': sequenceNumber,
+      if (validationToken != null) 'validationToken': validationToken,
+      if (conversationId != null) 'conversationId': conversationId,
     };
   }
 
@@ -76,6 +84,8 @@ class EchoModel {
     int? senderKeyVersion,
     int? recipientKeyVersion,
     int? sequenceNumber,
+    String? validationToken,
+    String? conversationId,
   }) {
     return EchoModel(
       id: id ?? this.id,
@@ -89,6 +99,8 @@ class EchoModel {
       senderKeyVersion: senderKeyVersion ?? this.senderKeyVersion,
       recipientKeyVersion: recipientKeyVersion ?? this.recipientKeyVersion,
       sequenceNumber: sequenceNumber ?? this.sequenceNumber,
+      validationToken: validationToken ?? this.validationToken,
+      conversationId: conversationId ?? this.conversationId,
     );
   }
 

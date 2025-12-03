@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/echo.dart';
 import '../../services/partner_service.dart';
 import '../../services/encryption.dart';
@@ -93,8 +92,7 @@ class _ConversationScreenState extends State<ConversationScreen>
     _encryptionService = EncryptionService();
     _secureStorage = SecureStorageService();
     _rateLimiter = MessageRateLimiter();
-    final prefs = await SharedPreferences.getInstance();
-    _replayProtection = ReplayProtectionService(prefs);
+    _replayProtection = ReplayProtectionService(userId: _currentUserId);
 
     _contentCache = DecryptedContentCacheService(secureStorage: _secureStorage);
     await _contentCache.loadFromDisk();
@@ -374,22 +372,40 @@ class _ConversationScreenState extends State<ConversationScreen>
         senderId: _currentUserId,
       );
 
+      final messageId = _db.collection('messages').doc().id;
+      final timestamp = DateTime.now();
+      final sequenceNumber = encryptionResult['sequenceNumber'] as int;
+
+      final validationResult = await _replayProtection.validateMessageServerSide(
+        messageId: messageId,
+        conversationId: widget.conversationId,
+        recipientId: widget.partner.id,
+        sequenceNumber: sequenceNumber,
+        timestamp: timestamp,
+      );
+
+      if (!validationResult.valid) {
+        throw Exception(validationResult.error ?? 'Message validation failed');
+      }
+
       final message = EchoModel(
-        id: '',
+        id: messageId,
         senderId: _currentUserId,
         recipientId: widget.partner.id,
         content: encryptionResult['content'] as String,
-        timestamp: DateTime.now(),
+        timestamp: timestamp,
         type: type,
         status: EchoStatus.sent,
         metadata: metadata ?? EchoMetadata.empty(),
         senderKeyVersion: encryptionResult['senderKeyVersion'] as int,
         recipientKeyVersion: encryptionResult['recipientKeyVersion'] as int,
-        sequenceNumber: encryptionResult['sequenceNumber'] as int,
+        sequenceNumber: sequenceNumber,
+        validationToken: validationResult.token,
+        conversationId: widget.conversationId,
       );
 
-      final docRef = await _db.collection('messages').add(message.toJson());
-      _contentCache.put(docRef.id, text);
+      await _db.collection('messages').doc(messageId).set(message.toJson());
+      _contentCache.put(messageId, text);
 
       await _db.collection('conversations').doc(widget.conversationId).update({
         'lastMessage': _truncateForPreview(text),

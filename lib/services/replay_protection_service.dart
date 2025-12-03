@@ -1,24 +1,37 @@
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 class ReplayProtectionService {
-  static const String _sequencePrefix = 'msg_seq_';
-  static const String _noncePrefix = 'msg_nonce_';
   static const Duration _nonceExpiry = Duration(hours: 1);
+  static const Duration _clockSkewTolerance = Duration(minutes: 2);
 
-  final SharedPreferences _prefs;
+  final FirebaseFirestore _db;
+  final FirebaseFunctions _functions;
+  final String _userId;
 
-  ReplayProtectionService(this._prefs);
+  ReplayProtectionService({
+    required String userId,
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+  })  : _userId = userId,
+        _db = firestore ?? FirebaseFirestore.instance,
+        _functions = functions ?? FirebaseFunctions.instance;
 
   String _getConversationId(String userId1, String userId2) {
     final ids = [userId1, userId2]..sort();
     return ids.join('_');
   }
 
+  CollectionReference<Map<String, dynamic>> get _noncesCollection =>
+      _db.collection('users').doc(_userId).collection('seen_nonces');
+
+  CollectionReference<Map<String, dynamic>> get _sequencesCollection =>
+      _db.collection('users').doc(_userId).collection('message_sequences');
+
   Future<int> getLastSequenceNumber(String senderId, String recipientId) async {
     final conversationId = _getConversationId(senderId, recipientId);
-    final key = '$_sequencePrefix$conversationId';
-    return _prefs.getInt(key) ?? 0;
+    final doc = await _sequencesCollection.doc(conversationId).get();
+    return doc.data()?['lastSequence'] as int? ?? 0;
   }
 
   Future<void> updateSequenceNumber(
@@ -27,8 +40,10 @@ class ReplayProtectionService {
     int sequenceNumber,
   ) async {
     final conversationId = _getConversationId(senderId, recipientId);
-    final key = '$_sequencePrefix$conversationId';
-    await _prefs.setInt(key, sequenceNumber);
+    await _sequencesCollection.doc(conversationId).set({
+      'lastSequence': sequenceNumber,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   Future<bool> isNonceValid(
@@ -38,24 +53,28 @@ class ReplayProtectionService {
     final now = DateTime.now();
     final age = now.difference(timestamp);
 
-    if (age > _nonceExpiry || age.isNegative && age.abs() > const Duration(minutes: 2)) {
+    if (age > _nonceExpiry) {
+      return false;
+    }
+    if (age.isNegative && age.abs() > _clockSkewTolerance) {
       return false;
     }
 
-    final key = '$_noncePrefix$messageId';
-    final existingData = _prefs.getString(key);
+    return await _db.runTransaction<bool>((transaction) async {
+      final nonceRef = _noncesCollection.doc(messageId);
+      final nonceDoc = await transaction.get(nonceRef);
 
-    if (existingData != null) {
-      return false;
-    }
+      if (nonceDoc.exists) {
+        return false;
+      }
 
-    final nonceData = jsonEncode({
-      'timestamp': timestamp.toIso8601String(),
-      'stored': now.toIso8601String(),
+      transaction.set(nonceRef, {
+        'timestamp': Timestamp.fromDate(timestamp),
+        'storedAt': FieldValue.serverTimestamp(),
+      });
+
+      return true;
     });
-    await _prefs.setString(key, nonceData);
-
-    return true;
   }
 
   Future<bool> validateMessage({
@@ -65,54 +84,128 @@ class ReplayProtectionService {
     required int sequenceNumber,
     required DateTime timestamp,
   }) async {
-    final nonceValid = await isNonceValid(messageId, timestamp);
-    if (!nonceValid) {
-      return false;
-    }
-
-    final lastSeq = await getLastSequenceNumber(senderId, recipientId);
-
-    if (sequenceNumber <= lastSeq) {
-      return false;
-    }
-
-    await updateSequenceNumber(senderId, recipientId, sequenceNumber);
-    return true;
-  }
-
-  Future<void> cleanupExpiredNonces() async {
     final now = DateTime.now();
-    final keys = _prefs.getKeys();
+    final age = now.difference(timestamp);
 
-    for (final key in keys) {
-      if (key.startsWith(_noncePrefix)) {
-        final data = _prefs.getString(key);
-        if (data != null) {
-          try {
-            final json = jsonDecode(data) as Map<String, dynamic>;
-            final stored = DateTime.parse(json['stored'] as String);
-
-            if (now.difference(stored) > _nonceExpiry) {
-              await _prefs.remove(key);
-            }
-          } catch (e) {
-            await _prefs.remove(key);
-          }
-        }
-      }
+    if (age > _nonceExpiry) {
+      return false;
     }
+    if (age.isNegative && age.abs() > _clockSkewTolerance) {
+      return false;
+    }
+
+    final conversationId = _getConversationId(senderId, recipientId);
+
+    return await _db.runTransaction<bool>((transaction) async {
+      final nonceRef = _noncesCollection.doc(messageId);
+      final sequenceRef = _sequencesCollection.doc(conversationId);
+
+      final nonceDoc = await transaction.get(nonceRef);
+      final sequenceDoc = await transaction.get(sequenceRef);
+
+      if (nonceDoc.exists) {
+        return false;
+      }
+
+      final lastSeq = sequenceDoc.data()?['lastSequence'] as int? ?? 0;
+      if (sequenceNumber <= lastSeq) {
+        return false;
+      }
+
+      transaction.set(nonceRef, {
+        'timestamp': Timestamp.fromDate(timestamp),
+        'storedAt': FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(sequenceRef, {
+        'lastSequence': sequenceNumber,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      return true;
+    });
   }
 
   Future<int> getNextSequenceNumber(String senderId, String recipientId) async {
-    final lastSeq = await getLastSequenceNumber(senderId, recipientId);
-    final nextSeq = lastSeq + 1;
-    await updateSequenceNumber(senderId, recipientId, nextSeq);
-    return nextSeq;
+    final conversationId = _getConversationId(senderId, recipientId);
+
+    return await _db.runTransaction<int>((transaction) async {
+      final docRef = _sequencesCollection.doc(conversationId);
+      final doc = await transaction.get(docRef);
+
+      final lastSeq = doc.data()?['lastSequence'] as int? ?? 0;
+      final nextSeq = lastSeq + 1;
+
+      transaction.set(docRef, {
+        'lastSequence': nextSeq,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      return nextSeq;
+    });
+  }
+
+  Future<ServerValidationResult> validateMessageServerSide({
+    required String messageId,
+    required String conversationId,
+    required String recipientId,
+    required int sequenceNumber,
+    required DateTime timestamp,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('validateMessageSend');
+      final result = await callable.call({
+        'messageId': messageId,
+        'conversationId': conversationId,
+        'recipientId': recipientId,
+        'sequenceNumber': sequenceNumber,
+        'timestamp': timestamp.millisecondsSinceEpoch,
+      });
+
+      final data = result.data as Map<String, dynamic>;
+      return ServerValidationResult(
+        valid: data['valid'] as bool? ?? false,
+        token: data['token'] as String?,
+        error: data['error'] as String?,
+      );
+    } on FirebaseFunctionsException catch (e) {
+      return ServerValidationResult(
+        valid: false,
+        error: e.message ?? 'Validation failed',
+      );
+    }
   }
 
   Future<void> resetConversation(String senderId, String recipientId) async {
     final conversationId = _getConversationId(senderId, recipientId);
-    final key = '$_sequencePrefix$conversationId';
-    await _prefs.remove(key);
+    await _sequencesCollection.doc(conversationId).delete();
   }
+
+  Future<void> cleanupExpiredNonces() async {
+    final cutoff = DateTime.now().subtract(_nonceExpiry);
+    final expiredDocs = await _noncesCollection
+        .where('storedAt', isLessThan: Timestamp.fromDate(cutoff))
+        .limit(100)
+        .get();
+
+    if (expiredDocs.docs.isEmpty) return;
+
+    final batch = _db.batch();
+    for (final doc in expiredDocs.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+  }
+}
+
+class ServerValidationResult {
+  final bool valid;
+  final String? token;
+  final String? error;
+
+  ServerValidationResult({
+    required this.valid,
+    this.token,
+    this.error,
+  });
 }

@@ -30,3 +30,8 @@ export const BACKUP_CODE_CONFIG = {
   count: 10,
   pbkdf2Iterations: 100000,
 };
+
+export const REPLAY_PROTECTION = {
+  nonceExpiryHours: 1,
+  clockSkewToleranceMinutes: 2,
+};
