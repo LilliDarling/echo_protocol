@@ -145,10 +145,8 @@ class _ConversationScreenState extends State<ConversationScreen>
 
       for (final doc in snapshot.docs) {
         final message = EchoModel.fromFirestore(doc);
-        if (_isConversationMessage(message)) {
-          messages.add(message);
-          await _cacheDecryptedContent(message);
-        }
+        messages.add(message);
+        await _cacheDecryptedContent(message);
       }
 
       if (snapshot.docs.isNotEmpty) {
@@ -196,10 +194,8 @@ class _ConversationScreenState extends State<ConversationScreen>
 
       for (final doc in snapshot.docs) {
         final message = EchoModel.fromFirestore(doc);
-        if (_isConversationMessage(message)) {
-          olderMessages.add(message);
-          await _cacheDecryptedContent(message);
-        }
+        olderMessages.add(message);
+        await _cacheDecryptedContent(message);
       }
 
       if (snapshot.docs.isNotEmpty) {
@@ -247,8 +243,7 @@ class _ConversationScreenState extends State<ConversationScreen>
         for (final change in snapshot.docChanges) {
           if (change.type == DocumentChangeType.added) {
             final message = EchoModel.fromFirestore(change.doc);
-            if (_isConversationMessage(message) &&
-                !_messages.any((m) => m.id == message.id)) {
+            if (!_messages.any((m) => m.id == message.id)) {
               await _cacheDecryptedContent(message);
               if (mounted) {
                 setState(() => _messages = [..._messages, message]);
@@ -277,13 +272,6 @@ class _ConversationScreenState extends State<ConversationScreen>
     );
   }
 
-  bool _isConversationMessage(EchoModel message) {
-    return (message.senderId == _currentUserId &&
-            message.recipientId == widget.partner.id) ||
-        (message.senderId == widget.partner.id &&
-            message.recipientId == _currentUserId);
-  }
-
   Future<void> _cacheDecryptedContent(EchoModel message) async {
     if (!_contentCache.contains(message.id)) {
       try {
@@ -306,10 +294,12 @@ class _ConversationScreenState extends State<ConversationScreen>
   Future<void> _markMessagesAsDelivered() async {
     final undelivered = await _db
         .collection('messages')
-        .where('senderId', isEqualTo: widget.partner.id)
+        .where('conversationId', isEqualTo: widget.conversationId)
         .where('recipientId', isEqualTo: _currentUserId)
         .where('status', isEqualTo: 'sent')
         .get();
+
+    if (undelivered.docs.isEmpty) return;
 
     final batch = _db.batch();
     for (final doc in undelivered.docs) {
@@ -324,7 +314,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   Future<void> _markVisibleMessagesAsRead() async {
     final unread = await _db
         .collection('messages')
-        .where('senderId', isEqualTo: widget.partner.id)
+        .where('conversationId', isEqualTo: widget.conversationId)
         .where('recipientId', isEqualTo: _currentUserId)
         .where('status', whereIn: ['sent', 'delivered'])
         .get();
