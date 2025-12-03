@@ -1,6 +1,11 @@
 import 'dart:math';
+import 'package:cloud_functions/cloud_functions.dart';
 
 class MessageRateLimiter {
+  final FirebaseFunctions _functions;
+
+  MessageRateLimiter({FirebaseFunctions? functions})
+      : _functions = functions ?? FirebaseFunctions.instance;
   static const int _maxMessagesPerMinute = 30;
   static const int _maxMessagesPerHour = 500;
   static const int _maxConversationMessagesPerMinute = 20;
@@ -204,4 +209,50 @@ class MessageRateLimiter {
     final conversationKey = _getConversationKey(userId, partnerId);
     _conversationAttempts.remove(conversationKey);
   }
+
+  Future<MessageRateLimitResult> checkServerRateLimit({
+    required String conversationId,
+    required String recipientId,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('checkMessageRateLimit');
+      final result = await callable.call({
+        'conversationId': conversationId,
+        'recipientId': recipientId,
+      });
+
+      final data = result.data as Map<String, dynamic>;
+      return MessageRateLimitResult(
+        allowed: data['allowed'] as bool? ?? false,
+        retryAfterMs: data['retryAfterMs'] as int?,
+        remainingMinute: data['remainingMinute'] as int?,
+        remainingHour: data['remainingHour'] as int?,
+      );
+    } on FirebaseFunctionsException catch (e) {
+      if (e.code == 'resource-exhausted') {
+        return MessageRateLimitResult(
+          allowed: false,
+          retryAfterMs: 60000,
+        );
+      }
+      rethrow;
+    }
+  }
+}
+
+class MessageRateLimitResult {
+  final bool allowed;
+  final int? retryAfterMs;
+  final int? remainingMinute;
+  final int? remainingHour;
+
+  MessageRateLimitResult({
+    required this.allowed,
+    this.retryAfterMs,
+    this.remainingMinute,
+    this.remainingHour,
+  });
+
+  Duration get retryAfter =>
+      retryAfterMs != null ? Duration(milliseconds: retryAfterMs!) : Duration.zero;
 }

@@ -6,6 +6,12 @@ export const RATE_LIMITS = {
   TOTP: {maxAttempts: 5, windowMinutes: 5},
   BACKUP_CODE: {maxAttempts: 3, windowMinutes: 5},
   IP: {maxAttemptsPerIp: 50, windowMinutes: 60},
+  MESSAGE: {
+    maxPerMinute: 30,
+    maxPerHour: 500,
+    conversationMaxPerMinute: 20,
+    conversationMaxPerHour: 300,
+  },
 };
 
 export const ANOMALY_THRESHOLDS = {

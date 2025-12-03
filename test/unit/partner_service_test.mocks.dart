@@ -1648,6 +1648,32 @@ class MockSecureStorageService extends _i1.Mock
             returnValue: _i7.Future<int?>.value(),
           )
           as _i7.Future<int?>);
+
+  @override
+  _i7.Future<void> storeCacheKey(String? cacheKey) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeCacheKey, [cacheKey]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getCacheKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#getCacheKey, []),
+            returnValue: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<void> deleteCacheKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#deleteCacheKey, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
 }
 
 /// A class which mocks [Transaction].
@@ -1717,7 +1743,6 @@ class MockTransaction extends _i1.Mock implements _i6.Transaction {
 /// A class which mocks [CollectionReference].
 ///
 /// See the documentation for Mockito's code generation for more information.
-// ignore: must_be_immutable
 class MockCollectionReference extends _i1.Mock
     implements _i6.CollectionReference<Map<String, dynamic>> {
   MockCollectionReference() {
@@ -2144,7 +2169,6 @@ class MockCollectionReference extends _i1.Mock
 /// A class which mocks [DocumentReference].
 ///
 /// See the documentation for Mockito's code generation for more information.
-// ignore: must_be_immutable
 class MockDocumentReference extends _i1.Mock
     implements _i6.DocumentReference<Map<String, dynamic>> {
   MockDocumentReference() {
@@ -2439,7 +2463,6 @@ class MockQueryDocumentSnapshot extends _i1.Mock
 /// A class which mocks [Query].
 ///
 /// See the documentation for Mockito's code generation for more information.
-// ignore: must_be_immutable
 class MockQuery extends _i1.Mock implements _i6.Query<Map<String, dynamic>> {
   MockQuery() {
     _i1.throwOnMissingStub(this);

@@ -1,12 +1,19 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/annotations.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:echo_protocol/services/message_rate_limiter.dart';
+
+@GenerateMocks([FirebaseFunctions])
+import 'message_rate_limiter_test.mocks.dart';
 
 void main() {
   group('MessageRateLimiter', () {
     late MessageRateLimiter rateLimiter;
+    late MockFirebaseFunctions mockFunctions;
 
     setUp(() {
-      rateLimiter = MessageRateLimiter();
+      mockFunctions = MockFirebaseFunctions();
+      rateLimiter = MessageRateLimiter(functions: mockFunctions);
     });
 
     tearDown(() {

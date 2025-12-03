@@ -356,6 +356,18 @@ class _ConversationScreenState extends State<ConversationScreen>
     });
 
     try {
+      final rateLimitResult = await _rateLimiter.checkServerRateLimit(
+        conversationId: widget.conversationId,
+        recipientId: widget.partner.id,
+      );
+
+      if (!rateLimitResult.allowed) {
+        final retrySeconds = (rateLimitResult.retryAfter.inSeconds);
+        throw Exception(
+          'Message rate limit exceeded. Please wait ${retrySeconds > 60 ? '${(retrySeconds / 60).ceil()} minutes' : '$retrySeconds seconds'}.',
+        );
+      }
+
       final encryptionResult = await _encryptionHelper.encryptMessage(
         plaintext: text,
         partnerId: widget.partner.id,
