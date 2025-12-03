@@ -174,4 +174,18 @@ class SecureStorageService {
     final versionStr = await _storage.read(key: 'current_key_version');
     return versionStr != null ? int.tryParse(versionStr) : null;
   }
+
+  static const String _cacheKeyKey = 'decrypted_content_cache_key';
+
+  Future<void> storeCacheKey(String cacheKey) async {
+    await _storage.write(key: _cacheKeyKey, value: cacheKey);
+  }
+
+  Future<String?> getCacheKey() async {
+    return await _storage.read(key: _cacheKeyKey);
+  }
+
+  Future<void> deleteCacheKey() async {
+    await _storage.delete(key: _cacheKeyKey);
+  }
 }

@@ -1,6 +1,8 @@
+import 'dart:math';
 import 'dart:typed_data';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:pointycastle/export.dart';
 
 /// Security utilities for Echo Protocol
 /// Provides constant-time operations and additional security hardening
@@ -218,6 +220,28 @@ class SecurityUtils {
   static void clearRateLimitCache() {
     _rateLimitCache.clear();
     _lastCleanup = null;
+  }
+
+  static SecureRandom getSecureRandom() {
+    final secureRandom = FortunaRandom();
+    final random = Random.secure();
+
+    final seeds = <int>[];
+    for (int i = 0; i < 24; i++) {
+      seeds.add(random.nextInt(256));
+    }
+
+    final timestamp = DateTime.now().microsecondsSinceEpoch;
+    final timestampBytes = ByteData(8)..setInt64(0, timestamp, Endian.big);
+    seeds.addAll(timestampBytes.buffer.asUint8List());
+
+    secureRandom.seed(KeyParameter(Uint8List.fromList(seeds)));
+    return secureRandom;
+  }
+
+  static Uint8List generateSecureRandomBytes(int length) {
+    final secureRandom = getSecureRandom();
+    return secureRandom.nextBytes(length);
   }
 
   static void validateEncryptionParams({

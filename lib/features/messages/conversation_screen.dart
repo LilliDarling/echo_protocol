@@ -11,6 +11,7 @@ import '../../services/message_encryption_helper.dart';
 import '../../services/message_rate_limiter.dart';
 import '../../services/replay_protection_service.dart';
 import '../../services/media_encryption_service.dart';
+import '../../services/decrypted_content_cache.dart';
 import '../settings/fingerprint_verification.dart';
 import '../../widgets/message_bubble.dart';
 import '../../widgets/message_input.dart';
@@ -31,7 +32,8 @@ class ConversationScreen extends StatefulWidget {
   State<ConversationScreen> createState() => _ConversationScreenState();
 }
 
-class _ConversationScreenState extends State<ConversationScreen> {
+class _ConversationScreenState extends State<ConversationScreen>
+    with WidgetsBindingObserver {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final ScrollController _scrollController = ScrollController();
@@ -42,9 +44,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
   late final MessageRateLimiter _rateLimiter;
   late final ReplayProtectionService _replayProtection;
   MediaEncryptionService? _mediaEncryptionService;
+  late final DecryptedContentCacheService _contentCache;
 
   List<EchoModel> _messages = [];
-  final Map<String, String> _decryptedContent = {};
   StreamSubscription? _messagesSubscription;
   bool _isLoading = true;
   bool _isSending = false;
@@ -55,6 +57,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeServices();
     _subscribeToMessages();
     _markMessagesAsDelivered();
@@ -62,9 +65,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _messagesSubscription?.cancel();
     _scrollController.dispose();
+    _contentCache.saveToDisk();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _contentCache.saveToDisk();
+    }
   }
 
   Future<void> _initializeServices() async {
@@ -74,7 +87,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
     final prefs = await SharedPreferences.getInstance();
     _replayProtection = ReplayProtectionService(prefs);
 
-    // Load user's private key
+    _contentCache = DecryptedContentCacheService(secureStorage: _secureStorage);
+    await _contentCache.loadFromDisk();
+
     final privateKey = await _secureStorage.getPrivateKey();
     if (privateKey != null) {
       final keyVersion = await _secureStorage.getCurrentKeyVersion();
@@ -118,13 +133,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
               (message.senderId == widget.partner.id &&
                   message.recipientId == _currentUserId)) {
             messages.add(message);
-            // Decrypt if not already cached
-            if (!_decryptedContent.containsKey(message.id)) {
+            if (!_contentCache.contains(message.id)) {
               try {
                 final decrypted = await _decryptMessage(message);
-                _decryptedContent[message.id] = decrypted;
+                _contentCache.put(message.id, decrypted);
               } catch (e) {
-                _decryptedContent[message.id] = '[Unable to decrypt message]';
+                _contentCache.put(message.id, '[Unable to decrypt message]');
               }
             }
           }
@@ -250,7 +264,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       final docRef = await _db.collection('messages').add(message.toJson());
 
       // Cache the decrypted content
-      _decryptedContent[docRef.id] = text;
+      _contentCache.put(docRef.id, text);
 
       // Update conversation
       await _db.collection('conversations').doc(widget.conversationId).update({
@@ -450,7 +464,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       itemBuilder: (context, index) {
         final message = _messages[index];
         final isMe = message.senderId == _currentUserId;
-        final decryptedText = _decryptedContent[message.id] ?? '...';
+        final decryptedText = _contentCache.get(message.id) ?? '...';
 
         // Check if we need a date separator
         Widget? dateSeparator;
