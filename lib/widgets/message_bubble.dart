@@ -5,13 +5,13 @@ import 'message_status.dart';
 import 'media_message.dart';
 import 'link_preview_widget.dart';
 
-/// Widget displaying a single message bubble
 class MessageBubble extends StatelessWidget {
   final EchoModel message;
   final String decryptedContent;
   final bool isMe;
   final String partnerName;
   final MediaEncryptionService? mediaEncryptionService;
+  final VoidCallback? onRetry;
 
   const MessageBubble({
     super.key,
@@ -20,12 +20,62 @@ class MessageBubble extends StatelessWidget {
     required this.isMe,
     required this.partnerName,
     this.mediaEncryptionService,
+    this.onRetry,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isFailed = message.status.isFailed;
+
+    Widget bubble = Container(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.75,
+      ),
+      decoration: BoxDecoration(
+        color: isMe
+            ? (isFailed ? Colors.red.shade700 : theme.primaryColor)
+            : (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(16),
+          topRight: const Radius.circular(16),
+          bottomLeft: Radius.circular(isMe ? 16 : 4),
+          bottomRight: Radius.circular(isMe ? 4 : 16),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(16),
+          topRight: const Radius.circular(16),
+          bottomLeft: Radius.circular(isMe ? 16 : 4),
+          bottomRight: Radius.circular(isMe ? 4 : 16),
+        ),
+        child: _buildContent(context),
+      ),
+    );
+
+    if (isFailed && onRetry != null) {
+      bubble = GestureDetector(
+        onTap: onRetry,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            bubble,
+            Padding(
+              padding: const EdgeInsets.only(top: 4, right: 4),
+              child: Text(
+                'Tap to retry',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.red.shade400,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Padding(
       padding: EdgeInsets.only(
@@ -36,31 +86,7 @@ class MessageBubble extends StatelessWidget {
       ),
       child: Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.75,
-          ),
-          decoration: BoxDecoration(
-            color: isMe
-                ? theme.primaryColor
-                : (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(16),
-              topRight: const Radius.circular(16),
-              bottomLeft: Radius.circular(isMe ? 16 : 4),
-              bottomRight: Radius.circular(isMe ? 4 : 16),
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(16),
-              topRight: const Radius.circular(16),
-              bottomLeft: Radius.circular(isMe ? 16 : 4),
-              bottomRight: Radius.circular(isMe ? 4 : 16),
-            ),
-            child: _buildContent(context),
-          ),
-        ),
+        child: bubble,
       ),
     );
   }

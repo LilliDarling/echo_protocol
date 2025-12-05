@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Echo model for messages between partners
 class EchoModel {
   final String id;
   final String senderId;
@@ -104,12 +103,10 @@ class EchoModel {
     );
   }
 
-  /// Mark echo as delivered
   EchoModel markAsDelivered() {
     return copyWith(status: EchoStatus.delivered);
   }
 
-  /// Mark echo as read
   EchoModel markAsRead() {
     return copyWith(status: EchoStatus.read);
   }
@@ -134,6 +131,8 @@ enum EchoType {
 }
 
 enum EchoStatus {
+  pending('pending'),
+  failed('failed'),
   sent('sent'),
   delivered('delivered'),
   read('read');
@@ -147,6 +146,9 @@ enum EchoStatus {
       orElse: () => EchoStatus.sent,
     );
   }
+
+  bool get isPending => this == EchoStatus.pending;
+  bool get isFailed => this == EchoStatus.failed;
 }
 
 class EchoMetadata {

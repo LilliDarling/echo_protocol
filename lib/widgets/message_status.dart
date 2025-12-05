@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/echo.dart';
 
-/// Widget displaying message delivery status (sent, delivered, read)
 class MessageStatus extends StatelessWidget {
   final EchoStatus status;
 
@@ -13,6 +12,23 @@ class MessageStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     switch (status) {
+      case EchoStatus.pending:
+        return const SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Colors.white70,
+          ),
+        );
+
+      case EchoStatus.failed:
+        return const Icon(
+          Icons.error_outline,
+          size: 14,
+          color: Colors.redAccent,
+        );
+
       case EchoStatus.sent:
         return const Icon(
           Icons.check,
@@ -33,7 +49,6 @@ class MessageStatus extends StatelessWidget {
   }
 }
 
-/// Double check mark widget for delivered/read status
 class _DoubleCheck extends StatelessWidget {
   final Color color;
 

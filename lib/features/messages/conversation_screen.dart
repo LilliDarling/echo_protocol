@@ -12,6 +12,7 @@ import '../../services/replay_protection_service.dart';
 import '../../services/media_encryption_service.dart';
 import '../../services/decrypted_content_cache.dart';
 import '../../services/read_receipt_service.dart';
+import '../../services/offline_queue_service.dart';
 import '../settings/fingerprint_verification.dart';
 import '../../widgets/message_bubble.dart';
 import '../../widgets/message_input.dart';
@@ -45,10 +46,12 @@ class _ConversationScreenState extends State<ConversationScreen>
   MediaEncryptionService? _mediaEncryptionService;
   late final DecryptedContentCacheService _contentCache;
   late final ReadReceiptService _readReceiptService;
+  late final OfflineQueueService _offlineQueue;
 
   List<EchoModel> _messages = [];
   StreamSubscription? _messagesSubscription;
   StreamSubscription? _newMessagesSubscription;
+  StreamSubscription? _offlineQueueSubscription;
   bool _isLoading = true;
   bool _isSending = false;
   bool _isLoadingMore = false;
@@ -72,6 +75,7 @@ class _ConversationScreenState extends State<ConversationScreen>
       conversationId: widget.conversationId,
       currentUserId: _currentUserId,
     );
+    _offlineQueue = OfflineQueueService();
     _initializeServices();
     _loadInitialMessages();
     _markMessagesAsDelivered();
@@ -82,10 +86,12 @@ class _ConversationScreenState extends State<ConversationScreen>
     WidgetsBinding.instance.removeObserver(this);
     _messagesSubscription?.cancel();
     _newMessagesSubscription?.cancel();
+    _offlineQueueSubscription?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _contentCache.saveToDisk();
     _readReceiptService.dispose();
+    _offlineQueue.dispose();
     super.dispose();
   }
 
@@ -105,6 +111,9 @@ class _ConversationScreenState extends State<ConversationScreen>
 
     _contentCache = DecryptedContentCacheService(secureStorage: _secureStorage);
     await _contentCache.loadFromDisk();
+
+    await _offlineQueue.initialize();
+    _subscribeToOfflineQueue();
 
     final privateKey = await _secureStorage.getPrivateKey();
     if (privateKey != null) {
@@ -228,6 +237,26 @@ class _ConversationScreenState extends State<ConversationScreen>
         setState(() => _isLoadingMore = false);
       }
     }
+  }
+
+  void _subscribeToOfflineQueue() {
+    _offlineQueueSubscription = _offlineQueue.statusStream.listen((updates) {
+      if (!mounted) return;
+
+      for (final entry in updates.entries) {
+        final messageId = entry.key;
+        final pending = entry.value;
+
+        if (pending.conversationId != widget.conversationId) continue;
+
+        final index = _messages.indexWhere((m) => m.id == messageId);
+        if (index != -1) {
+          setState(() {
+            _messages[index] = pending.toEchoModel();
+          });
+        }
+      }
+    });
   }
 
   void _subscribeToNewMessages() {
@@ -354,22 +383,35 @@ class _ConversationScreenState extends State<ConversationScreen>
       final timestamp = DateTime.now();
       final sequenceNumber = encryptionResult['sequenceNumber'] as int;
 
-      final validationResult = await _replayProtection.validateMessageServerSide(
-        messageId: messageId,
-        conversationId: widget.conversationId,
-        recipientId: widget.partner.id,
-        sequenceNumber: sequenceNumber,
-        timestamp: timestamp,
-      );
+      String? validationToken;
+      bool useOfflineQueue = false;
 
-      if (!validationResult.valid) {
-        if (validationResult.isRateLimited) {
-          final retrySeconds = validationResult.retryAfter.inSeconds;
-          throw Exception(
-            'Message rate limit exceeded. Please wait ${retrySeconds > 60 ? '${(retrySeconds / 60).ceil()} minutes' : '$retrySeconds seconds'}.',
-          );
+      try {
+        final validationResult = await _replayProtection.validateMessageServerSide(
+          messageId: messageId,
+          conversationId: widget.conversationId,
+          recipientId: widget.partner.id,
+          sequenceNumber: sequenceNumber,
+          timestamp: timestamp,
+        );
+
+        if (!validationResult.valid) {
+          if (validationResult.isRateLimited) {
+            final retrySeconds = validationResult.retryAfter.inSeconds;
+            throw Exception(
+              'Message rate limit exceeded. Please wait ${retrySeconds > 60 ? '${(retrySeconds / 60).ceil()} minutes' : '$retrySeconds seconds'}.',
+            );
+          }
+          throw Exception(validationResult.error ?? 'Message validation failed');
         }
-        throw Exception(validationResult.error ?? 'Message validation failed');
+
+        validationToken = validationResult.token;
+      } catch (e) {
+        if (!_offlineQueue.isOnline || e.toString().contains('network')) {
+          useOfflineQueue = true;
+        } else {
+          rethrow;
+        }
       }
 
       final message = EchoModel(
@@ -379,25 +421,43 @@ class _ConversationScreenState extends State<ConversationScreen>
         content: encryptionResult['content'] as String,
         timestamp: timestamp,
         type: type,
-        status: EchoStatus.sent,
+        status: useOfflineQueue ? EchoStatus.pending : EchoStatus.sent,
         metadata: metadata ?? EchoMetadata.empty(),
         senderKeyVersion: encryptionResult['senderKeyVersion'] as int,
         recipientKeyVersion: encryptionResult['recipientKeyVersion'] as int,
         sequenceNumber: sequenceNumber,
-        validationToken: validationResult.token,
+        validationToken: validationToken,
         conversationId: widget.conversationId,
       );
 
-      await _messagesRef.doc(messageId).set(message.toJson());
       _contentCache.put(messageId, text);
-
-      await _db.collection('conversations').doc(widget.conversationId).update({
-        'lastMessage': _truncateForPreview(text),
-        'lastMessageAt': FieldValue.serverTimestamp(),
-        'unreadCount.${widget.partner.id}': FieldValue.increment(1),
-      });
-
+      setState(() => _messages = [..._messages, message]);
       _scrollToBottom();
+
+      if (useOfflineQueue) {
+        await _offlineQueue.enqueue(
+          messageId: messageId,
+          conversationId: widget.conversationId,
+          senderId: _currentUserId,
+          recipientId: widget.partner.id,
+          plaintext: text,
+          encryptedContent: encryptionResult['content'] as String,
+          type: type,
+          metadata: metadata ?? EchoMetadata.empty(),
+          senderKeyVersion: encryptionResult['senderKeyVersion'] as int,
+          recipientKeyVersion: encryptionResult['recipientKeyVersion'] as int,
+          sequenceNumber: sequenceNumber,
+          validationToken: validationToken,
+        );
+      } else {
+        await _messagesRef.doc(messageId).set(message.toJson());
+
+        await _db.collection('conversations').doc(widget.conversationId).update({
+          'lastMessage': _truncateForPreview(text),
+          'lastMessageAt': FieldValue.serverTimestamp(),
+          'unreadCount.${widget.partner.id}': FieldValue.increment(1),
+        });
+      }
     } catch (e) {
       setState(() {
         _error = e.toString().replaceAll('Exception: ', '');
@@ -618,6 +678,9 @@ class _ConversationScreenState extends State<ConversationScreen>
               isMe: isMe,
               partnerName: widget.partner.name,
               mediaEncryptionService: _mediaEncryptionService,
+              onRetry: message.status.isFailed
+                  ? () => _offlineQueue.retry(message.id)
+                  : null,
             ),
           ],
         );
