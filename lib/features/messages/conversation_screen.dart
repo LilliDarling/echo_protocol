@@ -11,12 +11,12 @@ import '../../services/message_rate_limiter.dart';
 import '../../services/replay_protection_service.dart';
 import '../../services/media_encryption_service.dart';
 import '../../services/decrypted_content_cache.dart';
+import '../../services/read_receipt_service.dart';
 import '../settings/fingerprint_verification.dart';
 import '../../widgets/message_bubble.dart';
 import '../../widgets/message_input.dart';
 import '../../widgets/date_separator.dart';
 
-/// Main conversation screen for messaging with partner
 class ConversationScreen extends StatefulWidget {
   final PartnerInfo partner;
   final String conversationId;
@@ -44,6 +44,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   late final ReplayProtectionService _replayProtection;
   MediaEncryptionService? _mediaEncryptionService;
   late final DecryptedContentCacheService _contentCache;
+  late final ReadReceiptService _readReceiptService;
 
   List<EchoModel> _messages = [];
   StreamSubscription? _messagesSubscription;
@@ -64,6 +65,10 @@ class _ConversationScreenState extends State<ConversationScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_onScroll);
+    _readReceiptService = ReadReceiptService(
+      conversationId: widget.conversationId,
+      currentUserId: _currentUserId,
+    );
     _initializeServices();
     _loadInitialMessages();
     _markMessagesAsDelivered();
@@ -77,6 +82,7 @@ class _ConversationScreenState extends State<ConversationScreen>
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _contentCache.saveToDisk();
+    _readReceiptService.dispose();
     super.dispose();
   }
 
@@ -309,28 +315,17 @@ class _ConversationScreenState extends State<ConversationScreen>
     await batch.commit();
   }
 
-  Future<void> _markVisibleMessagesAsRead() async {
-    final unread = await _db
-        .collection('messages')
-        .where('conversationId', isEqualTo: widget.conversationId)
-        .where('recipientId', isEqualTo: _currentUserId)
-        .where('status', whereIn: ['sent', 'delivered'])
-        .get();
+  void _markVisibleMessagesAsRead() {
+    final unreadIds = _messages
+        .where((m) =>
+            m.recipientId == _currentUserId &&
+            m.status != EchoStatus.read)
+        .map((m) => m.id)
+        .toList();
 
-    if (unread.docs.isEmpty) return;
-
-    final batch = _db.batch();
-    for (final doc in unread.docs) {
-      batch.update(doc.reference, {
-        'status': 'read',
-        'readAt': FieldValue.serverTimestamp(),
-      });
+    if (unreadIds.isNotEmpty) {
+      _readReceiptService.markMultipleAsRead(unreadIds);
     }
-    await batch.commit();
-
-    await _db.collection('conversations').doc(widget.conversationId).update({
-      'unreadCount.$_currentUserId': 0,
-    });
   }
 
   void _scrollToBottom() {
