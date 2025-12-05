@@ -19,6 +19,9 @@ class ReadReceiptService {
     FirebaseFirestore? firestore,
   }) : _db = firestore ?? FirebaseFirestore.instance;
 
+  CollectionReference<Map<String, dynamic>> get _messagesRef =>
+      _db.collection('conversations').doc(conversationId).collection('messages');
+
   void markAsRead(String messageId) {
     _pendingMessageIds.add(messageId);
     _scheduleFlush();
@@ -63,8 +66,7 @@ class ReadReceiptService {
     final timestamp = FieldValue.serverTimestamp();
 
     for (final id in messageIds) {
-      final ref = _db.collection('messages').doc(id);
-      batch.update(ref, {
+      batch.update(_messagesRef.doc(id), {
         'status': 'read',
         'readAt': timestamp,
       });
@@ -74,9 +76,7 @@ class ReadReceiptService {
   }
 
   Future<void> markAllUnreadAsRead() async {
-    final unread = await _db
-        .collection('messages')
-        .where('conversationId', isEqualTo: conversationId)
+    final unread = await _messagesRef
         .where('recipientId', isEqualTo: currentUserId)
         .where('status', whereIn: ['sent', 'delivered'])
         .get();

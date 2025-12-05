@@ -60,6 +60,9 @@ class _ConversationScreenState extends State<ConversationScreen>
 
   String get _currentUserId => _auth.currentUser?.uid ?? '';
 
+  CollectionReference<Map<String, dynamic>> get _messagesRef =>
+      _db.collection('conversations').doc(widget.conversationId).collection('messages');
+
   @override
   void initState() {
     super.initState();
@@ -138,9 +141,7 @@ class _ConversationScreenState extends State<ConversationScreen>
 
   Future<void> _loadInitialMessages() async {
     try {
-      final query = _db
-          .collection('messages')
-          .where('conversationId', isEqualTo: widget.conversationId)
+      final query = _messagesRef
           .orderBy('timestamp', descending: true)
           .limit(_pageSize);
 
@@ -186,9 +187,7 @@ class _ConversationScreenState extends State<ConversationScreen>
       final scrollOffset = _scrollController.position.pixels;
       final maxScrollBefore = _scrollController.position.maxScrollExtent;
 
-      final query = _db
-          .collection('messages')
-          .where('conversationId', isEqualTo: widget.conversationId)
+      final query = _messagesRef
           .orderBy('timestamp', descending: true)
           .startAfterDocument(_oldestMessageDoc!)
           .limit(_pageSize);
@@ -236,9 +235,7 @@ class _ConversationScreenState extends State<ConversationScreen>
         ? _messages.last.timestamp
         : DateTime.now();
 
-    final query = _db
-        .collection('messages')
-        .where('conversationId', isEqualTo: widget.conversationId)
+    final query = _messagesRef
         .where('timestamp', isGreaterThan: Timestamp.fromDate(newestTimestamp))
         .orderBy('timestamp', descending: false);
 
@@ -296,9 +293,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   }
 
   Future<void> _markMessagesAsDelivered() async {
-    final undelivered = await _db
-        .collection('messages')
-        .where('conversationId', isEqualTo: widget.conversationId)
+    final undelivered = await _messagesRef
         .where('recipientId', isEqualTo: _currentUserId)
         .where('status', isEqualTo: 'sent')
         .get();
@@ -355,7 +350,7 @@ class _ConversationScreenState extends State<ConversationScreen>
         senderId: _currentUserId,
       );
 
-      final messageId = _db.collection('messages').doc().id;
+      final messageId = _messagesRef.doc().id;
       final timestamp = DateTime.now();
       final sequenceNumber = encryptionResult['sequenceNumber'] as int;
 
@@ -393,7 +388,7 @@ class _ConversationScreenState extends State<ConversationScreen>
         conversationId: widget.conversationId,
       );
 
-      await _db.collection('messages').doc(messageId).set(message.toJson());
+      await _messagesRef.doc(messageId).set(message.toJson());
       _contentCache.put(messageId, text);
 
       await _db.collection('conversations').doc(widget.conversationId).update({
