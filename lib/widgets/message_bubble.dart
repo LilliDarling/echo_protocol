@@ -12,6 +12,7 @@ class MessageBubble extends StatelessWidget {
   final String partnerName;
   final MediaEncryptionService? mediaEncryptionService;
   final VoidCallback? onRetry;
+  final VoidCallback? onLongPress;
 
   const MessageBubble({
     super.key,
@@ -21,6 +22,7 @@ class MessageBubble extends StatelessWidget {
     required this.partnerName,
     this.mediaEncryptionService,
     this.onRetry,
+    this.onLongPress,
   });
 
   @override
@@ -28,6 +30,10 @@ class MessageBubble extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final isFailed = message.status.isFailed;
+
+    if (message.isDeleted) {
+      return _buildDeletedMessage(context, isDark);
+    }
 
     Widget bubble = Container(
       constraints: BoxConstraints(
@@ -75,6 +81,11 @@ class MessageBubble extends StatelessWidget {
           ],
         ),
       );
+    } else if (isMe && onLongPress != null) {
+      bubble = GestureDetector(
+        onLongPress: onLongPress,
+        child: bubble,
+      );
     }
 
     return Padding(
@@ -87,6 +98,54 @@ class MessageBubble extends StatelessWidget {
       child: Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: bubble,
+      ),
+    );
+  }
+
+  Widget _buildDeletedMessage(BuildContext context, bool isDark) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: isMe ? 48 : 0,
+        right: isMe ? 0 : 48,
+        top: 4,
+        bottom: 4,
+      ),
+      child: Align(
+        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(16),
+              topRight: const Radius.circular(16),
+              bottomLeft: Radius.circular(isMe ? 16 : 4),
+              bottomRight: Radius.circular(isMe ? 4 : 16),
+            ),
+            border: Border.all(
+              color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.block,
+                size: 16,
+                color: Colors.grey.shade500,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'This message was deleted',
+                style: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontStyle: FontStyle.italic,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -179,7 +238,6 @@ class MessageBubble extends StatelessWidget {
         );
 
       case EchoType.text:
-        // Check if text contains a URL for link preview
         final hasUrl = _containsUrl(decryptedContent);
 
         return Column(
@@ -217,6 +275,17 @@ class MessageBubble extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          if (message.isEdited) ...[
+            Text(
+              'edited',
+              style: TextStyle(
+                fontSize: 11,
+                fontStyle: FontStyle.italic,
+                color: isMe ? Colors.white60 : Colors.grey.shade400,
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
           Text(
             _formatTime(message.timestamp),
             style: TextStyle(

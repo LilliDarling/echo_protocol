@@ -14,6 +14,10 @@ class EchoModel {
   final int sequenceNumber;
   final String? validationToken;
   final String? conversationId;
+  final bool isEdited;
+  final DateTime? editedAt;
+  final bool isDeleted;
+  final DateTime? deletedAt;
 
   EchoModel({
     required this.id,
@@ -29,6 +33,10 @@ class EchoModel {
     required this.sequenceNumber,
     this.validationToken,
     this.conversationId,
+    this.isEdited = false,
+    this.editedAt,
+    this.isDeleted = false,
+    this.deletedAt,
   });
 
   factory EchoModel.fromJson(String id, Map<String, dynamic> json) {
@@ -46,6 +54,14 @@ class EchoModel {
       sequenceNumber: json['sequenceNumber'] as int? ?? 0,
       validationToken: json['validationToken'] as String?,
       conversationId: json['conversationId'] as String?,
+      isEdited: json['isEdited'] as bool? ?? false,
+      editedAt: json['editedAt'] != null
+          ? (json['editedAt'] as Timestamp).toDate()
+          : null,
+      isDeleted: json['isDeleted'] as bool? ?? false,
+      deletedAt: json['deletedAt'] != null
+          ? (json['deletedAt'] as Timestamp).toDate()
+          : null,
     );
   }
 
@@ -68,6 +84,10 @@ class EchoModel {
       'sequenceNumber': sequenceNumber,
       if (validationToken != null) 'validationToken': validationToken,
       if (conversationId != null) 'conversationId': conversationId,
+      'isEdited': isEdited,
+      if (editedAt != null) 'editedAt': Timestamp.fromDate(editedAt!),
+      'isDeleted': isDeleted,
+      if (deletedAt != null) 'deletedAt': Timestamp.fromDate(deletedAt!),
     };
   }
 
@@ -85,6 +105,10 @@ class EchoModel {
     int? sequenceNumber,
     String? validationToken,
     String? conversationId,
+    bool? isEdited,
+    DateTime? editedAt,
+    bool? isDeleted,
+    DateTime? deletedAt,
   }) {
     return EchoModel(
       id: id ?? this.id,
@@ -100,6 +124,10 @@ class EchoModel {
       sequenceNumber: sequenceNumber ?? this.sequenceNumber,
       validationToken: validationToken ?? this.validationToken,
       conversationId: conversationId ?? this.conversationId,
+      isEdited: isEdited ?? this.isEdited,
+      editedAt: editedAt ?? this.editedAt,
+      isDeleted: isDeleted ?? this.isDeleted,
+      deletedAt: deletedAt ?? this.deletedAt,
     );
   }
 

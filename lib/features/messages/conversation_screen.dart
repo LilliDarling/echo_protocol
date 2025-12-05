@@ -485,6 +485,151 @@ class _ConversationScreenState extends State<ConversationScreen>
     return '${text.substring(0, maxLength)}...';
   }
 
+  Future<void> _editMessage(EchoModel message, String newText) async {
+    if (newText.trim().isEmpty) return;
+    if (message.senderId != _currentUserId) return;
+    if (message.isDeleted) return;
+
+    try {
+      final encryptionResult = await _encryptionHelper.encryptMessage(
+        plaintext: newText,
+        partnerId: widget.partner.id,
+        senderId: _currentUserId,
+      );
+
+      await _messagesRef.doc(message.id).update({
+        'content': encryptionResult['content'],
+        'isEdited': true,
+        'editedAt': FieldValue.serverTimestamp(),
+      });
+
+      _contentCache.put(message.id, newText);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to edit message: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteMessage(EchoModel message) async {
+    if (message.senderId != _currentUserId) return;
+    if (message.isDeleted) return;
+
+    try {
+      await _messagesRef.doc(message.id).update({
+        'isDeleted': true,
+        'deletedAt': FieldValue.serverTimestamp(),
+        'content': '',
+      });
+
+      _contentCache.remove(message.id);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete message: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showMessageOptions(EchoModel message, String decryptedText) {
+    if (message.senderId != _currentUserId) return;
+    if (message.isDeleted) return;
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (message.type == EchoType.text)
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Edit message'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showEditDialog(message, decryptedText);
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Delete message', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                _showDeleteConfirmation(message);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditDialog(EchoModel message, String currentText) {
+    final controller = TextEditingController(text: currentText);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit message'),
+        content: TextField(
+          controller: controller,
+          maxLines: null,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Enter new message',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _editMessage(message, controller.text);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(EchoModel message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete message'),
+        content: const Text('This message will be deleted for everyone. This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteMessage(message);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openSecurityVerification() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -680,6 +825,9 @@ class _ConversationScreenState extends State<ConversationScreen>
               mediaEncryptionService: _mediaEncryptionService,
               onRetry: message.status.isFailed
                   ? () => _offlineQueue.retry(message.id)
+                  : null,
+              onLongPress: isMe && !message.isDeleted
+                  ? () => _showMessageOptions(message, decryptedText)
                   : null,
             ),
           ],
