@@ -249,6 +249,13 @@ class AuthService {
     if (user == null) throw Exception('No user signed in');
 
     try {
+      if (kIsWeb) {
+        LoggerService.warning('Key rotation on web platform', {
+          'userId': user.uid,
+          'warning': 'Web storage is less secure than native platforms',
+        });
+      }
+
       LoggerService.security('Key rotation initiated', {
         'userId': user.uid,
         'timestamp': DateTime.now().toIso8601String(),
@@ -333,6 +340,13 @@ class AuthService {
   // Private helper methods
 
   Future<Map<String, String>> _generateAndStoreKeys(String userId) async {
+    if (kIsWeb) {
+      LoggerService.warning('Generating keys on web platform', {
+        'userId': userId,
+        'warning': 'Private keys stored in IndexedDB are less secure than native Keychain/KeyStore',
+      });
+    }
+
     final keyPair = await _encryptionService.generateKeyPair();
     final initialVersion = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 

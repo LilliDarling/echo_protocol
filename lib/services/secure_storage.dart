@@ -1,8 +1,15 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Secure storage service for sensitive data
 /// Uses platform-specific secure storage (Keychain on iOS, KeyStore on Android)
 /// Private keys NEVER leave the device and are stored encrypted
+///
+/// WARNING: Web platform uses IndexedDB which has different security characteristics:
+/// - Data is NOT protected by hardware security (no Keychain/KeyStore equivalent)
+/// - Vulnerable to XSS attacks if the application is compromised
+/// - Data persists in browser storage accessible to JavaScript
+/// - Recommended: Use native apps for highest security requirements
 class SecureStorageService {
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(
@@ -11,11 +18,22 @@ class SecureStorageService {
     iOptions: IOSOptions(
       accessibility: KeychainAccessibility.first_unlock,
     ),
+    // Web storage uses IndexedDB - less secure than native platforms
+    // Data is encrypted at rest but vulnerable to XSS attacks
     webOptions: WebOptions(
-      dbName: 'echo_protocol_secure_storage',
-      publicKey: 'echo_protocol_public_key',
+      dbName: 'echo_protocol_secure',
+      publicKey: 'echo_protocol_key',
     ),
   );
+
+  static bool get isWebPlatform => kIsWeb;
+
+  static String get securityLevel {
+    if (kIsWeb) {
+      return 'limited';
+    }
+    return 'hardware';
+  }
 
   static const String _privateKeyKey = 'user_private_key';
   static const String _publicKeyKey = 'user_public_key';
@@ -187,5 +205,33 @@ class SecureStorageService {
 
   Future<void> deleteCacheKey() async {
     await _storage.delete(key: _cacheKeyKey);
+  }
+
+  /// Get security information for display to users
+  static Map<String, dynamic> getSecurityInfo() {
+    return {
+      'platform': kIsWeb ? 'web' : 'native',
+      'securityLevel': securityLevel,
+      'storageType': kIsWeb ? 'IndexedDB' : 'Hardware-backed Keystore',
+      'warnings': kIsWeb
+          ? [
+              'Web storage is less secure than native apps',
+              'Data may be vulnerable to browser-based attacks',
+              'For maximum security, use the mobile app',
+            ]
+          : <String>[],
+    };
+  }
+
+  /// Check if the current platform meets security requirements for an operation
+  /// Returns null if OK, or an error message if the platform is insufficient
+  static String? checkSecurityRequirements({
+    bool requireHardwareSecurity = false,
+  }) {
+    if (requireHardwareSecurity && kIsWeb) {
+      return 'This operation requires hardware-backed security. '
+          'Please use the mobile app for this feature.';
+    }
+    return null;
   }
 }
