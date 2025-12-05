@@ -8,8 +8,6 @@ import 'encryption.dart';
 import 'secure_storage.dart';
 import 'logger.dart';
 
-/// Authentication service for user login/signup
-/// Handles Firebase Auth, Google Sign-In, and encryption key generation
 class AuthService {
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
@@ -95,21 +93,9 @@ class AuthService {
       final UserCredential userCredential;
 
       if (kIsWeb) {
-        // Web: Use Firebase popup/redirect flow
         final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-
-        // Optional: Add scopes if needed
-        // googleProvider.addScope('https://www.googleapis.com/auth/contacts.readonly');
-
-        // Optional: Set custom parameters
-        // googleProvider.setCustomParameters({
-        //   'login_hint': 'user@example.com'
-        // });
-
-        // Sign in with popup (or use signInWithRedirect for same-window flow)
         userCredential = await _auth.signInWithPopup(googleProvider);
       } else {
-        // Mobile/Desktop: Use google_sign_in package
         final GoogleSignInAccount googleUser = await GoogleSignIn.instance.authenticate();
         final GoogleSignInAuthentication googleAuth = googleUser.authentication;
 
@@ -162,7 +148,6 @@ class AuthService {
         try {
           await GoogleSignIn.instance.signOut();
         } catch (e) {
-          // GoogleSignIn may not be available in test environment
           // Continue with Firebase sign out
         }
       }
@@ -170,8 +155,6 @@ class AuthService {
       await _auth.signOut();
 
       LoggerService.auth('Sign out successful', userId: userId);
-
-      // Optionally clear secure storage (keep keys for offline access)
       await _secureStorage.clearAll();
     } catch (e) {
       LoggerService.error('Sign out failed');
@@ -249,18 +232,6 @@ class AuthService {
     if (user == null) throw Exception('No user signed in');
 
     try {
-      if (kIsWeb) {
-        LoggerService.warning('Key rotation on web platform', {
-          'userId': user.uid,
-          'warning': 'Web storage is less secure than native platforms',
-        });
-      }
-
-      LoggerService.security('Key rotation initiated', {
-        'userId': user.uid,
-        'timestamp': DateTime.now().toIso8601String(),
-      });
-
       final oldPublicKey = await _secureStorage.getPublicKey();
       final oldPrivateKey = await _secureStorage.getPrivateKey();
       final oldVersion = await _secureStorage.getCurrentKeyVersion();
@@ -285,12 +256,6 @@ class AuthService {
           'fingerprint': oldFingerprint,
           'archivedAt': DateTime.now().toIso8601String(),
         });
-
-        LoggerService.security('Old keys archived', {
-          'userId': user.uid,
-          'archivedVersion': oldVersion,
-          'archivedFingerprint': oldFingerprint,
-        });
       }
 
       await _secureStorage.storePrivateKey(rotationData['privateKey'] as String);
@@ -304,14 +269,6 @@ class AuthService {
         'publicKeyFingerprint': rotationData['fingerprint'],
       });
 
-      LoggerService.security('Key rotation completed', {
-        'userId': user.uid,
-        'oldFingerprint': oldFingerprint,
-        'newFingerprint': rotationData['fingerprint'],
-        'oldVersion': oldVersion,
-        'newVersion': newVersion,
-      });
-
       return {
         'publicKey': rotationData['publicKey'] as String,
         'fingerprint': rotationData['fingerprint'] as String,
@@ -322,8 +279,6 @@ class AuthService {
     }
   }
 
-  /// Get the fingerprint of current user's public key
-  /// Used for out-of-band verification with conversation partners
   Future<String?> getMyPublicKeyFingerprint() async {
     final publicKey = await _secureStorage.getPublicKey();
     if (publicKey == null) return null;
@@ -331,22 +286,11 @@ class AuthService {
     return _encryptionService.generateFingerprint(publicKey);
   }
 
-  /// Verify partner's public key fingerprint
-  /// Returns true if the fingerprint matches the public key
   bool verifyPartnerFingerprint(String publicKey, String expectedFingerprint) {
     return _encryptionService.verifyFingerprint(publicKey, expectedFingerprint);
   }
 
-  // Private helper methods
-
   Future<Map<String, String>> _generateAndStoreKeys(String userId) async {
-    if (kIsWeb) {
-      LoggerService.warning('Generating keys on web platform', {
-        'userId': userId,
-        'warning': 'Private keys stored in IndexedDB are less secure than native Keychain/KeyStore',
-      });
-    }
-
     final keyPair = await _encryptionService.generateKeyPair();
     final initialVersion = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 

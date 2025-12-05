@@ -1,15 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Secure storage service for sensitive data
-/// Uses platform-specific secure storage (Keychain on iOS, KeyStore on Android)
-/// Private keys NEVER leave the device and are stored encrypted
-///
-/// WARNING: Web platform uses IndexedDB which has different security characteristics:
-/// - Data is NOT protected by hardware security (no Keychain/KeyStore equivalent)
-/// - Vulnerable to XSS attacks if the application is compromised
-/// - Data persists in browser storage accessible to JavaScript
-/// - Recommended: Use native apps for highest security requirements
 class SecureStorageService {
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(
@@ -18,8 +9,6 @@ class SecureStorageService {
     iOptions: IOSOptions(
       accessibility: KeychainAccessibility.first_unlock,
     ),
-    // Web storage uses IndexedDB - less secure than native platforms
-    // Data is encrypted at rest but vulnerable to XSS attacks
     webOptions: WebOptions(
       dbName: 'echo_protocol_secure',
       publicKey: 'echo_protocol_key',
@@ -207,7 +196,6 @@ class SecureStorageService {
     await _storage.delete(key: _cacheKeyKey);
   }
 
-  /// Get security information for display to users
   static Map<String, dynamic> getSecurityInfo() {
     return {
       'platform': kIsWeb ? 'web' : 'native',
@@ -223,8 +211,6 @@ class SecureStorageService {
     };
   }
 
-  /// Check if the current platform meets security requirements for an operation
-  /// Returns null if OK, or an error message if the platform is insufficient
   static String? checkSecurityRequirements({
     bool requireHardwareSecurity = false,
   }) {

@@ -5,8 +5,6 @@ import 'package:video_player/video_player.dart';
 import '../models/echo.dart';
 import '../services/media_encryption_service.dart';
 
-/// Widget displaying media (image/video) messages
-/// Supports both encrypted and unencrypted media
 class MediaMessage extends StatefulWidget {
   final EchoModel message;
   final bool isMe;
@@ -38,7 +36,6 @@ class _MediaMessageState extends State<MediaMessage> {
     final thumbnailUrl = widget.message.metadata.thumbnailUrl;
     if (thumbnailUrl == null || thumbnailUrl.isEmpty) return;
 
-    // If encrypted, we need to decrypt
     if (widget.message.metadata.isEncrypted && widget.encryptionService != null) {
       setState(() => _isDecrypting = true);
       try {
@@ -86,9 +83,7 @@ class _MediaMessageState extends State<MediaMessage> {
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Image - use decrypted path if encrypted, otherwise use network
               _buildThumbnail(thumbnailUrl, fileUrl),
-              // Video play button overlay
               if (widget.message.type == EchoType.video)
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -110,17 +105,9 @@ class _MediaMessageState extends State<MediaMessage> {
   }
 
   Widget _buildThumbnail(String? thumbnailUrl, String? fileUrl) {
-    // Show loading if decrypting
-    if (_isDecrypting) {
-      return _buildLoadingPlaceholder();
-    }
+    if (_isDecrypting) return _buildLoadingPlaceholder();
+    if (_hasError) return _buildErrorPlaceholder();
 
-    // Show error if decryption failed
-    if (_hasError) {
-      return _buildErrorPlaceholder();
-    }
-
-    // If encrypted and we have decrypted path, use file image
     if (widget.message.metadata.isEncrypted && _decryptedThumbnailPath != null) {
       return Image.file(
         File(_decryptedThumbnailPath!),
@@ -129,12 +116,10 @@ class _MediaMessageState extends State<MediaMessage> {
       );
     }
 
-    // If encrypted but no encryption service, show placeholder with lock
     if (widget.message.metadata.isEncrypted && widget.encryptionService == null) {
       return _buildEncryptedPlaceholder();
     }
 
-    // Unencrypted - use cached network image as before
     return CachedNetworkImage(
       imageUrl: thumbnailUrl ?? fileUrl!,
       fit: BoxFit.cover,
@@ -238,6 +223,8 @@ class _MediaMessageState extends State<MediaMessage> {
       MaterialPageRoute(
         builder: (context) => _FullScreenMedia(
           url: fileUrl,
+          thumbnailUrl: widget.message.metadata.thumbnailUrl,
+          decryptedThumbnailPath: _decryptedThumbnailPath,
           isVideo: widget.message.type == EchoType.video,
           isEncrypted: widget.message.metadata.isEncrypted,
           encryptionService: widget.encryptionService,
@@ -247,10 +234,10 @@ class _MediaMessageState extends State<MediaMessage> {
   }
 }
 
-/// Full screen view for images/videos
-/// Supports both encrypted and unencrypted media
 class _FullScreenMedia extends StatefulWidget {
   final String url;
+  final String? thumbnailUrl;
+  final String? decryptedThumbnailPath;
   final bool isVideo;
   final bool isEncrypted;
   final MediaEncryptionService? encryptionService;
@@ -258,6 +245,8 @@ class _FullScreenMedia extends StatefulWidget {
   const _FullScreenMedia({
     required this.url,
     required this.isVideo,
+    this.thumbnailUrl,
+    this.decryptedThumbnailPath,
     this.isEncrypted = false,
     this.encryptionService,
   });
@@ -271,15 +260,21 @@ class _FullScreenMediaState extends State<_FullScreenMedia> {
   bool _isVideoInitialized = false;
   bool _hasError = false;
   bool _isDecrypting = false;
+  bool _isLoadingFullResolution = false;
+  bool _fullResolutionLoaded = false;
   String? _decryptedFilePath;
 
   @override
   void initState() {
     super.initState();
-    _loadMedia();
+    if (widget.isVideo) _loadFullResolution();
   }
 
-  Future<void> _loadMedia() async {
+  Future<void> _loadFullResolution() async {
+    if (_fullResolutionLoaded || _isLoadingFullResolution) return;
+
+    setState(() => _isLoadingFullResolution = true);
+
     if (widget.isEncrypted && widget.encryptionService != null) {
       setState(() => _isDecrypting = true);
       try {
@@ -293,6 +288,8 @@ class _FullScreenMediaState extends State<_FullScreenMedia> {
           setState(() {
             _decryptedFilePath = decryptedPath;
             _isDecrypting = false;
+            _isLoadingFullResolution = false;
+            _fullResolutionLoaded = true;
           });
           if (widget.isVideo) {
             _initializeVideoFromFile(decryptedPath);
@@ -303,11 +300,17 @@ class _FullScreenMediaState extends State<_FullScreenMedia> {
           setState(() {
             _hasError = true;
             _isDecrypting = false;
+            _isLoadingFullResolution = false;
           });
         }
       }
     } else if (widget.isVideo) {
       _initializeVideoFromNetwork();
+    } else {
+      setState(() {
+        _isLoadingFullResolution = false;
+        _fullResolutionLoaded = true;
+      });
     }
   }
 
@@ -371,7 +374,6 @@ class _FullScreenMediaState extends State<_FullScreenMedia> {
   }
 
   Widget _buildContent() {
-    // Show loading while decrypting
     if (_isDecrypting) {
       return const Center(
         child: Column(
@@ -396,7 +398,98 @@ class _FullScreenMediaState extends State<_FullScreenMedia> {
   }
 
   Widget _buildImageViewer() {
-    // If encrypted, use file image
+    if (_fullResolutionLoaded) return _buildFullResolutionImage();
+
+    return GestureDetector(
+      onTap: _loadFullResolution,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 4.0,
+            child: _buildThumbnailImage(),
+          ),
+          if (_isLoadingFullResolution || _isDecrypting)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(color: Colors.white),
+                  const SizedBox(height: 12),
+                  Text(
+                    _isDecrypting ? 'Decrypting...' : 'Loading full image...',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.touch_app, color: Colors.white70, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Tap for full resolution',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThumbnailImage() {
+    if (widget.decryptedThumbnailPath != null) {
+      return Image.file(
+        File(widget.decryptedThumbnailPath!),
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) => _buildThumbnailFallback(),
+      );
+    }
+
+    if (widget.thumbnailUrl != null) {
+      return CachedNetworkImage(
+        imageUrl: widget.thumbnailUrl!,
+        fit: BoxFit.contain,
+        placeholder: (context, url) => const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+        errorWidget: (context, url, error) => _buildThumbnailFallback(),
+      );
+    }
+
+    return _buildThumbnailFallback();
+  }
+
+  Widget _buildThumbnailFallback() {
+    return Container(
+      width: 200,
+      height: 200,
+      color: Colors.grey.shade800,
+      child: const Icon(
+        Icons.image,
+        size: 64,
+        color: Colors.white38,
+      ),
+    );
+  }
+
+  Widget _buildFullResolutionImage() {
     if (widget.isEncrypted && _decryptedFilePath != null) {
       return InteractiveViewer(
         minScale: 0.5,
@@ -413,7 +506,6 @@ class _FullScreenMediaState extends State<_FullScreenMedia> {
       );
     }
 
-    // Unencrypted - use network image
     return InteractiveViewer(
       minScale: 0.5,
       maxScale: 4.0,
@@ -470,7 +562,6 @@ class _FullScreenMediaState extends State<_FullScreenMedia> {
   }
 }
 
-/// Video playback controls
 class _VideoControls extends StatefulWidget {
   final VideoPlayerController controller;
 
@@ -534,7 +625,6 @@ class _VideoControlsState extends State<_VideoControls> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              // Play/pause button
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -553,7 +643,6 @@ class _VideoControlsState extends State<_VideoControls> {
                 ),
               ),
               const SizedBox(height: 32),
-              // Progress bar
               Container(
                 color: Colors.black.withValues(alpha: 0.5),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

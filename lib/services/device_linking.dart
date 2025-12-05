@@ -93,12 +93,6 @@ class DeviceLinkingService {
 
   Future<bool> linkDeviceFromQRCode(String qrData) async {
     try {
-      if (kIsWeb) {
-        LoggerService.warning('Device linking on web platform', {
-          'warning': 'Private keys will be stored in IndexedDB which is less secure than native storage',
-        });
-      }
-
       final data = jsonDecode(qrData) as Map<String, dynamic>;
 
       if (data['type'] != 'echo_protocol_device_link') {
