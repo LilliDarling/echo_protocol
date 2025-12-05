@@ -294,11 +294,16 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
           expireAt: nonceExpireAt,
         });
 
+        const sequenceExpireAt = admin.firestore.Timestamp.fromMillis(
+          now + 30 * 24 * 60 * 60 * 1000
+        );
+
         transaction.set(
           sequenceRef,
           {
             lastSequence: sequenceNumber,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            expireAt: sequenceExpireAt,
           },
           {merge: true}
         );
