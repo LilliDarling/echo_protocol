@@ -1,7 +1,7 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
-import {REPLAY_PROTECTION} from "../config/constants";
+import {REPLAY_PROTECTION, RATE_LIMITS} from "../config/constants";
 
 interface ValidateMessageRequest {
   messageId: string;
@@ -15,6 +15,9 @@ interface ValidateMessageResponse {
   valid: boolean;
   token?: string;
   error?: string;
+  retryAfterMs?: number;
+  remainingMinute?: number;
+  remainingHour?: number;
 }
 
 function getConversationKey(userId1: string, userId2: string): string {
@@ -55,6 +58,7 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
 
     const db = admin.firestore();
     const now = Date.now();
+    const nowTimestamp = admin.firestore.Timestamp.now();
     const messageTime = timestamp;
 
     const maxAge = REPLAY_PROTECTION.nonceExpiryHours * 60 * 60 * 1000;
@@ -79,20 +83,147 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
     }
 
     const conversationKey = getConversationKey(senderId, recipientId);
+    const rateLimitConfig = RATE_LIMITS.MESSAGE;
 
     try {
       const result = await db.runTransaction(async (transaction) => {
+        // Rate limit refs
+        const userRateLimitRef = db.collection("message_rate_limits").doc(senderId);
+        const convRateLimitRef = db
+          .collection("message_rate_limits")
+          .doc(`${senderId}_${conversationId}`);
+
+        // Replay protection refs
         const nonceRef = db.collection("message_nonces").doc(messageId);
         const sequenceRef = db
           .collection("message_sequences")
           .doc(`${senderId}_${conversationKey}`);
         const tokenRef = db.collection("message_tokens").doc();
 
-        const [nonceDoc, sequenceDoc] = await Promise.all([
+        // Fetch all documents
+        const [userDoc, convDoc, nonceDoc, sequenceDoc] = await Promise.all([
+          transaction.get(userRateLimitRef),
+          transaction.get(convRateLimitRef),
           transaction.get(nonceRef),
           transaction.get(sequenceRef),
         ]);
 
+        // --- Rate Limiting Check ---
+        const hourAgo = new Date(nowTimestamp.toMillis() - 60 * 60 * 1000);
+        const minuteAgo = new Date(nowTimestamp.toMillis() - 60 * 1000);
+
+        let userAttempts: admin.firestore.Timestamp[] = [];
+        if (userDoc.exists) {
+          userAttempts = (userDoc.data()?.attempts || []) as admin.firestore.Timestamp[];
+          userAttempts = userAttempts.filter(
+            (ts: admin.firestore.Timestamp) => ts.toDate() > hourAgo
+          );
+        }
+
+        let convAttempts: admin.firestore.Timestamp[] = [];
+        if (convDoc.exists) {
+          convAttempts = (convDoc.data()?.attempts || []) as admin.firestore.Timestamp[];
+          convAttempts = convAttempts.filter(
+            (ts: admin.firestore.Timestamp) => ts.toDate() > hourAgo
+          );
+        }
+
+        const userAttemptsInMinute = userAttempts.filter(
+          (t: admin.firestore.Timestamp) => t.toDate() > minuteAgo
+        ).length;
+        const userAttemptsInHour = userAttempts.length;
+
+        const convAttemptsInMinute = convAttempts.filter(
+          (t: admin.firestore.Timestamp) => t.toDate() > minuteAgo
+        ).length;
+        const convAttemptsInHour = convAttempts.length;
+
+        let retryAfterMs = 0;
+        let limitReason = "";
+
+        if (userAttemptsInMinute >= rateLimitConfig.maxPerMinute) {
+          const oldestInMinute = userAttempts
+            .filter((t: admin.firestore.Timestamp) => t.toDate() > minuteAgo)
+            .sort((a: admin.firestore.Timestamp, b: admin.firestore.Timestamp) =>
+              a.toMillis() - b.toMillis()
+            )[0];
+          if (oldestInMinute) {
+            retryAfterMs = Math.max(
+              retryAfterMs,
+              oldestInMinute.toMillis() + 60000 - nowTimestamp.toMillis()
+            );
+          }
+          limitReason = "global minute limit";
+        }
+
+        if (userAttemptsInHour >= rateLimitConfig.maxPerHour) {
+          const oldestInHour = userAttempts
+            .sort((a: admin.firestore.Timestamp, b: admin.firestore.Timestamp) =>
+              a.toMillis() - b.toMillis()
+            )[0];
+          if (oldestInHour) {
+            retryAfterMs = Math.max(
+              retryAfterMs,
+              oldestInHour.toMillis() + 3600000 - nowTimestamp.toMillis()
+            );
+          }
+          limitReason = "global hour limit";
+        }
+
+        if (convAttemptsInMinute >= rateLimitConfig.conversationMaxPerMinute) {
+          const oldestInMinute = convAttempts
+            .filter((t: admin.firestore.Timestamp) => t.toDate() > minuteAgo)
+            .sort((a: admin.firestore.Timestamp, b: admin.firestore.Timestamp) =>
+              a.toMillis() - b.toMillis()
+            )[0];
+          if (oldestInMinute) {
+            retryAfterMs = Math.max(
+              retryAfterMs,
+              oldestInMinute.toMillis() + 60000 - nowTimestamp.toMillis()
+            );
+          }
+          limitReason = "conversation minute limit";
+        }
+
+        if (convAttemptsInHour >= rateLimitConfig.conversationMaxPerHour) {
+          const oldestInHour = convAttempts
+            .sort((a: admin.firestore.Timestamp, b: admin.firestore.Timestamp) =>
+              a.toMillis() - b.toMillis()
+            )[0];
+          if (oldestInHour) {
+            retryAfterMs = Math.max(
+              retryAfterMs,
+              oldestInHour.toMillis() + 3600000 - nowTimestamp.toMillis()
+            );
+          }
+          limitReason = "conversation hour limit";
+        }
+
+        if (retryAfterMs > 0) {
+          logger.warn("Message rate limit exceeded", {
+            userId: senderId,
+            conversationId,
+            limitReason,
+            userAttemptsInMinute,
+            userAttemptsInHour,
+            convAttemptsInMinute,
+            convAttemptsInHour,
+          });
+
+          return {
+            valid: false,
+            error: "Rate limit exceeded",
+            retryAfterMs: Math.ceil(retryAfterMs),
+            remainingMinute: 0,
+            remainingHour: Math.max(
+              0,
+              rateLimitConfig.maxPerHour - userAttemptsInHour,
+              rateLimitConfig.conversationMaxPerHour - convAttemptsInHour
+            ),
+          };
+        }
+
+        // --- Replay Protection Check ---
         if (nonceDoc.exists) {
           logger.warn("Duplicate nonce detected (replay attack)", {
             senderId,
@@ -113,6 +244,7 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
           return {valid: false, error: "Invalid sequence number"};
         }
 
+        // --- All checks passed, write updates ---
         const token = tokenRef.id;
         const expiresAt = admin.firestore.Timestamp.fromMillis(now + 30000);
         const nonceExpireAt = admin.firestore.Timestamp.fromMillis(
@@ -121,7 +253,39 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
         const tokenExpireAt = admin.firestore.Timestamp.fromMillis(
           now + 60 * 60 * 1000
         );
+        const rateLimitExpireAt = admin.firestore.Timestamp.fromMillis(
+          nowTimestamp.toMillis() + 2 * 60 * 60 * 1000
+        );
 
+        // Update rate limit tracking
+        userAttempts.push(nowTimestamp);
+        convAttempts.push(nowTimestamp);
+
+        transaction.set(
+          userRateLimitRef,
+          {
+            attempts: userAttempts,
+            lastAttempt: nowTimestamp,
+            userId: senderId,
+            expireAt: rateLimitExpireAt,
+          },
+          {merge: true}
+        );
+
+        transaction.set(
+          convRateLimitRef,
+          {
+            attempts: convAttempts,
+            lastAttempt: nowTimestamp,
+            conversationId: conversationId,
+            userId: senderId,
+            recipientId: recipientId,
+            expireAt: rateLimitExpireAt,
+          },
+          {merge: true}
+        );
+
+        // Write replay protection data
         transaction.set(nonceRef, {
           senderId,
           conversationId,
@@ -151,7 +315,18 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
           expireAt: tokenExpireAt,
         });
 
-        return {valid: true, token};
+        return {
+          valid: true,
+          token,
+          remainingMinute: Math.min(
+            rateLimitConfig.maxPerMinute - userAttemptsInMinute - 1,
+            rateLimitConfig.conversationMaxPerMinute - convAttemptsInMinute - 1
+          ),
+          remainingHour: Math.min(
+            rateLimitConfig.maxPerHour - userAttemptsInHour - 1,
+            rateLimitConfig.conversationMaxPerHour - convAttemptsInHour - 1
+          ),
+        };
       });
 
       return result;

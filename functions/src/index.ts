@@ -18,7 +18,6 @@ export {verify2FABackupCode} from "./functions/verify2FABackupCode";
 export {enable2FA} from "./functions/enable2FA";
 export {disable2FA} from "./functions/disable2FA";
 export {regenerateBackupCodes} from "./functions/regenerateBackupCodes";
-export {checkMessageRateLimit} from "./functions/checkMessageRateLimit";
 export {validateMessageSend} from "./functions/validateMessageSend";
 export {onMessageCreate} from "./functions/onMessageCreate";
 export {cleanupExpiredReplayData} from "./functions/cleanupExpiredReplayData";

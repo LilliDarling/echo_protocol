@@ -167,6 +167,9 @@ class ReplayProtectionService {
         valid: data['valid'] as bool? ?? false,
         token: data['token'] as String?,
         error: data['error'] as String?,
+        retryAfterMs: data['retryAfterMs'] as int?,
+        remainingMinute: data['remainingMinute'] as int?,
+        remainingHour: data['remainingHour'] as int?,
       );
     } on FirebaseFunctionsException catch (e) {
       return ServerValidationResult(
@@ -202,10 +205,21 @@ class ServerValidationResult {
   final bool valid;
   final String? token;
   final String? error;
+  final int? retryAfterMs;
+  final int? remainingMinute;
+  final int? remainingHour;
 
   ServerValidationResult({
     required this.valid,
     this.token,
     this.error,
+    this.retryAfterMs,
+    this.remainingMinute,
+    this.remainingHour,
   });
+
+  Duration get retryAfter =>
+      retryAfterMs != null ? Duration(milliseconds: retryAfterMs!) : Duration.zero;
+
+  bool get isRateLimited => retryAfterMs != null && retryAfterMs! > 0;
 }
