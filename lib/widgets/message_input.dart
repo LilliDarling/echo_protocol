@@ -5,13 +5,12 @@ import '../models/echo.dart';
 import '../services/media_upload_service.dart';
 import '../services/media_encryption_service.dart';
 
-/// Message input widget with text field and send button
-/// Supports encrypted media uploads when mediaEncryptionService is provided
 class MessageInput extends StatefulWidget {
   final Future<void> Function(String text, {EchoType type, EchoMetadata? metadata}) onSend;
   final bool isSending;
   final String partnerId;
   final MediaEncryptionService? mediaEncryptionService;
+  final void Function(String)? onTextChanged;
 
   const MessageInput({
     super.key,
@@ -19,6 +18,7 @@ class MessageInput extends StatefulWidget {
     required this.isSending,
     required this.partnerId,
     this.mediaEncryptionService,
+    this.onTextChanged,
   });
 
   @override
@@ -366,7 +366,10 @@ class _MessageInputState extends State<MessageInput> {
                         vertical: 10,
                       ),
                     ),
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (text) {
+                      setState(() {});
+                      widget.onTextChanged?.call(text);
+                    },
                     onSubmitted: (_) => _handleSend(),
                   ),
                 ),

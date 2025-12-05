@@ -13,10 +13,12 @@ import '../../services/media_encryption_service.dart';
 import '../../services/decrypted_content_cache.dart';
 import '../../services/read_receipt_service.dart';
 import '../../services/offline_queue_service.dart';
+import '../../services/typing_indicator_service.dart';
 import '../settings/fingerprint_verification.dart';
 import '../../widgets/message_bubble.dart';
 import '../../widgets/message_input.dart';
 import '../../widgets/date_separator.dart';
+import '../../widgets/typing_indicator.dart';
 
 class ConversationScreen extends StatefulWidget {
   final PartnerInfo partner;
@@ -47,6 +49,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   late final DecryptedContentCacheService _contentCache;
   late final ReadReceiptService _readReceiptService;
   late final OfflineQueueService _offlineQueue;
+  late final TypingIndicatorService _typingService;
 
   List<EchoModel> _messages = [];
   StreamSubscription? _messagesSubscription;
@@ -58,6 +61,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   bool _hasMoreMessages = true;
   DocumentSnapshot? _oldestMessageDoc;
   String? _error;
+  bool _isPartnerTyping = false;
 
   static const int _pageSize = 30;
 
@@ -76,6 +80,10 @@ class _ConversationScreenState extends State<ConversationScreen>
       currentUserId: _currentUserId,
     );
     _offlineQueue = OfflineQueueService();
+    _typingService = TypingIndicatorService(
+      conversationId: widget.conversationId,
+      currentUserId: _currentUserId,
+    );
     _initializeServices();
     _loadInitialMessages();
     _markMessagesAsDelivered();
@@ -92,6 +100,7 @@ class _ConversationScreenState extends State<ConversationScreen>
     _contentCache.saveToDisk();
     _readReceiptService.dispose();
     _offlineQueue.dispose();
+    _typingService.dispose();
     super.dispose();
   }
 
@@ -114,6 +123,7 @@ class _ConversationScreenState extends State<ConversationScreen>
 
     await _offlineQueue.initialize();
     _subscribeToOfflineQueue();
+    _subscribeToTypingIndicator();
 
     final privateKey = await _secureStorage.getPrivateKey();
     if (privateKey != null) {
@@ -259,6 +269,14 @@ class _ConversationScreenState extends State<ConversationScreen>
     });
   }
 
+  void _subscribeToTypingIndicator() {
+    _typingService.startListening();
+    _typingService.partnerTypingStream.listen((isTyping) {
+      if (!mounted) return;
+      setState(() => _isPartnerTyping = isTyping);
+    });
+  }
+
   void _subscribeToNewMessages() {
     final newestTimestamp = _messages.isNotEmpty
         ? _messages.last.timestamp
@@ -366,6 +384,8 @@ class _ConversationScreenState extends State<ConversationScreen>
 
   Future<void> _sendMessage(String text, {EchoType type = EchoType.text, EchoMetadata? metadata}) async {
     if (text.trim().isEmpty && type == EchoType.text) return;
+
+    _typingService.stopTyping();
 
     setState(() {
       _isSending = true;
@@ -734,11 +754,14 @@ class _ConversationScreenState extends State<ConversationScreen>
           Expanded(
             child: _buildMessagesList(),
           ),
+          if (_isPartnerTyping)
+            TypingIndicator(partnerName: widget.partner.name),
           MessageInput(
             onSend: _sendMessage,
             isSending: _isSending,
             partnerId: widget.partner.id,
             mediaEncryptionService: _mediaEncryptionService,
+            onTextChanged: _typingService.onTextChanged,
           ),
         ],
       ),
