@@ -6,6 +6,10 @@ import {alertSuspiciousActivity} from "./anomaly";
 
 /**
  * Check and enforce user-based rate limiting
+ * @param {admin.firestore.Firestore} db - Firestore database instance
+ * @param {string} userId - User ID to check rate limit for
+ * @param {"TOTP" | "BACKUP_CODE"} limitType - Type of rate limit to check
+ * @return {Promise<void>}
  */
 export async function checkUserRateLimit(
   db: admin.firestore.Firestore,
@@ -26,7 +30,8 @@ export async function checkUserRateLimit(
       let attempts: admin.firestore.Timestamp[] = [];
       if (attemptsDoc.exists) {
         const data = attemptsDoc.data();
-        attempts = (data?.[limitType.toLowerCase()] || []) as admin.firestore.Timestamp[];
+        const key = limitType.toLowerCase();
+        attempts = (data?.[key] || []) as admin.firestore.Timestamp[];
         attempts = attempts.filter(
           (timestamp: admin.firestore.Timestamp) =>
             timestamp.toDate() > windowStart
@@ -34,7 +39,11 @@ export async function checkUserRateLimit(
       }
 
       if (attempts.length >= config.maxAttempts) {
-        logger.warn("User rate limit exceeded", {userId, limitType, attempts: attempts.length});
+        logger.warn("User rate limit exceeded", {
+          userId,
+          limitType,
+          attempts: attempts.length,
+        });
         throw new HttpsError(
           "resource-exhausted",
           `Too many ${limitType.toLowerCase()} verification attempts. ` +
@@ -61,6 +70,10 @@ export async function checkUserRateLimit(
 
 /**
  * Check and enforce IP-based rate limiting (prevents distributed attacks)
+ * @param {admin.firestore.Firestore} db - Firestore database instance
+ * @param {string} ip - IP address to check rate limit for
+ * @param {string} userId - User ID making the request
+ * @return {Promise<void>}
  */
 export async function checkIpRateLimit(
   db: admin.firestore.Firestore,
@@ -78,8 +91,12 @@ export async function checkIpRateLimit(
         now.toMillis() - config.windowMinutes * 60 * 1000
       );
 
-      let attempts: { timestamp: admin.firestore.Timestamp; userId: string }[] = [];
-      let uniqueUsers = new Set<string>();
+      type AttemptRecord = {
+        timestamp: admin.firestore.Timestamp;
+        userId: string;
+      };
+      let attempts: AttemptRecord[] = [];
+      const uniqueUsers = new Set<string>();
 
       if (ipDoc.exists) {
         const data = ipDoc.data();
@@ -128,12 +145,9 @@ export async function checkIpRateLimit(
       );
 
       if (attempts.length >= ANOMALY_THRESHOLDS.suspiciousIpAttempts) {
-        await alertSuspiciousActivity(
-          db,
-          ip,
-          "high_attempt_rate",
-          `IP ${ip} has made ${attempts.length} 2FA attempts in ${config.windowMinutes} minutes`
-        );
+        const msg = `IP ${ip} has made ${attempts.length} 2FA attempts ` +
+          `in ${config.windowMinutes} minutes`;
+        await alertSuspiciousActivity(db, ip, "high_attempt_rate", msg);
       }
     });
   } catch (error) {

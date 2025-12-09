@@ -14,14 +14,14 @@ export const enable2FA = onCall(
   async (request) => {
     validateRequest(request);
 
-    const userId = request.auth!.uid;
+    const userId = request.auth?.uid as string;
     const ip = request.rawRequest.ip || "unknown";
 
     logger.info("Enabling 2FA", {userId, ip});
 
     try {
       const secret = speakeasy.generateSecret({
-        name: `EchoProtocol (${request.auth!.token.email || userId})`,
+        name: `EchoProtocol (${request.auth?.token.email || userId})`,
         issuer: TOTP_CONFIG.issuer,
         length: TOTP_CONFIG.secretLength,
       });
@@ -62,7 +62,8 @@ export const enable2FA = onCall(
         backupCodes: backupCodes,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error("Failed to enable 2FA", {userId, errorMessage});
       throw new HttpsError("internal", "Failed to enable 2FA");
     }

@@ -3,8 +3,12 @@ import {BACKUP_CODE_CONFIG} from "../config/constants";
 
 /**
  * Generate cryptographically secure backup codes
+ * @param {number} count - Number of backup codes to generate
+ * @return {string[]} Array of backup codes in format XXXX-XXXX
  */
-export function generateBackupCodes(count: number = BACKUP_CODE_CONFIG.count): string[] {
+export function generateBackupCodes(
+  count: number = BACKUP_CODE_CONFIG.count
+): string[] {
   const codes: string[] = [];
 
   for (let i = 0; i < count; i++) {

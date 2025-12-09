@@ -12,7 +12,7 @@ export const verify2FABackupCode = onCall(
   async (request) => {
     validateRequest(request);
 
-    const userId = request.auth!.uid;
+    const userId = request.auth?.uid as string;
     const {code} = request.data;
     const ip = request.rawRequest.ip || "unknown";
 
@@ -98,8 +98,12 @@ export const verify2FABackupCode = onCall(
       if (error instanceof HttpsError) {
         throw error;
       }
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error("2FA backup code verification error", {userId, errorMessage});
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error("2FA backup code verification error", {
+        userId,
+        errorMessage,
+      });
       throw new HttpsError("internal", "Verification failed");
     }
   }

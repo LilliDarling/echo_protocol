@@ -12,7 +12,7 @@ export const verify2FATOTP = onCall(
   async (request) => {
     validateRequest(request);
 
-    const userId = request.auth!.uid;
+    const userId = request.auth?.uid as string;
     const {code} = request.data;
     const ip = request.rawRequest.ip || "unknown";
 
@@ -111,7 +111,8 @@ export const verify2FATOTP = onCall(
       if (error instanceof HttpsError) {
         throw error;
       }
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error("2FA TOTP verification error", {userId, errorMessage});
       throw new HttpsError("internal", "Verification failed");
     }

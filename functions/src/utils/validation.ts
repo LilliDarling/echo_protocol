@@ -1,10 +1,11 @@
-import {HttpsError} from "firebase-functions/v2/https";
+import {HttpsError, CallableRequest} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 
 /**
  * Validate request authentication and basic security checks
+ * @param {CallableRequest} request - The callable request to validate
  */
-export function validateRequest(request: any): void {
+export function validateRequest(request: CallableRequest): void {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "User must be authenticated");
   }

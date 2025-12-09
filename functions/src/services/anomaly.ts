@@ -3,6 +3,11 @@ import * as logger from "firebase-functions/logger";
 
 /**
  * Alert on suspicious activity for security monitoring
+ * @param {admin.firestore.Firestore} db - Firestore database instance
+ * @param {string} ip - IP address of the suspicious activity
+ * @param {string} alertType - Type of alert (e.g., distributed_attack)
+ * @param {string} description - Human-readable description of the alert
+ * @return {Promise<void>}
  */
 export async function alertSuspiciousActivity(
   db: admin.firestore.Firestore,

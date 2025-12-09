@@ -20,6 +20,12 @@ interface ValidateMessageResponse {
   remainingHour?: number;
 }
 
+/**
+ * Generate a consistent conversation key from two user IDs
+ * @param {string} userId1 - First user ID
+ * @param {string} userId2 - Second user ID
+ * @return {string} Sorted concatenation of user IDs
+ */
 function getConversationKey(userId1: string, userId2: string): string {
   return [userId1, userId2].sort().join("_");
 }
@@ -88,7 +94,9 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
     try {
       const result = await db.runTransaction(async (transaction) => {
         // Rate limit refs
-        const userRateLimitRef = db.collection("message_rate_limits").doc(senderId);
+        const userRateLimitRef = db
+          .collection("message_rate_limits")
+          .doc(senderId);
         const convRateLimitRef = db
           .collection("message_rate_limits")
           .doc(`${senderId}_${conversationId}`);
@@ -114,7 +122,8 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
 
         let userAttempts: admin.firestore.Timestamp[] = [];
         if (userDoc.exists) {
-          userAttempts = (userDoc.data()?.attempts || []) as admin.firestore.Timestamp[];
+          userAttempts =
+            (userDoc.data()?.attempts || []) as admin.firestore.Timestamp[];
           userAttempts = userAttempts.filter(
             (ts: admin.firestore.Timestamp) => ts.toDate() > hourAgo
           );
@@ -122,7 +131,8 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
 
         let convAttempts: admin.firestore.Timestamp[] = [];
         if (convDoc.exists) {
-          convAttempts = (convDoc.data()?.attempts || []) as admin.firestore.Timestamp[];
+          convAttempts =
+            (convDoc.data()?.attempts || []) as admin.firestore.Timestamp[];
           convAttempts = convAttempts.filter(
             (ts: admin.firestore.Timestamp) => ts.toDate() > hourAgo
           );
@@ -142,11 +152,10 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
         let limitReason = "";
 
         if (userAttemptsInMinute >= rateLimitConfig.maxPerMinute) {
+          type TS = admin.firestore.Timestamp;
           const oldestInMinute = userAttempts
-            .filter((t: admin.firestore.Timestamp) => t.toDate() > minuteAgo)
-            .sort((a: admin.firestore.Timestamp, b: admin.firestore.Timestamp) =>
-              a.toMillis() - b.toMillis()
-            )[0];
+            .filter((t: TS) => t.toDate() > minuteAgo)
+            .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
           if (oldestInMinute) {
             retryAfterMs = Math.max(
               retryAfterMs,
@@ -157,10 +166,9 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
         }
 
         if (userAttemptsInHour >= rateLimitConfig.maxPerHour) {
+          type TS = admin.firestore.Timestamp;
           const oldestInHour = userAttempts
-            .sort((a: admin.firestore.Timestamp, b: admin.firestore.Timestamp) =>
-              a.toMillis() - b.toMillis()
-            )[0];
+            .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
           if (oldestInHour) {
             retryAfterMs = Math.max(
               retryAfterMs,
@@ -171,11 +179,10 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
         }
 
         if (convAttemptsInMinute >= rateLimitConfig.conversationMaxPerMinute) {
+          type TS = admin.firestore.Timestamp;
           const oldestInMinute = convAttempts
-            .filter((t: admin.firestore.Timestamp) => t.toDate() > minuteAgo)
-            .sort((a: admin.firestore.Timestamp, b: admin.firestore.Timestamp) =>
-              a.toMillis() - b.toMillis()
-            )[0];
+            .filter((t: TS) => t.toDate() > minuteAgo)
+            .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
           if (oldestInMinute) {
             retryAfterMs = Math.max(
               retryAfterMs,
@@ -186,10 +193,9 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
         }
 
         if (convAttemptsInHour >= rateLimitConfig.conversationMaxPerHour) {
+          type TS = admin.firestore.Timestamp;
           const oldestInHour = convAttempts
-            .sort((a: admin.firestore.Timestamp, b: admin.firestore.Timestamp) =>
-              a.toMillis() - b.toMillis()
-            )[0];
+            .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
           if (oldestInHour) {
             retryAfterMs = Math.max(
               retryAfterMs,

@@ -14,7 +14,7 @@ export const regenerateBackupCodes = onCall(
   async (request) => {
     validateRequest(request);
 
-    const userId = request.auth!.uid;
+    const userId = request.auth?.uid as string;
     const {code} = request.data;
     const ip = request.rawRequest.ip || "unknown";
 
@@ -76,8 +76,12 @@ export const regenerateBackupCodes = onCall(
       if (error instanceof HttpsError) {
         throw error;
       }
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error("Failed to regenerate backup codes", {userId, errorMessage});
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error("Failed to regenerate backup codes", {
+        userId,
+        errorMessage,
+      });
       throw new HttpsError("internal", "Failed to regenerate backup codes");
     }
   }

@@ -12,7 +12,7 @@ export const disable2FA = onCall(
   async (request) => {
     validateRequest(request);
 
-    const userId = request.auth!.uid;
+    const userId = request.auth?.uid as string;
     const {code} = request.data;
     const ip = request.rawRequest.ip || "unknown";
 
@@ -76,7 +76,8 @@ export const disable2FA = onCall(
       if (error instanceof HttpsError) {
         throw error;
       }
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error("Failed to disable 2FA", {userId, errorMessage});
       throw new HttpsError("internal", "Failed to disable 2FA");
     }

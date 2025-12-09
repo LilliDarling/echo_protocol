@@ -15,20 +15,16 @@ class _HomeScreenState extends State<HomeScreen> {
   final AuthService _authService = AuthService();
   int _currentIndex = 0;
 
-  late final List<Widget> _tabs;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabs = [
+  List<Widget> _buildTabs(BuildContext context) {
+    return [
       const MessagesTab(),
-      _buildPlaceholderTab('Express', Icons.favorite),
-      _buildPlaceholderTab('Plans', Icons.calendar_today),
+      _buildPlaceholderTab(context, 'Express', Icons.favorite),
+      _buildPlaceholderTab(context, 'Plans', Icons.calendar_today),
       ProfileTab(),
     ];
   }
 
-  Widget _buildPlaceholderTab(String title, IconData icon) {
+  Widget _buildPlaceholderTab(BuildContext context, String title, IconData icon) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -75,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final titles = ['Messages', 'Express', 'Plans', 'Profile'];
+    final tabs = _buildTabs(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -91,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: IndexedStack(
         index: _currentIndex,
-        children: _tabs,
+        children: tabs,
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
