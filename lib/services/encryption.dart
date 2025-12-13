@@ -7,10 +7,19 @@ import 'package:pointycastle/export.dart';
 import '../utils/security.dart';
 
 /// End-to-end encryption service for Echo Protocol
+/// Singleton to ensure keys are shared across the app
 class EncryptionService {
+  static final EncryptionService _instance = EncryptionService._internal();
+
+  factory EncryptionService() {
+    return _instance;
+  }
+
+  EncryptionService._internal();
+
   // EC key pair for current user (Curve25519)
-  late ECPrivateKey? _privateKey;
-  late ECPublicKey? _publicKey;
+  ECPrivateKey? _privateKey;
+  ECPublicKey? _publicKey;
 
   ECPublicKey? _partnerPublicKey;
 

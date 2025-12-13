@@ -1,4 +1,4 @@
-package com.example.echo_protocol
+package app.echoprotocol
 
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity

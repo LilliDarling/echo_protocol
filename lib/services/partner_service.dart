@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'secure_storage.dart';
@@ -141,15 +142,33 @@ class PartnerService {
       throw Exception('Failed to generate unique invite code');
     }
 
-    // Get user's public key
-    final publicKey = await _secureStorage.getPublicKey();
+    // Get user's public key - try local storage first, then Firestore
+    var publicKey = await _secureStorage.getPublicKey();
     if (publicKey == null) {
-      throw Exception('Public key not found');
+      // Try to get from Firestore as fallback
+      final storedPublicKey = userDoc.data()?['publicKey'] as String?;
+      if (storedPublicKey != null) {
+        publicKey = storedPublicKey;
+        // Re-store locally for future use
+        await _secureStorage.storePublicKey(storedPublicKey);
+      } else {
+        throw Exception('Public key not found. Please sign out and sign in again.');
+      }
     }
 
     // Get user's name for display
     final userName = userDoc.data()?['name'] as String? ?? 'Unknown';
-    final publicKeyVersion = userDoc.data()?['publicKeyVersion'] as int? ?? 1;
+
+    // Handle both int and string types for publicKeyVersion
+    final storedVersion = userDoc.data()?['publicKeyVersion'];
+    int publicKeyVersion;
+    if (storedVersion is int) {
+      publicKeyVersion = storedVersion;
+    } else if (storedVersion is String) {
+      publicKeyVersion = int.tryParse(storedVersion) ?? 1;
+    } else {
+      publicKeyVersion = 1;
+    }
 
     // Create invite document
     final now = DateTime.now();
@@ -224,132 +243,72 @@ class PartnerService {
       throw Exception('Invalid invite code');
     }
 
-    // Check if user already has a partner
-    final userDoc = await _db.collection('users').doc(user.uid).get();
-    final existingPartnerId = userDoc.data()?['partnerId'] as String?;
-    if (existingPartnerId != null) {
-      throw Exception('You already have a partner linked');
-    }
+    // Get my public key to send to partner - try local storage first, then Firestore
+    var myPublicKey = await _secureStorage.getPublicKey();
+    var myKeyVersion = await _secureStorage.getCurrentKeyVersion();
 
-    // Get invite document
-    final inviteDoc = await _db
-        .collection('partnerInvites')
-        .doc(normalizedCode)
-        .get();
+    if (myPublicKey == null || myKeyVersion == null) {
+      // Try to get from Firestore as fallback
+      final userDoc = await _db.collection('users').doc(user.uid).get();
+      final userData = userDoc.data();
 
-    if (!inviteDoc.exists) {
-      throw Exception('Invalid invite code');
-    }
+      if (myPublicKey == null) {
+        final storedPublicKey = userData?['publicKey'] as String?;
+        if (storedPublicKey != null) {
+          myPublicKey = storedPublicKey;
+          await _secureStorage.storePublicKey(storedPublicKey);
+        } else {
+          throw Exception('Authentication error. Please sign out and sign in again.');
+        }
+      }
 
-    final inviteData = inviteDoc.data()!;
-
-    if (inviteData['used'] == true) {
-      throw Exception('This invite code is no longer valid');
-    }
-
-    final expiresAt = (inviteData['expiresAt'] as Timestamp).toDate();
-    if (DateTime.now().isAfter(expiresAt)) {
-      throw Exception('This invite code is no longer valid');
-    }
-
-    final partnerId = inviteData['userId'] as String;
-    if (partnerId == user.uid) {
-      throw Exception('Invalid operation');
-    }
-
-    // Get partner's public key from invite
-    final partnerPublicKey = inviteData['publicKey'] as String;
-    final partnerKeyVersion = inviteData['publicKeyVersion'] as int? ?? 1;
-    final partnerName = inviteData['userName'] as String? ?? 'Partner';
-    final storedFingerprint = inviteData['publicKeyFingerprint'] as String?;
-    final storedSignature = inviteData['signature'] as String?;
-
-    if (!_encryptionService.isValidPublicKey(partnerPublicKey)) {
-      throw Exception('Invalid invite data');
-    }
-
-    if (storedFingerprint != null) {
-      final computedFingerprint = _encryptionService.generateFingerprint(partnerPublicKey);
-      if (!SecurityUtils.constantTimeEquals(
-        storedFingerprint.replaceAll(' ', ''),
-        computedFingerprint.replaceAll(' ', ''),
-      )) {
-        throw Exception('Invalid invite data');
+      if (myKeyVersion == null) {
+        // Handle both int and string types from Firestore
+        final storedVersion = userData?['publicKeyVersion'];
+        if (storedVersion is int) {
+          myKeyVersion = storedVersion;
+        } else if (storedVersion is String) {
+          myKeyVersion = int.tryParse(storedVersion) ?? 1;
+        } else {
+          myKeyVersion = 1;
+        }
+        await _secureStorage.storeCurrentKeyVersion(myKeyVersion);
       }
     }
 
-    if (storedSignature != null && !_verifyInviteSignature(
-      inviteCode: normalizedCode,
-      userId: partnerId,
-      publicKey: partnerPublicKey,
-      expiresAt: expiresAt,
-      signature: storedSignature,
-    )) {
-      throw Exception('Invalid invite data');
-    }
+    // Call Cloud Function to handle the partner linking
+    final functions = FirebaseFunctions.instance;
+    final callable = functions.httpsCallable('acceptPartnerInvite');
 
-    final partnerDoc = await _db.collection('users').doc(partnerId).get();
-    if (!partnerDoc.exists) {
-      throw Exception('Partner not found');
-    }
-    final partnerExistingPartner = partnerDoc.data()?['partnerId'] as String?;
-    if (partnerExistingPartner != null) {
-      throw Exception('This user is already linked');
-    }
-
-    final myPublicKey = await _secureStorage.getPublicKey();
-    if (myPublicKey == null) {
-      throw Exception('Authentication error');
-    }
-
-    final myKeyVersion = await _secureStorage.getCurrentKeyVersion() ?? 1;
-
-    await _secureStorage.storePartnerPublicKey(partnerPublicKey);
-    _encryptionService.setPartnerPublicKey(partnerPublicKey);
-    await _db.runTransaction((transaction) async {
-      transaction.update(inviteDoc.reference, {
-        'used': true,
-        'usedAt': FieldValue.serverTimestamp(),
-        'usedBy': user.uid,
+    try {
+      final result = await callable.call<Map<String, dynamic>>({
+        'inviteCode': normalizedCode,
+        'myPublicKey': myPublicKey,
+        'myKeyVersion': myKeyVersion,
       });
 
-      transaction.update(_db.collection('users').doc(user.uid), {
-        'partnerId': partnerId,
-        'partnerPublicKey': partnerPublicKey,
-        'partnerKeyVersion': partnerKeyVersion,
-        'partnerLinkedAt': FieldValue.serverTimestamp(),
-      });
+      final data = result.data;
+      final partnerId = data['partnerId'] as String;
+      final partnerName = data['partnerName'] as String;
+      final partnerPublicKey = data['partnerPublicKey'] as String;
+      final partnerKeyVersion = data['partnerKeyVersion'] as int;
+      final partnerFingerprint = data['partnerFingerprint'] as String?;
 
-      transaction.update(_db.collection('users').doc(partnerId), {
-        'partnerId': user.uid,
-        'partnerPublicKey': myPublicKey,
-        'partnerKeyVersion': myKeyVersion,
-        'partnerLinkedAt': FieldValue.serverTimestamp(),
-      });
+      // Store partner's public key locally
+      await _secureStorage.storePartnerPublicKey(partnerPublicKey);
+      _encryptionService.setPartnerPublicKey(partnerPublicKey);
 
-      final conversationId = _generateConversationId(user.uid, partnerId);
-      transaction.set(_db.collection('conversations').doc(conversationId), {
-        'participants': [user.uid, partnerId],
-        'createdAt': FieldValue.serverTimestamp(),
-        'lastMessageAt': FieldValue.serverTimestamp(),
-        'lastMessage': null,
-        'unreadCount': {
-          user.uid: 0,
-          partnerId: 0,
-        },
-      });
-    });
-
-    final partnerFingerprint = _encryptionService.generateFingerprint(partnerPublicKey);
-
-    return PartnerInfo(
-      id: partnerId,
-      name: partnerName,
-      publicKey: partnerPublicKey,
-      keyVersion: partnerKeyVersion,
-      fingerprint: partnerFingerprint,
-      isNewlyLinked: true,
-    );
+      return PartnerInfo(
+        id: partnerId,
+        name: partnerName,
+        publicKey: partnerPublicKey,
+        keyVersion: partnerKeyVersion,
+        fingerprint: partnerFingerprint ?? _encryptionService.generateFingerprint(partnerPublicKey),
+        isNewlyLinked: true,
+      );
+    } on FirebaseFunctionsException catch (e) {
+      throw Exception(e.message ?? 'Failed to accept invite');
+    }
   }
 
   String _generateConversationId(String uid1, String uid2) {
@@ -371,12 +330,24 @@ class PartnerService {
     if (!partnerDoc.exists) return null;
 
     final partnerData = partnerDoc.data()!;
+
+    // Handle publicKeyVersion that might be stored as string or int
+    final storedKeyVersion = partnerData['publicKeyVersion'];
+    int keyVersion;
+    if (storedKeyVersion is int) {
+      keyVersion = storedKeyVersion;
+    } else if (storedKeyVersion is String) {
+      keyVersion = int.tryParse(storedKeyVersion) ?? 1;
+    } else {
+      keyVersion = 1;
+    }
+
     return PartnerInfo(
       id: partnerId,
       name: partnerData['name'] as String? ?? 'Partner',
       avatar: partnerData['avatar'] as String?,
       publicKey: partnerData['publicKey'] as String,
-      keyVersion: partnerData['publicKeyVersion'] as int? ?? 1,
+      keyVersion: keyVersion,
       lastActive: (partnerData['lastActive'] as Timestamp?)?.toDate(),
     );
   }
@@ -467,6 +438,13 @@ class PartnerService {
   Future<void> initializePartnerEncryption() async {
     final user = _auth.currentUser;
     if (user == null) return;
+
+    // First, ensure user's own private key is loaded
+    final privateKey = await _secureStorage.getPrivateKey();
+    if (privateKey != null) {
+      final keyVersion = await _secureStorage.getCurrentKeyVersion();
+      _encryptionService.setPrivateKey(privateKey, keyVersion: keyVersion);
+    }
 
     final userDoc = await _db.collection('users').doc(user.uid).get();
     final partnerPublicKey = userDoc.data()?['partnerPublicKey'] as String?;
