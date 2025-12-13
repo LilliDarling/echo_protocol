@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/auth.dart';
 import '../settings/fingerprint_verification.dart';
 import '../settings/device_linking.dart';
@@ -190,6 +191,47 @@ class ProfileTab extends StatelessWidget {
           },
         ),
 
+        const Divider(height: 32),
+
+        // Legal Section
+        _buildSectionHeader(context, 'Legal'),
+
+        ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.indigo.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.privacy_tip,
+              color: Colors.indigo.shade700,
+            ),
+          ),
+          title: const Text('Privacy Policy'),
+          subtitle: const Text('How we handle your data'),
+          trailing: const Icon(Icons.open_in_new, size: 20),
+          onTap: () => _launchPrivacyPolicy(context),
+        ),
+
+        ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.teal.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.description,
+              color: Colors.teal.shade700,
+            ),
+          ),
+          title: const Text('Terms of Service'),
+          subtitle: const Text('Usage terms and conditions'),
+          trailing: const Icon(Icons.open_in_new, size: 20),
+          onTap: () => _launchTermsOfService(context),
+        ),
+
         const SizedBox(height: 32),
 
         // About Section
@@ -251,6 +293,31 @@ class ProfileTab extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static const String _privacyPolicyUrl = 'https://www.notion.so/Echo-Protocol-Privacy-Policy-2c6041b919bf80aa9e33e0a30e127b5c';
+  static const String _termsOfServiceUrl = 'https://yourwebsite.com/terms-of-service';
+
+  Future<void> _launchPrivacyPolicy(BuildContext context) async {
+    final uri = Uri.parse(_privacyPolicyUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open Privacy Policy')),
+      );
+    }
+  }
+
+  Future<void> _launchTermsOfService(BuildContext context) async {
+    final uri = Uri.parse(_termsOfServiceUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open Terms of Service')),
+      );
+    }
   }
 
   Future<void> _showKeyRotationDialog(BuildContext context) async {
