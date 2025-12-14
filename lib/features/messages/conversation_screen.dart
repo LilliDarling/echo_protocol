@@ -114,41 +114,50 @@ class _ConversationScreenState extends State<ConversationScreen>
   }
 
   Future<void> _initializeServices() async {
-    _encryptionService = EncryptionService();
-    _secureStorage = SecureStorageService();
-    _rateLimiter = MessageRateLimiter();
-    _replayProtection = ReplayProtectionService(userId: _currentUserId);
+    try {
+      _encryptionService = EncryptionService();
+      _secureStorage = SecureStorageService();
+      _rateLimiter = MessageRateLimiter();
+      _replayProtection = ReplayProtectionService(userId: _currentUserId);
 
-    _contentCache = DecryptedContentCacheService(secureStorage: _secureStorage);
-    await _contentCache.loadFromDisk();
+      _contentCache = DecryptedContentCacheService(secureStorage: _secureStorage);
+      await _contentCache.loadFromDisk();
 
-    await _offlineQueue.initialize();
-    _subscribeToOfflineQueue();
-    _subscribeToTypingIndicator();
+      await _offlineQueue.initialize();
+      _subscribeToOfflineQueue();
+      _subscribeToTypingIndicator();
 
-    final privateKey = await _secureStorage.getPrivateKey();
-    if (privateKey != null) {
+      final privateKey = await _secureStorage.getPrivateKey();
+      if (privateKey == null) {
+        throw Exception('Encryption keys not found. Please sign out and sign in again.');
+      }
+
       final keyVersion = await _secureStorage.getCurrentKeyVersion();
       _encryptionService.setPrivateKey(privateKey, keyVersion: keyVersion);
-    }
+      _encryptionService.setPartnerPublicKey(widget.partner.publicKey);
 
-    _encryptionService.setPartnerPublicKey(widget.partner.publicKey);
+      _encryptionHelper = MessageEncryptionHelper(
+        encryptionService: _encryptionService,
+        secureStorage: _secureStorage,
+        replayProtection: _replayProtection,
+        rateLimiter: _rateLimiter,
+      );
 
-    _encryptionHelper = MessageEncryptionHelper(
-      encryptionService: _encryptionService,
-      secureStorage: _secureStorage,
-      replayProtection: _replayProtection,
-      rateLimiter: _rateLimiter,
-    );
+      _mediaEncryptionService = MediaEncryptionService(
+        encryptionService: _encryptionService,
+      );
 
-    _mediaEncryptionService = MediaEncryptionService(
-      encryptionService: _encryptionService,
-    );
-
-    if (mounted) {
-      setState(() {
-        _isServicesInitialized = true;
-      });
+      if (mounted) {
+        setState(() {
+          _isServicesInitialized = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to initialize encryption: ${e.toString()}';
+        });
+      }
     }
   }
 

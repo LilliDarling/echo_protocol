@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../services/auth.dart';
-import '../../services/two_factor.dart';
 import '../../utils/validators.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 import 'two_factor_setup.dart';
+import 'recovery_phrase_display_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -20,7 +20,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _confirmPasswordController = TextEditingController();
   final _displayNameController = TextEditingController();
   final _authService = AuthService();
-  final _twoFactorService = TwoFactorService();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -51,18 +50,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final credential = await _authService.signUpWithEmail(
+      final result = await _authService.signUpWithEmail(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         displayName: _displayNameController.text.trim(),
       );
 
       if (mounted) {
+        // Show recovery phrase screen first, then proceed to 2FA setup
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => TwoFactorSetupScreen(
-              userId: credential.user!.uid,
-              isOnboarding: true,
+            builder: (_) => RecoveryPhraseDisplayScreen(
+              recoveryPhrase: result.recoveryPhrase,
+              onComplete: () {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => TwoFactorSetupScreen(
+                      userId: result.credential.user!.uid,
+                      isOnboarding: true,
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         );
@@ -87,22 +96,31 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final credential = await _authService.signInWithGoogle();
-      final userId = credential.user!.uid;
-
-      final is2FAEnabled = await _twoFactorService.is2FAEnabled(userId);
+      final result = await _authService.signInWithGoogle();
 
       if (mounted) {
-        if (is2FAEnabled) {
+        if (result is SignUpResult) {
+          // New user - show recovery phrase first
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (_) => TwoFactorSetupScreen(
-                userId: userId,
-                isOnboarding: true,
+              builder: (_) => RecoveryPhraseDisplayScreen(
+                recoveryPhrase: result.recoveryPhrase,
+                onComplete: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => TwoFactorSetupScreen(
+                        userId: result.credential.user!.uid,
+                        isOnboarding: true,
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           );
-        } else {
+        } else if (result is SignInResult) {
+          // Existing user - go to 2FA setup or home
+          final userId = result.credential.user!.uid;
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => TwoFactorSetupScreen(

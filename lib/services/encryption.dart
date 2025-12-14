@@ -27,10 +27,39 @@ class EncryptionService {
 
   int? _currentKeyVersion;
 
-  /// Generate a new EC key pair for the current user
-  /// Uses Curve25519 (X25519)
+  /// Generate a new EC key pair from a seed (deterministic).
+  /// Used for recovery phrase-based key generation.
+  Future<Map<String, String>> generateKeyPairFromSeed(Uint8List seed) async {
+    final ecDomainParameters = ECDomainParameters('secp256k1');
+
+    // Use HKDF to derive 32 bytes for the private key from the seed
+    final privateKeyBytes = SecurityUtils.hkdfSha256(
+      seed,
+      Uint8List.fromList('echo-protocol-v1'.codeUnits),
+      Uint8List.fromList('secp256k1-signing-key'.codeUnits),
+      32,
+    );
+
+    // Convert to BigInt for EC operations
+    final d = _decodeBigInt(privateKeyBytes);
+
+    // Ensure private key is within valid range (1 < d < n)
+    final validD = d % (ecDomainParameters.n - BigInt.one) + BigInt.one;
+
+    _privateKey = ECPrivateKey(validD, ecDomainParameters);
+
+    final Q = ecDomainParameters.G * validD;
+    _publicKey = ECPublicKey(Q, ecDomainParameters);
+
+    return {
+      'publicKey': _encodePublicKey(_publicKey!),
+      'privateKey': _encodePrivateKey(_privateKey!),
+    };
+  }
+
+  /// Generate a new EC key pair using secure random (non-deterministic).
+  /// Only used for backwards compatibility or special cases.
   Future<Map<String, String>> generateKeyPair() async {
-    // Use secp256k1 curve (used by Bitcoin, Signal, etc.)
     final ecDomainParameters = ECDomainParameters('secp256k1');
 
     final random = _getSecureRandom();

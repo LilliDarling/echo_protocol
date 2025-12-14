@@ -7,22 +7,42 @@ import '../utils/validators.dart';
 import 'encryption.dart';
 import 'secure_storage.dart';
 import 'logger.dart';
+import 'recovery_phrase_service.dart';
+
+/// Result of a sign-up operation that includes the recovery phrase.
+class SignUpResult {
+  final UserCredential credential;
+  final String recoveryPhrase;
+
+  SignUpResult({required this.credential, required this.recoveryPhrase});
+}
+
+/// Result of a sign-in operation.
+class SignInResult {
+  final UserCredential credential;
+  final bool needsRecovery;
+
+  SignInResult({required this.credential, this.needsRecovery = false});
+}
 
 class AuthService {
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
   final EncryptionService _encryptionService;
   final SecureStorageService _secureStorage;
+  final RecoveryPhraseService _recoveryPhraseService;
 
   AuthService({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
     EncryptionService? encryptionService,
     SecureStorageService? secureStorage,
+    RecoveryPhraseService? recoveryPhraseService,
   })  : _auth = auth ?? FirebaseAuth.instance,
         _db = firestore ?? FirebaseFirestore.instance,
         _encryptionService = encryptionService ?? EncryptionService(),
-        _secureStorage = secureStorage ?? SecureStorageService();
+        _secureStorage = secureStorage ?? SecureStorageService(),
+        _recoveryPhraseService = recoveryPhraseService ?? RecoveryPhraseService();
 
   User? get currentUser => _auth.currentUser;
 
@@ -30,7 +50,7 @@ class AuthService {
 
   String? get currentUserId => _auth.currentUser?.uid;
 
-  Future<UserCredential> signUpWithEmail({
+  Future<SignUpResult> signUpWithEmail({
     required String email,
     required String password,
     required String displayName,
@@ -49,25 +69,28 @@ class AuthService {
       final sanitizedName = displayName.trim();
       await credential.user?.updateDisplayName(sanitizedName);
 
-      final keyPair = await _generateAndStoreKeys(credential.user!.uid);
+      final keyResult = await _generateAndStoreKeys(credential.user!.uid);
 
       await _createUserDocument(
         userId: credential.user!.uid,
         email: email,
         displayName: displayName,
         photoUrl: null,
-        publicKey: keyPair['publicKey']!,
+        publicKey: keyResult['publicKey']!,
       );
 
       LoggerService.auth('Sign up successful', userId: credential.user!.uid);
-      return credential;
+      return SignUpResult(
+        credential: credential,
+        recoveryPhrase: keyResult['mnemonic']!,
+      );
     } on FirebaseAuthException catch (e) {
       LoggerService.error('Sign up failed: ${e.code}');
       throw _handleAuthException(e);
     }
   }
 
-  Future<UserCredential> signInWithEmail({
+  Future<SignInResult> signInWithEmail({
     required String email,
     required String password,
   }) async {
@@ -77,18 +100,22 @@ class AuthService {
         password: password,
       );
 
-      await _loadUserKeys(credential.user!.uid);
-      await _updateLastActive(credential.user!.uid);
+      final needsRecovery = !await _tryLoadUserKeys(credential.user!.uid);
+      if (!needsRecovery) {
+        await _updateLastActive(credential.user!.uid);
+      }
 
       LoggerService.auth('Sign in successful', userId: credential.user!.uid);
-      return credential;
+      return SignInResult(credential: credential, needsRecovery: needsRecovery);
     } on FirebaseAuthException catch (e) {
       LoggerService.error('Sign in failed: ${e.code}');
       throw _handleAuthException(e);
     }
   }
 
-  Future<UserCredential> signInWithGoogle() async {
+  /// Sign in with Google. Returns SignUpResult for new users (with recovery phrase)
+  /// or SignInResult for existing users.
+  Future<dynamic> signInWithGoogle() async {
     try {
       final UserCredential userCredential;
 
@@ -113,22 +140,30 @@ class AuthService {
       final isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
 
       if (isNewUser) {
-        final keyPair = await _generateAndStoreKeys(userCredential.user!.uid);
+        final keyResult = await _generateAndStoreKeys(userCredential.user!.uid);
 
         await _createUserDocument(
           userId: userCredential.user!.uid,
           email: userCredential.user!.email!,
           displayName: userCredential.user!.displayName ?? 'User',
           photoUrl: userCredential.user!.photoURL,
-          publicKey: keyPair['publicKey']!,
+          publicKey: keyResult['publicKey']!,
+        );
+
+        LoggerService.auth('Google sign-up successful', userId: userCredential.user!.uid);
+        return SignUpResult(
+          credential: userCredential,
+          recoveryPhrase: keyResult['mnemonic']!,
         );
       } else {
-        await _loadUserKeys(userCredential.user!.uid);
-        await _updateLastActive(userCredential.user!.uid);
-      }
+        final needsRecovery = !await _tryLoadUserKeys(userCredential.user!.uid);
+        if (!needsRecovery) {
+          await _updateLastActive(userCredential.user!.uid);
+        }
 
-      LoggerService.auth('Google sign-in successful', userId: userCredential.user!.uid);
-      return userCredential;
+        LoggerService.auth('Google sign-in successful', userId: userCredential.user!.uid);
+        return SignInResult(credential: userCredential, needsRecovery: needsRecovery);
+      }
     } on FirebaseAuthException catch (e) {
       LoggerService.error('Google sign-in failed: ${e.code}');
       throw _handleAuthException(e);
@@ -290,27 +325,88 @@ class AuthService {
     return _encryptionService.verifyFingerprint(publicKey, expectedFingerprint);
   }
 
+  /// Generate keys from a new mnemonic and store them.
+  /// Returns map with 'publicKey', 'privateKey', and 'mnemonic'.
   Future<Map<String, String>> _generateAndStoreKeys(String userId) async {
-    final keyPair = await _encryptionService.generateKeyPair();
-    final initialVersion = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    // Generate new recovery phrase
+    final mnemonic = _recoveryPhraseService.generateMnemonic();
+
+    // Derive seed from mnemonic
+    final seed = _recoveryPhraseService.deriveSeedFromMnemonic(mnemonic);
+
+    // Generate keys from seed (deterministic)
+    final keyPair = await _encryptionService.generateKeyPairFromSeed(seed);
+
+    // Use deterministic version based on public key
+    final keyVersion = _recoveryPhraseService.deriveKeyVersion(keyPair['publicKey']!);
 
     await _secureStorage.storePrivateKey(keyPair['privateKey']!);
     await _secureStorage.storePublicKey(keyPair['publicKey']!);
-    await _secureStorage.storeCurrentKeyVersion(initialVersion);
+    await _secureStorage.storeCurrentKeyVersion(keyVersion);
     await _secureStorage.storeUserId(userId);
 
-    return keyPair;
+    return {
+      'publicKey': keyPair['publicKey']!,
+      'privateKey': keyPair['privateKey']!,
+      'mnemonic': mnemonic,
+    };
   }
 
-  Future<void> _loadUserKeys(String userId) async {
+  /// Try to load user keys from secure storage.
+  /// Returns true if keys were loaded, false if recovery is needed.
+  Future<bool> _tryLoadUserKeys(String userId) async {
     final privateKey = await _secureStorage.getPrivateKey();
 
     if (privateKey != null) {
-      _encryptionService.setPrivateKey(privateKey);
+      final keyVersion = await _secureStorage.getCurrentKeyVersion();
+      _encryptionService.setPrivateKey(privateKey, keyVersion: keyVersion);
       await _secureStorage.storeUserId(userId);
-    } else {
-      throw Exception('Authentication failed. Please try again or contact support.');
+      return true;
     }
+
+    return false;
+  }
+
+  /// Recover keys using a recovery phrase.
+  /// Validates that the derived public key matches what's stored in Firestore.
+  Future<void> recoverWithPhrase(String mnemonic) async {
+    final user = currentUser;
+    if (user == null) throw Exception('No user signed in');
+
+    // Validate mnemonic format
+    if (!_recoveryPhraseService.validateMnemonic(mnemonic)) {
+      throw Exception('Invalid recovery phrase');
+    }
+
+    // Derive keys from mnemonic
+    final seed = _recoveryPhraseService.deriveSeedFromMnemonic(mnemonic);
+    final keyPair = await _encryptionService.generateKeyPairFromSeed(seed);
+
+    // Get the expected public key from Firestore
+    final userDoc = await _db.collection('users').doc(user.uid).get();
+    final storedPublicKey = userDoc.data()?['publicKey'] as String?;
+
+    if (storedPublicKey == null) {
+      throw Exception('User account not found');
+    }
+
+    // Verify the derived public key matches
+    if (keyPair['publicKey'] != storedPublicKey) {
+      throw Exception('Recovery phrase does not match this account');
+    }
+
+    // Keys match - store them
+    final keyVersion = _recoveryPhraseService.deriveKeyVersion(keyPair['publicKey']!);
+
+    await _secureStorage.storePrivateKey(keyPair['privateKey']!);
+    await _secureStorage.storePublicKey(keyPair['publicKey']!);
+    await _secureStorage.storeCurrentKeyVersion(keyVersion);
+    await _secureStorage.storeUserId(user.uid);
+
+    _encryptionService.setPrivateKey(keyPair['privateKey']!, keyVersion: keyVersion);
+
+    await _updateLastActive(user.uid);
+    LoggerService.auth('Recovery successful', userId: user.uid);
   }
 
   Future<void> _createUserDocument({

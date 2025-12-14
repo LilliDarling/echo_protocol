@@ -7,6 +7,8 @@ import '../../widgets/custom_button.dart';
 import 'signup.dart';
 import 'two_factor_verify.dart';
 import 'two_factor_setup.dart';
+import 'recovery_entry_screen.dart';
+import 'recovery_phrase_display_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -38,30 +40,29 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final credential = await _authService.signInWithEmail(
+      final result = await _authService.signInWithEmail(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
-      final userId = credential.user!.uid;
-      final is2FAEnabled = await _twoFactorService.is2FAEnabled(userId);
+      final userId = result.credential.user!.uid;
 
       if (mounted) {
-        if (is2FAEnabled) {
+        if (result.needsRecovery) {
+          // Keys not found - need recovery phrase
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (_) => TwoFactorVerifyScreen(userId: userId),
-            ),
-          );
-        } else {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => TwoFactorSetupScreen(
-                userId: userId,
-                isOnboarding: false,
+              builder: (_) => RecoveryEntryScreen(
+                onRecovered: () => _proceedAfterAuth(userId),
+                onCancel: () {
+                  _authService.signOut();
+                  Navigator.of(context).pop();
+                },
               ),
             ),
           );
+        } else {
+          await _proceedAfterAuth(userId);
         }
       }
     } catch (e) {
@@ -80,30 +81,74 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _proceedAfterAuth(String userId) async {
+    final is2FAEnabled = await _twoFactorService.is2FAEnabled(userId);
+
+    if (mounted) {
+      if (is2FAEnabled) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => TwoFactorVerifyScreen(userId: userId),
+          ),
+        );
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => TwoFactorSetupScreen(
+              userId: userId,
+              isOnboarding: false,
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
 
     try {
-      final credential = await _authService.signInWithGoogle();
-      final userId = credential.user!.uid;
-      final is2FAEnabled = await _twoFactorService.is2FAEnabled(userId);
+      final result = await _authService.signInWithGoogle();
 
       if (mounted) {
-        if (is2FAEnabled) {
+        if (result is SignUpResult) {
+          // New user - show recovery phrase first
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (_) => TwoFactorVerifyScreen(userId: userId),
-            ),
-          );
-        } else {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => TwoFactorSetupScreen(
-                userId: userId,
-                isOnboarding: false,
+              builder: (_) => RecoveryPhraseDisplayScreen(
+                recoveryPhrase: result.recoveryPhrase,
+                onComplete: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => TwoFactorSetupScreen(
+                        userId: result.credential.user!.uid,
+                        isOnboarding: true,
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           );
+        } else if (result is SignInResult) {
+          final userId = result.credential.user!.uid;
+
+          if (result.needsRecovery) {
+            // Keys not found - need recovery phrase
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => RecoveryEntryScreen(
+                  onRecovered: () => _proceedAfterAuth(userId),
+                  onCancel: () {
+                    _authService.signOut();
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ),
+            );
+          } else {
+            await _proceedAfterAuth(userId);
+          }
         }
       }
     } catch (e) {
