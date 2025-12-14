@@ -140,8 +140,8 @@ class _RecoveryEntryScreenState extends State<RecoveryEntryScreen> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  childAspectRatio: 2.2,
+                  crossAxisCount: 2,
+                  childAspectRatio: 3.0,
                   crossAxisSpacing: 8,
                   mainAxisSpacing: 8,
                 ),

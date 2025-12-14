@@ -123,14 +123,14 @@ class _RecoveryPhraseDisplayScreenState extends State<RecoveryPhraseDisplayScree
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          childAspectRatio: 2.5,
+                          crossAxisCount: 2,
+                          childAspectRatio: 3.5,
                           crossAxisSpacing: 8,
                           mainAxisSpacing: 8,
                         ),
                         itemCount: _words.length,
                         itemBuilder: (context, index) => Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(8),
@@ -138,22 +138,24 @@ class _RecoveryPhraseDisplayScreenState extends State<RecoveryPhraseDisplayScree
                           ),
                           child: Row(
                             children: [
-                              Text(
-                                '${index + 1}.',
-                                style: TextStyle(
-                                  color: Colors.grey.shade500,
-                                  fontSize: 12,
+                              SizedBox(
+                                width: 24,
+                                child: Text(
+                                  '${index + 1}.',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade500,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
                                   _words[index],
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w500,
                                     fontFamily: 'monospace',
+                                    fontSize: 14,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],

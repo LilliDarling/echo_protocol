@@ -79,6 +79,8 @@ class _RecoveryPhraseVerifyScreenState extends State<RecoveryPhraseVerifyScreen>
     }
 
     if (_allVerified) {
+      // Pop verify screen first, then trigger callback
+      Navigator.of(context).pop();
       widget.onVerified();
     } else {
       setState(() {
