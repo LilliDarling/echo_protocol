@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/partner_service.dart';
 import '../settings/fingerprint_verification.dart';
 
@@ -34,14 +37,36 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
     facing: CameraFacing.back,
   );
 
+  StreamSubscription<DocumentSnapshot>? _partnerLinkSubscription;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _listenForPartnerLink();
+  }
+
+  /// Listen for when our partner link is established (e.g., when someone accepts our invite)
+  void _listenForPartnerLink() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    _partnerLinkSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .snapshots()
+        .listen((snapshot) {
+      final partnerId = snapshot.data()?['partnerId'] as String?;
+      if (partnerId != null && mounted) {
+        // Partner link established! Notify parent to refresh
+        widget.onPartnerLinked?.call();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _partnerLinkSubscription?.cancel();
     _tabController.dispose();
     _codeController.dispose();
     _scannerController.dispose();
@@ -60,9 +85,14 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
         _inviteCode = code;
       });
     } catch (e) {
+      final errorMsg = e.toString().replaceAll('Exception: ', '');
       setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
+        _error = errorMsg;
       });
+      // If user already has a partner, also refresh to show the conversation
+      if (errorMsg.toLowerCase().contains('already have a partner')) {
+        widget.onPartnerLinked?.call();
+      }
     } finally {
       setState(() {
         _isGeneratingCode = false;

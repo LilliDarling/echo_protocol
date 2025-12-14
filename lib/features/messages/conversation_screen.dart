@@ -59,6 +59,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   bool _isSending = false;
   bool _isLoadingMore = false;
   bool _hasMoreMessages = true;
+  bool _isServicesInitialized = false;
   DocumentSnapshot? _oldestMessageDoc;
   String? _error;
   bool _isPartnerTyping = false;
@@ -145,7 +146,9 @@ class _ConversationScreenState extends State<ConversationScreen>
     );
 
     if (mounted) {
-      setState(() {});
+      setState(() {
+        _isServicesInitialized = true;
+      });
     }
   }
 
@@ -384,6 +387,13 @@ class _ConversationScreenState extends State<ConversationScreen>
 
   Future<void> _sendMessage(String text, {EchoType type = EchoType.text, EchoMetadata? metadata}) async {
     if (text.trim().isEmpty && type == EchoType.text) return;
+
+    if (!_isServicesInitialized) {
+      setState(() {
+        _error = 'Please wait, initializing encryption...';
+      });
+      return;
+    }
 
     _typingService.stopTyping();
 
@@ -758,10 +768,10 @@ class _ConversationScreenState extends State<ConversationScreen>
             TypingIndicator(partnerName: widget.partner.name),
           MessageInput(
             onSend: _sendMessage,
-            isSending: _isSending,
+            isSending: _isSending || !_isServicesInitialized,
             partnerId: widget.partner.id,
             mediaEncryptionService: _mediaEncryptionService,
-            onTextChanged: _typingService.onTextChanged,
+            onTextChanged: _isServicesInitialized ? _typingService.onTextChanged : null,
           ),
         ],
       ),

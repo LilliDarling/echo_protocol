@@ -70,6 +70,11 @@ class PartnerService {
     return digest.toString();
   }
 
+  // TODO: Move signature verification to Cloud Function (acceptPartnerInvite)
+  // The Cloud Function should verify the invite signature server-side using
+  // the creator's public key before allowing the partner link to be established.
+  // This prevents malicious clients from bypassing verification.
+  // ignore: unused_element
   bool _verifyInviteSignature({
     required String inviteCode,
     required String userId,
@@ -317,16 +322,26 @@ class PartnerService {
   }
 
   /// Get the current user's partner info
-  Future<PartnerInfo?> getPartner() async {
+  /// Set [forceRefresh] to true to bypass Firestore cache
+  Future<PartnerInfo?> getPartner({bool forceRefresh = false}) async {
     final user = _auth.currentUser;
     if (user == null) return null;
 
-    final userDoc = await _db.collection('users').doc(user.uid).get();
+    final getOptions = forceRefresh
+        ? const GetOptions(source: Source.server)
+        : null;
+
+    final userDoc = getOptions != null
+        ? await _db.collection('users').doc(user.uid).get(getOptions)
+        : await _db.collection('users').doc(user.uid).get();
     final partnerId = userDoc.data()?['partnerId'] as String?;
 
     if (partnerId == null) return null;
 
-    final partnerDoc = await _db.collection('users').doc(partnerId).get();
+    // Fetch partner's document (allowed by Firestore rules for linked partners)
+    final partnerDoc = getOptions != null
+        ? await _db.collection('users').doc(partnerId).get(getOptions)
+        : await _db.collection('users').doc(partnerId).get();
     if (!partnerDoc.exists) return null;
 
     final partnerData = partnerDoc.data()!;
@@ -342,11 +357,14 @@ class PartnerService {
       keyVersion = 1;
     }
 
+    final publicKey = partnerData['publicKey'] as String?;
+    if (publicKey == null) return null;
+
     return PartnerInfo(
       id: partnerId,
       name: partnerData['name'] as String? ?? 'Partner',
       avatar: partnerData['avatar'] as String?,
-      publicKey: partnerData['publicKey'] as String,
+      publicKey: publicKey,
       keyVersion: keyVersion,
       lastActive: (partnerData['lastActive'] as Timestamp?)?.toDate(),
     );

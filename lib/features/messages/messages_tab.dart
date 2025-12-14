@@ -5,6 +5,8 @@ import '../../services/partner_service.dart';
 import 'partner_linking_screen.dart';
 import 'conversation_screen.dart';
 
+// ignore warnings about unused imports - needed for _ConversationPreview
+
 /// Main messages tab that shows either partner linking or conversation
 class MessagesTab extends StatefulWidget {
   const MessagesTab({super.key});
@@ -17,8 +19,10 @@ class _MessagesTabState extends State<MessagesTab> {
   final PartnerService _partnerService = PartnerService();
 
   bool _isLoading = true;
+  bool _hasInitializedEncryption = false;
   PartnerInfo? _partner;
   String? _conversationId;
+  String? _error;
 
   @override
   void initState() {
@@ -27,13 +31,18 @@ class _MessagesTabState extends State<MessagesTab> {
   }
 
   Future<void> _loadPartnerInfo() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
-      final partner = await _partnerService.getPartner();
+      // Force fresh read from server to avoid stale cache issues
+      final partner = await _partnerService.getPartner(forceRefresh: true);
       final conversationId = await _partnerService.getConversationId();
 
-      if (partner != null) {
+      if (partner != null && !_hasInitializedEncryption) {
+        _hasInitializedEncryption = true;
         await _partnerService.initializePartnerEncryption();
       }
 
@@ -46,7 +55,10 @@ class _MessagesTabState extends State<MessagesTab> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
       }
     }
   }
@@ -60,6 +72,42 @@ class _MessagesTabState extends State<MessagesTab> {
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(),
+      );
+    }
+
+    // Show error if there is one
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
+              const SizedBox(height: 16),
+              Text(
+                'Error loading partner info',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _loadPartnerInfo,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
