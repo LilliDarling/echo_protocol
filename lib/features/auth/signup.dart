@@ -3,8 +3,8 @@ import '../../services/auth.dart';
 import '../../utils/validators.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
-import 'two_factor_setup.dart';
 import 'recovery_phrase_display_screen.dart';
+import 'onboarding_success.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -57,19 +57,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
       );
 
       if (mounted) {
-        // Show recovery phrase screen first, then proceed to 2FA setup
+        // Show recovery phrase screen first, then proceed to onboarding success
+        final userId = result.credential.user!.uid;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => RecoveryPhraseDisplayScreen(
               recoveryPhrase: result.recoveryPhrase,
-              onComplete: () {
-                Navigator.of(context).pushReplacement(
+              onComplete: (ctx) {
+                // Clear the entire stack and go to onboarding success
+                Navigator.of(ctx).pushAndRemoveUntil(
                   MaterialPageRoute(
-                    builder: (_) => TwoFactorSetupScreen(
-                      userId: result.credential.user!.uid,
-                      isOnboarding: true,
-                    ),
+                    builder: (_) => OnboardingSuccessScreen(userId: userId),
                   ),
+                  (route) => false,
                 );
               },
             ),
@@ -101,32 +101,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
       if (mounted) {
         if (result is SignUpResult) {
           // New user - show recovery phrase first
+          final userId = result.credential.user!.uid;
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => RecoveryPhraseDisplayScreen(
                 recoveryPhrase: result.recoveryPhrase,
-                onComplete: () {
-                  Navigator.of(context).pushReplacement(
+                onComplete: (ctx) {
+                  // Clear the entire stack and go to onboarding success
+                  Navigator.of(ctx).pushAndRemoveUntil(
                     MaterialPageRoute(
-                      builder: (_) => TwoFactorSetupScreen(
-                        userId: result.credential.user!.uid,
-                        isOnboarding: true,
-                      ),
+                      builder: (_) => OnboardingSuccessScreen(userId: userId),
                     ),
+                    (route) => false,
                   );
                 },
               ),
             ),
           );
         } else if (result is SignInResult) {
-          // Existing user - go to 2FA setup or home
+          // Existing user - go to onboarding success
           final userId = result.credential.user!.uid;
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (_) => TwoFactorSetupScreen(
-                userId: userId,
-                isOnboarding: true,
-              ),
+              builder: (_) => OnboardingSuccessScreen(userId: userId),
             ),
           );
         }

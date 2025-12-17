@@ -3,14 +3,13 @@ import 'package:flutter/material.dart';
 
 /// Screen to verify user has saved their recovery phrase.
 /// Asks user to enter 3 random words from their phrase.
+/// Returns true via Navigator.pop() when verification succeeds.
 class RecoveryPhraseVerifyScreen extends StatefulWidget {
   final String recoveryPhrase;
-  final VoidCallback onVerified;
 
   const RecoveryPhraseVerifyScreen({
     super.key,
     required this.recoveryPhrase,
-    required this.onVerified,
   });
 
   @override
@@ -79,9 +78,8 @@ class _RecoveryPhraseVerifyScreenState extends State<RecoveryPhraseVerifyScreen>
     }
 
     if (_allVerified) {
-      // Pop verify screen first, then trigger callback
-      Navigator.of(context).pop();
-      widget.onVerified();
+      // Pop with success result - let the display screen handle navigation
+      Navigator.of(context).pop(true);
     } else {
       setState(() {
         _error = 'Some words don\'t match. Please check your recovery phrase.';

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/two_factor.dart';
+import '../../services/secure_storage.dart';
 import '../../widgets/code_input.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
@@ -8,10 +9,12 @@ import 'account_recovery.dart';
 
 class TwoFactorVerifyScreen extends StatefulWidget {
   final String userId;
+  final VoidCallback? onVerified;
 
   const TwoFactorVerifyScreen({
     super.key,
     required this.userId,
+    this.onVerified,
   });
 
   @override
@@ -20,6 +23,7 @@ class TwoFactorVerifyScreen extends StatefulWidget {
 
 class _TwoFactorVerifyScreenState extends State<TwoFactorVerifyScreen> {
   final TwoFactorService _twoFactorService = TwoFactorService();
+  final SecureStorageService _secureStorage = SecureStorageService();
   final TextEditingController _backupCodeController = TextEditingController();
 
   bool _isVerifying = false;
@@ -45,12 +49,21 @@ class _TwoFactorVerifyScreenState extends State<TwoFactorVerifyScreen> {
       final isValid = await _twoFactorService.verifyTOTP(_totpCode, userId: widget.userId);
 
       if (isValid) {
+        // Mark 2FA as verified for this session
+        await _secureStorage.set2FASessionVerified(true);
+
         if (!mounted) return;
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-          (route) => false,
-        );
+
+        // If callback provided, use it; otherwise navigate to HomeScreen
+        if (widget.onVerified != null) {
+          widget.onVerified!();
+        } else {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            (route) => false,
+          );
+        }
       } else {
         setState(() {
           _error = 'Invalid code. Please try again.';
@@ -80,12 +93,21 @@ class _TwoFactorVerifyScreenState extends State<TwoFactorVerifyScreen> {
       final isValid = await _twoFactorService.verifyBackupCode(code, widget.userId);
 
       if (isValid) {
+        // Mark 2FA as verified for this session
+        await _secureStorage.set2FASessionVerified(true);
+
         if (!mounted) return;
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-          (route) => false,
-        );
+
+        // If callback provided, use it; otherwise navigate to HomeScreen
+        if (widget.onVerified != null) {
+          widget.onVerified!();
+        } else {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            (route) => false,
+          );
+        }
       } else {
         setState(() {
           _error = 'Invalid backup code.';

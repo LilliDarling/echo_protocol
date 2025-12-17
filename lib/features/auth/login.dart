@@ -6,9 +6,10 @@ import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 import 'signup.dart';
 import 'two_factor_verify.dart';
-import 'two_factor_setup.dart';
 import 'recovery_entry_screen.dart';
 import 'recovery_phrase_display_screen.dart';
+import 'onboarding_success.dart';
+import '../home/home.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -53,10 +54,10 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => RecoveryEntryScreen(
-                onRecovered: () => _proceedAfterAuth(userId),
-                onCancel: () {
+                onRecovered: (ctx) => _proceedAfterAuthWithContext(ctx, userId),
+                onCancel: (ctx) {
                   _authService.signOut();
-                  Navigator.of(context).pop();
+                  Navigator.of(ctx).pop();
                 },
               ),
             ),
@@ -82,23 +83,24 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _proceedAfterAuth(String userId) async {
+    await _proceedAfterAuthWithContext(context, userId);
+  }
+
+  Future<void> _proceedAfterAuthWithContext(BuildContext ctx, String userId) async {
     final is2FAEnabled = await _twoFactorService.is2FAEnabled(userId);
 
-    if (mounted) {
+    if (ctx.mounted) {
       if (is2FAEnabled) {
-        Navigator.of(context).pushReplacement(
+        Navigator.of(ctx).pushReplacement(
           MaterialPageRoute(
             builder: (_) => TwoFactorVerifyScreen(userId: userId),
           ),
         );
       } else {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => TwoFactorSetupScreen(
-              userId: userId,
-              isOnboarding: false,
-            ),
-          ),
+        // 2FA not enabled - go directly to home
+        Navigator.of(ctx).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false,
         );
       }
     }
@@ -113,18 +115,18 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         if (result is SignUpResult) {
           // New user - show recovery phrase first
+          final userId = result.credential.user!.uid;
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => RecoveryPhraseDisplayScreen(
                 recoveryPhrase: result.recoveryPhrase,
-                onComplete: () {
-                  Navigator.of(context).pushReplacement(
+                onComplete: (ctx) {
+                  // Clear the entire stack and go to onboarding success
+                  Navigator.of(ctx).pushAndRemoveUntil(
                     MaterialPageRoute(
-                      builder: (_) => TwoFactorSetupScreen(
-                        userId: result.credential.user!.uid,
-                        isOnboarding: true,
-                      ),
+                      builder: (_) => OnboardingSuccessScreen(userId: userId),
                     ),
+                    (route) => false,
                   );
                 },
               ),
@@ -138,10 +140,10 @@ class _LoginScreenState extends State<LoginScreen> {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
                 builder: (_) => RecoveryEntryScreen(
-                  onRecovered: () => _proceedAfterAuth(userId),
-                  onCancel: () {
+                  onRecovered: (ctx) => _proceedAfterAuthWithContext(ctx, userId),
+                  onCancel: (ctx) {
                     _authService.signOut();
-                    Navigator.of(context).pop();
+                    Navigator.of(ctx).pop();
                   },
                 ),
               ),

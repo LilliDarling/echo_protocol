@@ -3,8 +3,8 @@ import '../../services/auth.dart';
 
 /// Screen for entering recovery phrase to restore account access.
 class RecoveryEntryScreen extends StatefulWidget {
-  final VoidCallback onRecovered;
-  final VoidCallback? onCancel;
+  final void Function(BuildContext context) onRecovered;
+  final void Function(BuildContext context)? onCancel;
 
   const RecoveryEntryScreen({
     super.key,
@@ -52,7 +52,9 @@ class _RecoveryEntryScreenState extends State<RecoveryEntryScreen> {
 
     try {
       await _authService.recoverWithPhrase(_mnemonic);
-      widget.onRecovered();
+      if (mounted) {
+        widget.onRecovered(context);
+      }
     } catch (e) {
       setState(() {
         _error = e.toString().replaceAll('Exception: ', '');
@@ -99,7 +101,7 @@ class _RecoveryEntryScreenState extends State<RecoveryEntryScreen> {
         leading: widget.onCancel != null
             ? IconButton(
                 icon: const Icon(Icons.close),
-                onPressed: widget.onCancel,
+                onPressed: () => widget.onCancel!(context),
               )
             : null,
       ),

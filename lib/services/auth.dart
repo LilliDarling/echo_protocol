@@ -190,7 +190,9 @@ class AuthService {
       await _auth.signOut();
 
       LoggerService.auth('Sign out successful', userId: userId);
+      // Clear all secure storage including 2FA session flag
       await _secureStorage.clearAll();
+      await _secureStorage.clear2FASessionVerified();
     } catch (e) {
       LoggerService.error('Sign out failed');
       throw Exception('Failed to sign out');

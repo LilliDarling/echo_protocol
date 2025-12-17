@@ -6,7 +6,7 @@ import 'recovery_phrase_verify_screen.dart';
 /// User must write these down before proceeding.
 class RecoveryPhraseDisplayScreen extends StatefulWidget {
   final String recoveryPhrase;
-  final VoidCallback onComplete;
+  final void Function(BuildContext context) onComplete;
 
   const RecoveryPhraseDisplayScreen({
     super.key,
@@ -34,15 +34,19 @@ class _RecoveryPhraseDisplayScreenState extends State<RecoveryPhraseDisplayScree
     );
   }
 
-  void _proceedToVerification() {
-    Navigator.of(context).push(
+  Future<void> _proceedToVerification() async {
+    final verified = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (context) => RecoveryPhraseVerifyScreen(
+        builder: (_) => RecoveryPhraseVerifyScreen(
           recoveryPhrase: widget.recoveryPhrase,
-          onVerified: widget.onComplete,
         ),
       ),
     );
+
+    // If verified, call the completion callback with this screen's context
+    if (verified == true && mounted) {
+      widget.onComplete(context);
+    }
   }
 
   @override

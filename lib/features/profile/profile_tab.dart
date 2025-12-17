@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../services/auth.dart';
 import '../settings/fingerprint_verification.dart';
 import '../settings/device_linking.dart';
+import '../settings/two_factor_settings.dart';
 
 class ProfileTab extends StatelessWidget {
   final AuthService _authService = AuthService();
@@ -88,6 +89,33 @@ class ProfileTab extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (context) => FingerprintVerificationScreen(
+                  userId: user!.uid,
+                ),
+              ),
+            );
+          },
+        ),
+
+        ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.security,
+              color: Colors.orange.shade700,
+            ),
+          ),
+          title: const Text('Two-Factor Authentication'),
+          subtitle: const Text('Add extra security to your account'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => TwoFactorSettingsScreen(
                   userId: user!.uid,
                 ),
               ),

@@ -29,7 +29,7 @@ class OnboardingSuccessScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const StepProgressIndicator(currentStep: 4, totalSteps: 4),
+              const StepProgressIndicator(currentStep: 2, totalSteps: 2),
               const SizedBox(height: 48),
               const Icon(
                 Icons.check_circle_outline,
@@ -44,7 +44,7 @@ class OnboardingSuccessScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Your account is secured with end-to-end encryption and two-factor authentication.',
+                'Your account is secured with end-to-end encryption.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16),
               ),
@@ -53,6 +53,12 @@ class OnboardingSuccessScreen extends StatelessWidget {
                 "You're ready to start messaging securely!",
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Tip: Enable two-factor authentication in Settings for extra security.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
               ),
               const SizedBox(height: 48),
               CustomButton(

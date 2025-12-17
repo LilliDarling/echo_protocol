@@ -220,4 +220,23 @@ class SecureStorageService {
     }
     return null;
   }
+
+  // 2FA session verification flag - tracks if user has verified 2FA this session
+  static const String _twoFaSessionVerifiedKey = '2fa_session_verified';
+
+  Future<bool> get2FASessionVerified() async {
+    final value = await _storage.read(key: _twoFaSessionVerifiedKey);
+    return value == 'true';
+  }
+
+  Future<void> set2FASessionVerified(bool verified) async {
+    await _storage.write(
+      key: _twoFaSessionVerifiedKey,
+      value: verified.toString(),
+    );
+  }
+
+  Future<void> clear2FASessionVerified() async {
+    await _storage.delete(key: _twoFaSessionVerifiedKey);
+  }
 }
