@@ -190,8 +190,9 @@ class AuthService {
       await _auth.signOut();
 
       LoggerService.auth('Sign out successful', userId: userId);
-      // Clear all secure storage including 2FA session flag
-      await _secureStorage.clearAll();
+      // Only clear session-related data, preserve encryption keys and partner key
+      // This allows users to log back in without needing their recovery phrase
+      // and maintains their partner connection
       await _secureStorage.clear2FASessionVerified();
     } catch (e) {
       LoggerService.error('Sign out failed');
@@ -358,6 +359,14 @@ class AuthService {
   /// Returns true if keys were loaded, false if recovery is needed.
   Future<bool> _tryLoadUserKeys(String userId) async {
     final privateKey = await _secureStorage.getPrivateKey();
+    final storedUserId = await _secureStorage.getUserId();
+
+    // Check if keys belong to a different user
+    if (storedUserId != null && storedUserId != userId) {
+      // Clear keys from previous user for security
+      await _secureStorage.clearEncryptionKeys();
+      return false;
+    }
 
     if (privateKey != null) {
       final keyVersion = await _secureStorage.getCurrentKeyVersion();

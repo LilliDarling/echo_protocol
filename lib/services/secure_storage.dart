@@ -95,6 +95,15 @@ class SecureStorageService {
     return privateKey != null && publicKey != null;
   }
 
+  /// Clear only encryption keys and user ID, preserving other data
+  Future<void> clearEncryptionKeys() async {
+    await _storage.delete(key: _privateKeyKey);
+    await _storage.delete(key: _publicKeyKey);
+    await _storage.delete(key: _partnerPublicKeyKey);
+    await _storage.delete(key: _userIdKey);
+    await _storage.delete(key: 'current_key_version');
+  }
+
   Future<bool> hasPartnerKey() async {
     final partnerKey = await getPartnerPublicKey();
     return partnerKey != null;

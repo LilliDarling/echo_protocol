@@ -47,6 +47,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   final EncryptionService _encryptionService = EncryptionService();
 
   bool _keysLoaded = false;
+  bool _isLoadingKeys = false;
 
   @override
   Widget build(BuildContext context) {
@@ -62,21 +63,35 @@ class _AuthWrapperState extends State<AuthWrapper> {
         }
 
         if (snapshot.hasData && snapshot.data != null) {
-          // User is authenticated - try to load keys if not already loaded
-          if (!_keysLoaded) {
-            _loadKeysIfNeeded();
+          // User is authenticated - ensure keys are loaded before showing home
+          if (!_keysLoaded && !_isLoadingKeys) {
+            return FutureBuilder(
+              future: _loadKeysIfNeeded(),
+              builder: (context, keySnapshot) {
+                if (keySnapshot.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(
+                    body: Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                }
+                return const HomeScreen();
+              },
+            );
           }
           return const HomeScreen();
         }
 
         // Reset key loading state on logout
         _keysLoaded = false;
+        _isLoadingKeys = false;
         return const LoginScreen();
       },
     );
   }
 
   Future<void> _loadKeysIfNeeded() async {
+    _isLoadingKeys = true;
     try {
       final hasKeys = await _secureStorage.hasEncryptionKeys();
       if (hasKeys) {
@@ -89,6 +104,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
       _keysLoaded = true;
     } catch (e) {
       // Ignore errors - the app will handle missing keys appropriately
+    } finally {
+      _isLoadingKeys = false;
     }
   }
 }

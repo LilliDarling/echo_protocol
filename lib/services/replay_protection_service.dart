@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ReplayProtectionService {
   static const Duration _nonceExpiry = Duration(hours: 1);
@@ -153,6 +154,25 @@ class ReplayProtectionService {
     required DateTime timestamp,
   }) async {
     try {
+      // Ensure we have a valid auth token before calling the function
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        return ServerValidationResult(
+          valid: false,
+          error: 'Not authenticated. Please sign in again.',
+        );
+      }
+
+      // Force token refresh to ensure we have a valid token
+      try {
+        await user.getIdToken(true);
+      } catch (e) {
+        return ServerValidationResult(
+          valid: false,
+          error: 'Session expired. Please sign in again.',
+        );
+      }
+
       final callable = _functions.httpsCallable('validateMessageSend');
       final result = await callable.call({
         'messageId': messageId,
@@ -172,6 +192,13 @@ class ReplayProtectionService {
         remainingHour: data['remainingHour'] as int?,
       );
     } on FirebaseFunctionsException catch (e) {
+      // Handle specific auth errors
+      if (e.code == 'unauthenticated') {
+        return ServerValidationResult(
+          valid: false,
+          error: 'Session expired. Please sign out and sign back in.',
+        );
+      }
       return ServerValidationResult(
         valid: false,
         error: e.message ?? 'Validation failed',
