@@ -298,7 +298,7 @@ class OfflineQueueService {
       await messagesRef.doc(pending.id).set(message.toJson());
 
       await _db.collection('conversations').doc(pending.conversationId).update({
-        'lastMessage': _truncateForPreview(pending.plaintext),
+        'lastMessage': pending.encryptedContent,
         'lastMessageAt': FieldValue.serverTimestamp(),
         'unreadCount.${pending.recipientId}': FieldValue.increment(1),
       });
@@ -355,11 +355,6 @@ class OfflineQueueService {
     await _saveToDisk();
   }
 
-  String _truncateForPreview(String text) {
-    const maxLength = 50;
-    if (text.length <= maxLength) return text;
-    return '${text.substring(0, maxLength)}...';
-  }
 
   bool get isOnline => _isOnline;
 

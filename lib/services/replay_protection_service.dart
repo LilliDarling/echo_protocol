@@ -153,24 +153,46 @@ class ReplayProtectionService {
     required int sequenceNumber,
     required DateTime timestamp,
   }) async {
-    try {
-      // Ensure we have a valid auth token before calling the function
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        return ServerValidationResult(
-          valid: false,
-          error: 'Not authenticated. Please sign in again.',
-        );
-      }
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return ServerValidationResult(
+        valid: false,
+        error: 'Not authenticated. Please sign in again.',
+      );
+    }
 
-      // Force token refresh to ensure we have a valid token
-      try {
-        await user.getIdToken(true);
-      } catch (e) {
-        return ServerValidationResult(
-          valid: false,
-          error: 'Session expired. Please sign in again.',
-        );
+    // Try with cached token first, then retry with refresh if auth fails
+    return await _callValidateFunction(
+      user: user,
+      messageId: messageId,
+      conversationId: conversationId,
+      recipientId: recipientId,
+      sequenceNumber: sequenceNumber,
+      timestamp: timestamp,
+      forceRefresh: false,
+    );
+  }
+
+  Future<ServerValidationResult> _callValidateFunction({
+    required User user,
+    required String messageId,
+    required String conversationId,
+    required String recipientId,
+    required int sequenceNumber,
+    required DateTime timestamp,
+    required bool forceRefresh,
+  }) async {
+    try {
+      // Get token (cached or refreshed based on forceRefresh flag)
+      if (forceRefresh) {
+        try {
+          await user.getIdToken(true);
+        } catch (e) {
+          return ServerValidationResult(
+            valid: false,
+            error: 'Token refresh failed: ${e.runtimeType}: $e',
+          );
+        }
       }
 
       final callable = _functions.httpsCallable('validateMessageSend');
@@ -192,16 +214,39 @@ class ReplayProtectionService {
         remainingHour: data['remainingHour'] as int?,
       );
     } on FirebaseFunctionsException catch (e) {
-      // Handle specific auth errors
-      if (e.code == 'unauthenticated') {
-        return ServerValidationResult(
-          valid: false,
-          error: 'Session expired. Please sign out and sign back in.',
+      // If we get an auth error and haven't tried refreshing yet, retry with refresh
+      if (e.code == 'unauthenticated' && !forceRefresh) {
+        return await _callValidateFunction(
+          user: user,
+          messageId: messageId,
+          conversationId: conversationId,
+          recipientId: recipientId,
+          sequenceNumber: sequenceNumber,
+          timestamp: timestamp,
+          forceRefresh: true,
+        );
+      }
+
+      return ServerValidationResult(
+        valid: false,
+        error: 'Functions error [${e.code}]: ${e.message}',
+      );
+    } catch (e) {
+      // Catch any other exceptions
+      if (!forceRefresh) {
+        return await _callValidateFunction(
+          user: user,
+          messageId: messageId,
+          conversationId: conversationId,
+          recipientId: recipientId,
+          sequenceNumber: sequenceNumber,
+          timestamp: timestamp,
+          forceRefresh: true,
         );
       }
       return ServerValidationResult(
         valid: false,
-        error: e.message ?? 'Validation failed',
+        error: 'Unexpected error: ${e.runtimeType}: $e',
       );
     }
   }

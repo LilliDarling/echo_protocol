@@ -34,6 +34,7 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
   {
     enforceAppCheck: false,
     maxInstances: 10,
+    cors: true,
   },
   async (request): Promise<ValidateMessageResponse> => {
     if (!request.auth) {

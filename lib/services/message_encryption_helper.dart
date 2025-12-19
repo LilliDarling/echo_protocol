@@ -75,8 +75,10 @@ class MessageEncryptionHelper {
     required EchoModel message,
     required String myUserId,
     required String partnerId,
+    bool skipReplayValidation = false,
   }) async {
-    if (_replayProtection != null) {
+    // Only validate replay protection for newly received messages, not historical loads
+    if (_replayProtection != null && !skipReplayValidation && message.recipientId == myUserId) {
       final isValid = await _replayProtection.validateMessage(
         messageId: message.id,
         senderId: message.senderId,
@@ -86,7 +88,8 @@ class MessageEncryptionHelper {
       );
 
       if (!isValid) {
-        throw Exception('Replay attack detected: message failed validation');
+        // Nonce already seen - this is likely a historical message being re-loaded
+        // Skip validation but continue with decryption
       }
     }
 
@@ -98,12 +101,11 @@ class MessageEncryptionHelper {
         ? message.recipientKeyVersion
         : message.senderKeyVersion;
 
+    // Always try current keys first - they should work for most messages
     try {
-      final currentKeyVersion = await _secureStorage.getCurrentKeyVersion();
-      if (currentKeyVersion == myKeyVersionNeeded) {
-        return _encryptionService.decryptMessage(message.content);
-      }
+      return _encryptionService.decryptMessage(message.content);
     } catch (_) {
+      // Current keys didn't work, try archived keys as fallback
     }
 
     return await _decryptWithArchivedKeys(

@@ -85,8 +85,12 @@ class _ConversationScreenState extends State<ConversationScreen>
       conversationId: widget.conversationId,
       currentUserId: _currentUserId,
     );
-    _initializeServices();
-    _loadInitialMessages();
+    _initializeAndLoad();
+  }
+
+  Future<void> _initializeAndLoad() async {
+    await _initializeServices();
+    await _loadInitialMessages();
     _markMessagesAsDelivered();
   }
 
@@ -333,13 +337,18 @@ class _ConversationScreenState extends State<ConversationScreen>
   }
 
   Future<void> _cacheDecryptedContent(EchoModel message) async {
-    if (!_contentCache.contains(message.id)) {
-      try {
-        final decrypted = await _decryptMessage(message);
-        _contentCache.put(message.id, decrypted);
-      } catch (e) {
-        _contentCache.put(message.id, '[Unable to decrypt message]');
-      }
+    // Check if already successfully cached (not a failure placeholder)
+    final cached = _contentCache.get(message.id);
+    if (cached != null && cached != '[Unable to decrypt message]') {
+      return;
+    }
+
+    try {
+      final decrypted = await _decryptMessage(message);
+      _contentCache.put(message.id, decrypted);
+    } catch (e) {
+      // Don't cache failures - allow retry on next load
+      debugPrint('Decryption failed for ${message.id}: $e');
     }
   }
 
@@ -492,7 +501,7 @@ class _ConversationScreenState extends State<ConversationScreen>
         await _messagesRef.doc(messageId).set(message.toJson());
 
         await _db.collection('conversations').doc(widget.conversationId).update({
-          'lastMessage': _truncateForPreview(text),
+          'lastMessage': encryptionResult['content'] as String,
           'lastMessageAt': FieldValue.serverTimestamp(),
           'unreadCount.${widget.partner.id}': FieldValue.increment(1),
         });
@@ -518,11 +527,6 @@ class _ConversationScreenState extends State<ConversationScreen>
     }
   }
 
-  String _truncateForPreview(String text) {
-    const maxLength = 50;
-    if (text.length <= maxLength) return text;
-    return '${text.substring(0, maxLength)}...';
-  }
 
   Future<void> _editMessage(EchoModel message, String newText) async {
     if (newText.trim().isEmpty) return;

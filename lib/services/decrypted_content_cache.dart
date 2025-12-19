@@ -54,12 +54,21 @@ class DecryptedContentCacheService {
 
       final cacheData = json.decode(decryptedJson) as Map<String, dynamic>;
       final version = cacheData['version'] as int? ?? 0;
+
+      // Clear cache if version changed or contains old failure entries
       if (version != _cacheVersion) {
         await _deleteCacheFile();
         return;
       }
 
       final content = cacheData['content'] as Map<String, dynamic>? ?? {};
+
+      // Clear cache if it contains old failure entries
+      if (content.values.any((v) => v == '[Unable to decrypt message]')) {
+        await _deleteCacheFile();
+        return;
+      }
+
       _memoryCache.addAll(content.map((k, v) => MapEntry(k, v.toString())));
     } catch (e) {
       await _deleteCacheFile();
@@ -74,10 +83,19 @@ class DecryptedContentCacheService {
     try {
       final cacheKey = await _getOrCreateCacheKey();
 
+      // Filter out failed decryption placeholders - only cache successful decryptions
+      final successfulCache = Map<String, String>.fromEntries(
+        _memoryCache.entries.where((e) => e.value != '[Unable to decrypt message]'),
+      );
+
+      if (successfulCache.isEmpty) {
+        return;
+      }
+
       final cacheData = {
         'version': _cacheVersion,
         'timestamp': DateTime.now().toIso8601String(),
-        'content': _memoryCache,
+        'content': successfulCache,
       };
 
       final jsonData = json.encode(cacheData);

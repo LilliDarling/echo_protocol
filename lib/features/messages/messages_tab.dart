@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/partner_service.dart';
+import '../../services/encryption.dart';
 import 'partner_linking_screen.dart';
 import 'conversation_screen.dart';
 
@@ -136,6 +137,24 @@ class _ConversationPreview extends StatelessWidget {
     required this.conversationId,
   });
 
+  String _decryptPreview(String? encryptedMessage) {
+    if (encryptedMessage == null || encryptedMessage.isEmpty) {
+      return 'Start a conversation';
+    }
+    try {
+      final encryptionService = EncryptionService();
+      return encryptionService.decryptMessage(encryptedMessage);
+    } catch (e) {
+      // If decryption fails, show generic message
+      return 'Encrypted message';
+    }
+  }
+
+  String _truncatePreview(String text, {int maxLength = 50}) {
+    if (text.length <= maxLength) return text;
+    return '${text.substring(0, maxLength)}...';
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
@@ -147,11 +166,15 @@ class _ConversationPreview extends StatelessWidget {
           .snapshots(),
       builder: (context, snapshot) {
         final conversationData = snapshot.data?.data() as Map<String, dynamic>?;
-        final lastMessage = conversationData?['lastMessage'] as String?;
+        final lastMessageEncrypted = conversationData?['lastMessage'] as String?;
         final lastMessageAt = conversationData?['lastMessageAt'] as Timestamp?;
         final unreadCounts =
             conversationData?['unreadCount'] as Map<String, dynamic>?;
         final myUnreadCount = unreadCounts?[currentUserId] as int? ?? 0;
+
+        // Decrypt the preview message
+        final decryptedPreview = _decryptPreview(lastMessageEncrypted);
+        final displayMessage = _truncatePreview(decryptedPreview);
 
         return Column(
           children: [
@@ -160,7 +183,7 @@ class _ConversationPreview extends StatelessWidget {
                 children: [
                   _buildConversationTile(
                     context,
-                    lastMessage: lastMessage,
+                    lastMessage: displayMessage,
                     lastMessageAt: lastMessageAt,
                     unreadCount: myUnreadCount,
                   ),
