@@ -230,22 +230,65 @@ class SecureStorageService {
     return null;
   }
 
-  // 2FA session verification flag - tracks if user has verified 2FA this session
+  // 2FA session verification with timeout
+  // Stores timestamp of verification instead of just true/false
   static const String _twoFaSessionVerifiedKey = '2fa_session_verified';
+  static const Duration _twoFaSessionTimeout = Duration(hours: 24);
 
+  /// Check if 2FA session is verified and not expired
   Future<bool> get2FASessionVerified() async {
     final value = await _storage.read(key: _twoFaSessionVerifiedKey);
-    return value == 'true';
+    if (value == null) return false;
+
+    // Handle legacy 'true'/'false' values - treat as expired
+    final timestamp = int.tryParse(value);
+    if (timestamp == null) {
+      await clear2FASessionVerified();
+      return false;
+    }
+
+    final verifiedAt = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final isExpired = DateTime.now().difference(verifiedAt) >= _twoFaSessionTimeout;
+
+    if (isExpired) {
+      await clear2FASessionVerified();
+      return false;
+    }
+
+    return true;
   }
 
+  /// Set 2FA session as verified with current timestamp
   Future<void> set2FASessionVerified(bool verified) async {
-    await _storage.write(
-      key: _twoFaSessionVerifiedKey,
-      value: verified.toString(),
-    );
+    if (verified) {
+      await _storage.write(
+        key: _twoFaSessionVerifiedKey,
+        value: DateTime.now().millisecondsSinceEpoch.toString(),
+      );
+    } else {
+      await clear2FASessionVerified();
+    }
   }
 
+  /// Clear 2FA session verification
   Future<void> clear2FASessionVerified() async {
     await _storage.delete(key: _twoFaSessionVerifiedKey);
+  }
+
+  /// Get remaining time until 2FA session expires
+  /// Returns null if not verified or expired
+  Future<Duration?> get2FASessionTimeRemaining() async {
+    final value = await _storage.read(key: _twoFaSessionVerifiedKey);
+    if (value == null) return null;
+
+    final timestamp = int.tryParse(value);
+    if (timestamp == null) return null;
+
+    final verifiedAt = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final elapsed = DateTime.now().difference(verifiedAt);
+
+    if (elapsed >= _twoFaSessionTimeout) return null;
+
+    return _twoFaSessionTimeout - elapsed;
   }
 }
