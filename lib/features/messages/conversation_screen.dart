@@ -54,6 +54,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   List<EchoModel> _messages = [];
   StreamSubscription? _messagesSubscription;
   StreamSubscription? _newMessagesSubscription;
+  StreamSubscription? _modificationsSubscription;
   StreamSubscription? _offlineQueueSubscription;
   bool _isLoading = true;
   bool _isSending = false;
@@ -99,6 +100,7 @@ class _ConversationScreenState extends State<ConversationScreen>
     WidgetsBinding.instance.removeObserver(this);
     _messagesSubscription?.cancel();
     _newMessagesSubscription?.cancel();
+    _modificationsSubscription?.cancel();
     _offlineQueueSubscription?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
@@ -199,7 +201,7 @@ class _ConversationScreenState extends State<ConversationScreen>
           _messages = messages.reversed.toList();
           _isLoading = false;
         });
-        _scrollToBottom();
+        _scrollToBottom(immediate: true);
         _subscribeToNewMessages();
         _markVisibleMessagesAsRead();
       }
@@ -317,14 +319,7 @@ class _ConversationScreenState extends State<ConversationScreen>
             }
           } else if (change.type == DocumentChangeType.modified) {
             final message = EchoModel.fromFirestore(change.doc);
-            if (mounted) {
-              setState(() {
-                final index = _messages.indexWhere((m) => m.id == message.id);
-                if (index != -1) {
-                  _messages[index] = message;
-                }
-              });
-            }
+            await _handleMessageModification(message);
           }
         }
       },
@@ -334,6 +329,60 @@ class _ConversationScreenState extends State<ConversationScreen>
         }
       },
     );
+
+    // Subscribe to modifications for ALL messages (not just new ones)
+    // This catches edits/deletes to existing messages
+    _subscribeToModifications();
+  }
+
+  void _subscribeToModifications() {
+    // Listen to the entire collection for modifications
+    // For a 1-on-1 messaging app, conversation sizes are typically manageable
+    _modificationsSubscription = _messagesRef.snapshots().listen(
+      (snapshot) async {
+        for (final change in snapshot.docChanges) {
+          if (change.type == DocumentChangeType.modified) {
+            final message = EchoModel.fromFirestore(change.doc);
+            await _handleMessageModification(message);
+          }
+        }
+      },
+      onError: (error) {
+        debugPrint('Modifications listener error: $error');
+      },
+    );
+  }
+
+  Future<void> _handleMessageModification(EchoModel message) async {
+    final index = _messages.indexWhere((m) => m.id == message.id);
+    if (index == -1) return; // Message not in our list
+
+    final existingMessage = _messages[index];
+
+    // Skip if nothing changed (avoid unnecessary re-renders)
+    if (existingMessage.isEdited == message.isEdited &&
+        existingMessage.isDeleted == message.isDeleted &&
+        existingMessage.content == message.content &&
+        existingMessage.status == message.status) {
+      return;
+    }
+
+    // Update cache for edited messages (re-decrypt if content changed)
+    if (message.isEdited && !message.isDeleted &&
+        existingMessage.content != message.content) {
+      // Content changed - clear old cache and re-decrypt
+      _contentCache.remove(message.id);
+      await _cacheDecryptedContent(message);
+    } else if (message.isDeleted && !existingMessage.isDeleted) {
+      // Newly deleted
+      _contentCache.remove(message.id);
+    }
+
+    if (mounted) {
+      setState(() {
+        _messages[index] = message;
+      });
+    }
   }
 
   Future<void> _cacheDecryptedContent(EchoModel message) async {
@@ -391,16 +440,24 @@ class _ConversationScreenState extends State<ConversationScreen>
     }
   }
 
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+  void _scrollToBottom({bool immediate = false}) {
+    // Use a short delay to ensure ListView has fully laid out
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted || !_scrollController.hasClients) return;
+
+      final maxExtent = _scrollController.position.maxScrollExtent;
+      if (maxExtent <= 0) return; // Nothing to scroll
+
+      if (immediate) {
+        _scrollController.jumpTo(maxExtent);
+      } else {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+          maxExtent,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
-      });
-    }
+      }
+    });
   }
 
   Future<void> _sendMessage(String text, {EchoType type = EchoType.text, EchoMetadata? metadata}) async {
@@ -540,13 +597,26 @@ class _ConversationScreenState extends State<ConversationScreen>
         senderId: _currentUserId,
       );
 
+      // Optimistic UI update
+      _contentCache.put(message.id, newText);
+      if (mounted) {
+        setState(() {
+          final index = _messages.indexWhere((m) => m.id == message.id);
+          if (index != -1) {
+            _messages[index] = _messages[index].copyWith(
+              content: encryptionResult['content'] as String,
+              isEdited: true,
+              editedAt: DateTime.now(),
+            );
+          }
+        });
+      }
+
       await _messagesRef.doc(message.id).update({
         'content': encryptionResult['content'],
         'isEdited': true,
         'editedAt': FieldValue.serverTimestamp(),
       });
-
-      _contentCache.put(message.id, newText);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -564,13 +634,26 @@ class _ConversationScreenState extends State<ConversationScreen>
     if (message.isDeleted) return;
 
     try {
+      // Optimistic UI update
+      _contentCache.remove(message.id);
+      if (mounted) {
+        setState(() {
+          final index = _messages.indexWhere((m) => m.id == message.id);
+          if (index != -1) {
+            _messages[index] = _messages[index].copyWith(
+              isDeleted: true,
+              deletedAt: DateTime.now(),
+              content: '',
+            );
+          }
+        });
+      }
+
       await _messagesRef.doc(message.id).update({
         'isDeleted': true,
         'deletedAt': FieldValue.serverTimestamp(),
         'content': '',
       });
-
-      _contentCache.remove(message.id);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

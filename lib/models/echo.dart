@@ -145,7 +145,8 @@ enum EchoType {
   image('image'),
   video('video'),
   voice('voice'),
-  link('link');
+  link('link'),
+  gif('gif');
 
   final String value;
   const EchoType(this.value);

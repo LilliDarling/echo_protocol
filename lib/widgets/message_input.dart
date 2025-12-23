@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/echo.dart';
 import '../services/media_upload_service.dart';
 import '../services/media_encryption_service.dart';
+import '../services/gif_service.dart';
 
 class MessageInput extends StatefulWidget {
   final Future<void> Function(String text, {EchoType type, EchoMetadata? metadata}) onSend;
@@ -244,6 +245,36 @@ class _MessageInputState extends State<MessageInput> {
     }
   }
 
+  Future<void> _pickGif() async {
+    try {
+      final gifResult = await GifService.pickGif(context);
+
+      if (gifResult != null && mounted) {
+        final metadata = EchoMetadata(
+          fileUrl: gifResult.url,
+          thumbnailUrl: gifResult.previewUrl,
+          fileName: gifResult.title,
+          isEncrypted: false, // GIFs from Giphy are not encrypted
+        );
+
+        await widget.onSend(
+          '[GIF]',
+          type: EchoType.gif,
+          metadata: metadata,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send GIF: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   void _showAttachmentOptions() {
     showModalBottomSheet(
       context: context,
@@ -304,6 +335,21 @@ class _MessageInputState extends State<MessageInput> {
               onTap: () {
                 Navigator.pop(context);
                 _pickVideo();
+              },
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.pink.shade100,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.gif_box, color: Colors.pink.shade700),
+              ),
+              title: const Text('GIF'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickGif();
               },
             ),
             const SizedBox(height: 16),

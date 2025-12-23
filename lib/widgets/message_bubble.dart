@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/echo.dart';
 import '../services/media_encryption_service.dart';
 import 'message_status.dart';
@@ -173,6 +174,40 @@ class MessageBubble extends StatelessWidget {
                   style: TextStyle(color: textColor),
                 ),
               ),
+            _buildFooter(context),
+          ],
+        );
+
+      case EchoType.gif:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 250,
+                maxHeight: 250,
+              ),
+              child: CachedNetworkImage(
+                imageUrl: message.metadata.fileUrl ?? '',
+                placeholder: (context, url) => Container(
+                  width: 150,
+                  height: 150,
+                  color: Colors.grey.shade300,
+                  child: const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  width: 150,
+                  height: 100,
+                  color: Colors.grey.shade300,
+                  child: const Center(
+                    child: Icon(Icons.broken_image, color: Colors.grey),
+                  ),
+                ),
+                fit: BoxFit.contain,
+              ),
+            ),
             _buildFooter(context),
           ],
         );

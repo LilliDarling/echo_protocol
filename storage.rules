@@ -27,6 +27,25 @@ service firebase.storage {
                    && request.resource.size < 50 * 1024 * 1024;  // 50MB max
     }
 
+    // Media uploads (images, videos, thumbnails)
+    match /media/images/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId)
+                   && request.resource.size < 50 * 1024 * 1024;  // 50MB max
+    }
+
+    match /media/thumbnails/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId)
+                   && request.resource.size < 5 * 1024 * 1024;  // 5MB max for thumbnails
+    }
+
+    match /media/videos/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId)
+                   && request.resource.size < 50 * 1024 * 1024;  // 50MB max
+    }
+
     // Deny all other access
     match /{allPaths=**} {
       allow read, write: if false;

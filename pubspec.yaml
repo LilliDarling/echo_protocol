@@ -72,6 +72,7 @@ dependencies:
   video_thumbnail: ^0.5.3
   video_player: ^2.9.2
   path: ^1.9.0
+  giphy_get: ^3.5.5
 
 dev_dependencies:
   flutter_test:
