@@ -635,7 +635,6 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
   }
 
   String _formatInviteCode(String code) {
-    // Format as XXXX-XXXX for readability
     if (code.length == 8) {
       return '${code.substring(0, 4)}-${code.substring(4)}';
     }

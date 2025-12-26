@@ -86,19 +86,10 @@ class LoggerService {
     StackTrace? stackTrace,
     Level level,
   ) {
-    if (!kDebugMode) {
-      // In production, send to Firebase Crashlytics or monitoring service
-      // FirebaseCrashlytics.instance.recordError(error, stackTrace, reason: message);
-    }
+    // Production monitoring can be added here when needed
   }
 
   static void _sendSecurityEvent(Map<String, dynamic> logData) {
-    if (!kDebugMode) {
-      // In production, send to security monitoring service
-      // FirebaseAnalytics.instance.logEvent(
-      //   name: 'security_event',
-      //   parameters: logData,
-      // );
-    }
+    // Production security event logging can be added here when needed
   }
 }

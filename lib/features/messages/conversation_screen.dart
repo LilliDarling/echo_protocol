@@ -347,9 +347,6 @@ class _ConversationScreenState extends State<ConversationScreen>
           }
         }
       },
-      onError: (error) {
-        debugPrint('Modifications listener error: $error');
-      },
     );
   }
 
@@ -386,7 +383,6 @@ class _ConversationScreenState extends State<ConversationScreen>
   }
 
   Future<void> _cacheDecryptedContent(EchoModel message) async {
-    // Check if already successfully cached (not a failure placeholder)
     final cached = _contentCache.get(message.id);
     if (cached != null && cached != '[Unable to decrypt message]') {
       return;
@@ -395,9 +391,8 @@ class _ConversationScreenState extends State<ConversationScreen>
     try {
       final decrypted = await _decryptMessage(message);
       _contentCache.put(message.id, decrypted);
-    } catch (e) {
+    } catch (_) {
       // Don't cache failures - allow retry on next load
-      debugPrint('Decryption failed for ${message.id}: $e');
     }
   }
 
