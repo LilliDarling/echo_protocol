@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../widgets/progress_indicator.dart';
-import '../../widgets/custom_button.dart';
+import '../../widgets/common/progress_indicator.dart';
+import '../../widgets/common/custom_button.dart';
 import '../home/home.dart';
 
 class OnboardingSuccessScreen extends StatelessWidget {

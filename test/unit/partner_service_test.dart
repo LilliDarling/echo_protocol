@@ -3,7 +3,7 @@ import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:echo_protocol/services/partner_service.dart';
+import 'package:echo_protocol/services/partner.dart';
 import 'package:echo_protocol/services/encryption.dart';
 import 'package:echo_protocol/services/secure_storage.dart';
 

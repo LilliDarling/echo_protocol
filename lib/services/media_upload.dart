@@ -6,7 +6,7 @@ import 'dart:convert';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
-import 'media_encryption_service.dart';
+import 'media_encryption.dart';
 
 /// Service for uploading media files to Firebase Storage
 /// Supports optional end-to-end encryption of media files

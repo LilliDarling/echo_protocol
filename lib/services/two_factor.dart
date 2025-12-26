@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'secure_storage.dart';
-import 'logger.dart';
+import '../utils/logger.dart';
 
 /// Two-Factor Authentication Service (Server-Side via Cloud Functions)
 class TwoFactorService {

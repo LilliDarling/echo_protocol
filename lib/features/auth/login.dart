@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import '../../services/auth.dart';
 import '../../services/two_factor.dart';
 import '../../utils/validators.dart';
-import '../../widgets/custom_text_field.dart';
-import '../../widgets/custom_button.dart';
+import '../../widgets/inputs/custom_text_field.dart';
+import '../../widgets/common/custom_button.dart';
 import 'signup.dart';
 import 'two_factor_verify.dart';
-import 'recovery_entry_screen.dart';
-import 'recovery_phrase_display_screen.dart';
+import 'recovery_entry.dart';
+import 'recovery_phrase_display.dart';
 import 'onboarding_success.dart';
 import '../home/home.dart';
 

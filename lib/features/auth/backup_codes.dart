@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../services/screenshot_protection.dart';
-import '../../widgets/progress_indicator.dart';
-import '../../widgets/custom_button.dart';
+import '../../utils/screenshot_protection.dart';
+import '../../widgets/common/progress_indicator.dart';
+import '../../widgets/common/custom_button.dart';
 import 'onboarding_success.dart';
 
 class BackupCodesScreen extends StatefulWidget {

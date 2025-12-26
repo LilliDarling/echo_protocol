@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/echo.dart';
 import 'encryption.dart';
 import 'secure_storage.dart';
-import 'replay_protection_service.dart';
+import 'replay_protection.dart';
 import 'message_rate_limiter.dart';
 
 class MessageEncryptionHelper {

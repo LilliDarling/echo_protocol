@@ -3,8 +3,8 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:pointycastle/export.dart';
-import 'secure_storage.dart';
-import '../utils/security.dart';
+import '../services/secure_storage.dart';
+import 'security.dart';
 
 class DecryptedContentCacheService {
   final SecureStorageService _secureStorage;

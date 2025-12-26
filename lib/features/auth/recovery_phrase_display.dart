@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'recovery_phrase_verify_screen.dart';
+import 'recovery_phrase_verify.dart';
 
 /// Screen to display the 12-word recovery phrase after signup.
 /// User must write these down before proceeding.

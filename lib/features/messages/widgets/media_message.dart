@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:video_player/video_player.dart';
-import '../models/echo.dart';
-import '../services/media_encryption_service.dart';
+import '../../../models/echo.dart';
+import '../../../services/media_encryption.dart';
 
 class MediaMessage extends StatefulWidget {
   final EchoModel message;

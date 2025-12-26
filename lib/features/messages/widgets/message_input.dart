@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/echo.dart';
-import '../services/media_upload_service.dart';
-import '../services/media_encryption_service.dart';
-import '../services/gif_service.dart';
+import '../../../models/echo.dart';
+import '../../../services/media_upload.dart';
+import '../../../services/media_encryption.dart';
+import '../../../utils/gif.dart';
 
 class MessageInput extends StatefulWidget {
   final Future<void> Function(String text, {EchoType type, EchoMetadata? metadata}) onSend;

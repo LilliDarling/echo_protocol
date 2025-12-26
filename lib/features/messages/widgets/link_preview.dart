@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../models/echo.dart';
+import '../../../models/echo.dart';
 
 /// Widget displaying a link preview card
 class LinkPreviewWidget extends StatelessWidget {

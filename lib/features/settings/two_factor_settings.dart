@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/two_factor.dart';
-import '../../widgets/custom_button.dart';
+import '../../widgets/common/custom_button.dart';
 import '../auth/two_factor_setup.dart';
 import '../auth/backup_codes.dart';
 

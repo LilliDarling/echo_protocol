@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../models/echo.dart';
-import '../services/media_encryption_service.dart';
+import '../../../models/echo.dart';
+import '../../../services/media_encryption.dart';
 import 'message_status.dart';
 import 'media_message.dart';
-import 'link_preview_widget.dart';
+import 'link_preview.dart';
 
 class MessageBubble extends StatelessWidget {
   final EchoModel message;

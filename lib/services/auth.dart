@@ -6,8 +6,8 @@ import '../models/user.dart';
 import '../utils/validators.dart';
 import 'encryption.dart';
 import 'secure_storage.dart';
-import 'logger.dart';
-import 'recovery_phrase_service.dart';
+import '../utils/logger.dart';
+import '../utils/recovery_phrase.dart';
 
 /// Result of a sign-up operation that includes the recovery phrase.
 class SignUpResult {

@@ -6,7 +6,7 @@ import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'secure_storage.dart';
-import 'logger.dart';
+import '../utils/logger.dart';
 
 class DeviceLinkingService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;

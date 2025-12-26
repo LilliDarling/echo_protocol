@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../services/two_factor.dart';
-import '../../services/screenshot_protection.dart';
-import '../../widgets/progress_indicator.dart';
-import '../../widgets/code_input.dart';
-import '../../widgets/custom_button.dart';
+import '../../utils/screenshot_protection.dart';
+import '../../widgets/common/progress_indicator.dart';
+import '../../widgets/inputs/code_input.dart';
+import '../../widgets/common/custom_button.dart';
 import 'backup_codes.dart';
 
 class TwoFactorSetupScreen extends StatefulWidget {

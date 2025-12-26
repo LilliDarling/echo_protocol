@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:mockito/annotations.dart';
-import 'package:echo_protocol/services/replay_protection_service.dart';
+import 'package:echo_protocol/services/replay_protection.dart';
 import 'package:echo_protocol/utils/security.dart';
 
 @GenerateMocks([FirebaseFunctions])

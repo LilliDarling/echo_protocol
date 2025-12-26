@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/custom_text_field.dart';
+import '../../widgets/common/custom_button.dart';
+import '../../widgets/inputs/custom_text_field.dart';
 
 class AccountRecoveryScreen extends StatefulWidget {
   final String userId;

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../services/partner_service.dart';
-import '../../services/encryption.dart';
-import 'partner_linking_screen.dart';
-import 'conversation_screen.dart';
+import '../../../services/partner.dart';
+import '../../../services/encryption.dart';
+import 'partner_linking.dart';
+import 'conversation.dart';
 
 // ignore warnings about unused imports - needed for _ConversationPreview
 

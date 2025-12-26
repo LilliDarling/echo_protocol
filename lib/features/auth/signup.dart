@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../services/auth.dart';
 import '../../utils/validators.dart';
-import '../../widgets/custom_text_field.dart';
-import '../../widgets/custom_button.dart';
-import 'recovery_phrase_display_screen.dart';
+import '../../widgets/inputs/custom_text_field.dart';
+import '../../widgets/common/custom_button.dart';
+import 'recovery_phrase_display.dart';
 import 'onboarding_success.dart';
 
 class SignUpScreen extends StatefulWidget {

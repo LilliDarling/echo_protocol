@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:echo_protocol/services/decrypted_content_cache.dart';
+import 'package:echo_protocol/utils/decrypted_content_cache.dart';
 import 'package:echo_protocol/services/secure_storage.dart';
 
 void main() {

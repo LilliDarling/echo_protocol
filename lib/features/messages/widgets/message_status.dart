@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/echo.dart';
+import '../../../models/echo.dart';
 
 class MessageStatus extends StatelessWidget {
   final EchoStatus status;

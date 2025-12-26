@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/auth.dart';
 import '../auth/login.dart';
 import '../profile/profile_tab.dart';
-import '../messages/messages_tab.dart';
+import '../messages/screens/messages_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

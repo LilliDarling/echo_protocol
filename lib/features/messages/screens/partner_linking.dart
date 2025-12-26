@@ -5,8 +5,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../services/partner_service.dart';
-import '../settings/fingerprint_verification.dart';
+import '../../../services/partner.dart';
+import '../../settings/fingerprint_verification.dart';
 
 /// Screen for linking with a partner via QR code or invite code
 class PartnerLinkingScreen extends StatefulWidget {
