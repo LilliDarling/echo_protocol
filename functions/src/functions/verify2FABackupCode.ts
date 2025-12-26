@@ -2,7 +2,7 @@ import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {validateRequest} from "../utils/validation";
-import {hashBackupCode} from "../utils/hashing";
+import {verifyBackupCode} from "../utils/hashing";
 import {checkUserRateLimit, checkIpRateLimit} from "../services/rateLimit";
 
 const db = admin.firestore();
@@ -48,8 +48,9 @@ export const verify2FABackupCode = onCall(
         );
       }
 
-      const hashedCode = hashBackupCode(code, userId);
-      const codeIndex = hashedBackupCodes.indexOf(hashedCode);
+      const codeIndex = hashedBackupCodes.findIndex(
+        (storedHash: string) => verifyBackupCode(code, storedHash)
+      );
 
       if (codeIndex === -1) {
         await db.collection("security_logs").add({

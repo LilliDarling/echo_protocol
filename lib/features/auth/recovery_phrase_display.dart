@@ -28,10 +28,13 @@ class _RecoveryPhraseDisplayScreenState extends State<RecoveryPhraseDisplayScree
     Clipboard.setData(ClipboardData(text: widget.recoveryPhrase));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Recovery phrase copied. Store it securely and delete from clipboard.'),
+        content: Text('Recovery phrase copied. Will auto-clear in 60 seconds.'),
         duration: Duration(seconds: 3),
       ),
     );
+    Future.delayed(const Duration(seconds: 60), () {
+      Clipboard.setData(const ClipboardData(text: ''));
+    });
   }
 
   Future<void> _proceedToVerification() async {

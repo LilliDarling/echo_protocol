@@ -32,7 +32,7 @@ function getConversationKey(userId1: string, userId2: string): string {
 
 export const validateMessageSend = onCall<ValidateMessageRequest>(
   {
-    enforceAppCheck: false,
+    enforceAppCheck: true,
     maxInstances: 10,
     cors: true,
   },
@@ -247,6 +247,19 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
             messageId,
             sequenceNumber,
             lastSequence,
+          });
+          return {valid: false, error: "Invalid sequence number"};
+        }
+
+        // Prevent sequence gap attacks (jumping to very high numbers)
+        const maxGap = 1000;
+        if (sequenceNumber > lastSequence + maxGap) {
+          logger.warn("Sequence number gap too large", {
+            senderId,
+            messageId,
+            sequenceNumber,
+            lastSequence,
+            gap: sequenceNumber - lastSequence,
           });
           return {valid: false, error: "Invalid sequence number"};
         }

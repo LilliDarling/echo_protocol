@@ -69,9 +69,9 @@ service cloud.firestore {
 
       // Key history subcollection - stores archived public keys
       match /keyHistory/{version} {
-        // Users can read their own key history (for partner to decrypt old messages)
-        // Anyone can read key history to decrypt messages from that user
-        allow read: if isAuthenticated();
+        // Only owner and their partner can read key history
+        allow read: if isOwner(userId)
+          || (isAuthenticated() && get(/databases/$(database)/documents/users/$(userId)).data.partnerId == request.auth.uid);
 
         // Only the owner can create key history entries (during key rotation)
         allow create: if isOwner(userId)

@@ -38,12 +38,12 @@ export const enable2FA = onCall(
       await db.collection("2fa_secrets").doc(userId).set({
         secret: secret.base32,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        pendingBackupCodes: hashedBackupCodes,
       });
 
       await db.collection("users").doc(userId).update({
-        twoFactorEnabled: true,
-        backupCodes: hashedBackupCodes,
-        twoFactorEnabledAt: admin.firestore.FieldValue.serverTimestamp(),
+        twoFactorPending: true,
+        twoFactorPendingAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
       await db.collection("security_logs").add({

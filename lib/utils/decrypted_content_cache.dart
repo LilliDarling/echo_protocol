@@ -8,23 +8,41 @@ import 'security.dart';
 
 class DecryptedContentCacheService {
   final SecureStorageService _secureStorage;
-  final Map<String, String> _memoryCache = {};
+  final Map<String, String> _cache = {};
+  final List<String> _accessOrder = [];
 
   static const String _cacheSubdir = 'message_cache';
   static const String _cacheFileName = 'decrypted_content.enc';
   static const int _cacheVersion = 1;
+  static const int _maxCacheSize = 1000;
 
   DecryptedContentCacheService({
     required SecureStorageService secureStorage,
   }) : _secureStorage = secureStorage;
 
-  String? get(String messageId) => _memoryCache[messageId];
+  String? get(String messageId) {
+    final value = _cache[messageId];
+    if (value != null) {
+      _accessOrder.remove(messageId);
+      _accessOrder.add(messageId);
+    }
+    return value;
+  }
 
-  bool contains(String messageId) => _memoryCache.containsKey(messageId);
+  bool contains(String messageId) => _cache.containsKey(messageId);
 
   void put(String messageId, String decryptedContent) {
-    _memoryCache[messageId] = decryptedContent;
+    if (_cache.containsKey(messageId)) {
+      _accessOrder.remove(messageId);
+    } else if (_cache.length >= _maxCacheSize) {
+      final oldest = _accessOrder.removeAt(0);
+      _cache.remove(oldest);
+    }
+    _cache[messageId] = decryptedContent;
+    _accessOrder.add(messageId);
   }
+
+  Map<String, String> get _memoryCache => _cache;
 
   Map<String, String> getAll() => Map.unmodifiable(_memoryCache);
 
@@ -69,7 +87,13 @@ class DecryptedContentCacheService {
         return;
       }
 
-      _memoryCache.addAll(content.map((k, v) => MapEntry(k, v.toString())));
+      final entries = content.entries.toList();
+      final startIdx = entries.length > _maxCacheSize ? entries.length - _maxCacheSize : 0;
+      for (var i = startIdx; i < entries.length; i++) {
+        final key = entries[i].key;
+        _cache[key] = entries[i].value.toString();
+        _accessOrder.add(key);
+      }
     } catch (e) {
       await _deleteCacheFile();
     }
@@ -110,12 +134,16 @@ class DecryptedContentCacheService {
   }
 
   Future<void> clearAll() async {
-    _memoryCache.clear();
+    _cache.clear();
+    _accessOrder.clear();
     await _deleteCacheFile();
     await _secureStorage.deleteCacheKey();
   }
 
-  void remove(String messageId) => _memoryCache.remove(messageId);
+  void remove(String messageId) {
+    _cache.remove(messageId);
+    _accessOrder.remove(messageId);
+  }
 
   Future<Map<String, dynamic>> getStats() async {
     final cacheFile = await _getCacheFile();

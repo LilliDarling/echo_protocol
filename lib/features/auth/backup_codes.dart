@@ -46,9 +46,12 @@ class _BackupCodesScreenState extends State<BackupCodesScreen> {
       }).join('\n');
 
       await Clipboard.setData(ClipboardData(text: codesText));
+      Future.delayed(const Duration(seconds: 60), () {
+        Clipboard.setData(const ClipboardData(text: ''));
+      });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Backup codes copied to clipboard')),
+        const SnackBar(content: Text('Backup codes copied. Will auto-clear in 60 seconds.')),
       );
 
       setState(() => _hasAcknowledged = true);

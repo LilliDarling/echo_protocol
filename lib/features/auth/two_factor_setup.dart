@@ -111,8 +111,11 @@ class _TwoFactorSetupScreenState extends State<TwoFactorSetupScreen> {
   void _copySecret() {
     if (_setup != null) {
       Clipboard.setData(ClipboardData(text: _setup!.secret));
+      Future.delayed(const Duration(seconds: 60), () {
+        Clipboard.setData(const ClipboardData(text: ''));
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Secret key copied to clipboard')),
+        const SnackBar(content: Text('Secret key copied. Will auto-clear in 60 seconds.')),
       );
     }
   }

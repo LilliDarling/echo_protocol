@@ -39,7 +39,10 @@ export const verify2FATOTP = onCall(
       const userDoc = await db.collection("users").doc(userId).get();
       const userData = userDoc.data();
 
-      if (!userData?.twoFactorEnabled) {
+      const isPending = userData?.twoFactorPending === true;
+      const isEnabled = userData?.twoFactorEnabled === true;
+
+      if (!isPending && !isEnabled) {
         throw new HttpsError(
           "failed-precondition",
           "2FA is not enabled for this account"
@@ -59,7 +62,8 @@ export const verify2FATOTP = onCall(
         );
       }
 
-      const secret = secretDoc.data()?.secret;
+      const secretData = secretDoc.data();
+      const secret = secretData?.secret;
 
       if (!secret) {
         logger.error("2FA secret is empty", {userId});
@@ -93,19 +97,35 @@ export const verify2FATOTP = onCall(
         );
       }
 
+      // If pending, activate 2FA on first successful verification
+      if (isPending) {
+        const pendingBackupCodes = secretData?.pendingBackupCodes;
+        await db.collection("users").doc(userId).update({
+          twoFactorEnabled: true,
+          twoFactorEnabledAt: admin.firestore.FieldValue.serverTimestamp(),
+          twoFactorPending: admin.firestore.FieldValue.delete(),
+          twoFactorPendingAt: admin.firestore.FieldValue.delete(),
+          backupCodes: pendingBackupCodes || [],
+        });
+        await db.collection("2fa_secrets").doc(userId).update({
+          pendingBackupCodes: admin.firestore.FieldValue.delete(),
+        });
+      }
+
       await db.collection("security_logs").add({
         userId,
-        event: "2fa_totp_success",
+        event: isPending ? "2fa_activated" : "2fa_totp_success",
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
         ip: ip,
         userAgent: request.rawRequest.headers["user-agent"],
       });
 
-      logger.info("2FA TOTP verification successful", {userId, ip});
+      logger.info("2FA TOTP verification successful", {userId, ip, activated: isPending});
 
       return {
         success: true,
         verified: true,
+        activated: isPending,
       };
     } catch (error) {
       if (error instanceof HttpsError) {

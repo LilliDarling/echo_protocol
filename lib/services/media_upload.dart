@@ -121,10 +121,13 @@ class MediaUploadService {
       );
     }
 
-    // Clean up temporary thumbnail
     if (thumbnailPath != null) {
       try {
-        await File(thumbnailPath).delete();
+        final thumbFile = File(thumbnailPath);
+        if (await thumbFile.exists()) {
+          await thumbFile.writeAsBytes(List.filled(thumbFile.lengthSync(), 0));
+          await thumbFile.delete();
+        }
       } catch (_) {}
     }
 
@@ -144,11 +147,12 @@ class MediaUploadService {
     return hash.toString();
   }
 
-  /// Generate thumbnail for image
   Future<Uint8List> _generateImageThumbnail(Uint8List imageBytes) async {
+    File? tempFile;
     try {
       final tempDir = await getTemporaryDirectory();
-      final tempFile = File('${tempDir.path}/temp_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      final tempPath = '${tempDir.path}/.temp_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      tempFile = File(tempPath);
       await tempFile.writeAsBytes(imageBytes);
 
       final compressed = await FlutterImageCompress.compressWithFile(
@@ -158,15 +162,16 @@ class MediaUploadService {
         quality: 70,
       );
 
-      // Clean up temp file
-      try {
-        await tempFile.delete();
-      } catch (_) {}
-
       return compressed ?? imageBytes;
     } catch (e) {
-      // Fallback: return original bytes if compression fails
       return imageBytes;
+    } finally {
+      if (tempFile != null && await tempFile.exists()) {
+        try {
+          await tempFile.writeAsBytes(List.filled(tempFile.lengthSync(), 0));
+          await tempFile.delete();
+        } catch (_) {}
+      }
     }
   }
 

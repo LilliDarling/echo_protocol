@@ -209,6 +209,7 @@ class EncryptionService {
     required String myPrivateKeyPem,
     required String partnerPublicKeyPem,
   }) {
+    Uint8List? derivedKey;
     try {
       final tempPrivateKey = _decodePrivateKey(myPrivateKeyPem);
       final tempPartnerPublicKey = _decodePublicKey(partnerPublicKeyPem);
@@ -223,7 +224,7 @@ class EncryptionService {
       final salt = _deriveSaltFromPublicKeys(tempPublicKey, tempPartnerPublicKey);
       final info = Uint8List.fromList(utf8.encode('message-encryption-key'));
 
-      final derivedKey = SecurityUtils.hkdfSha256(
+      derivedKey = SecurityUtils.hkdfSha256(
         Uint8List.fromList(sharedSecretBytes),
         salt,
         info,
@@ -255,6 +256,8 @@ class EncryptionService {
       return encrypter.decrypt(encrypted, iv: iv);
     } catch (e) {
       throw SecurityUtils.sanitizeDecryptionError(e);
+    } finally {
+      if (derivedKey != null) SecurityUtils.secureClear(derivedKey);
     }
   }
 
@@ -592,10 +595,14 @@ class EncryptionService {
   }
 
   void clearKeys() {
+    if (_sharedSecret != null) {
+      SecurityUtils.secureClear(_sharedSecret!.bytes);
+    }
     _privateKey = null;
     _publicKey = null;
     _partnerPublicKey = null;
     _sharedSecret = null;
+    _currentKeyVersion = null;
   }
 
   /// Rotate user's key pair

@@ -49,17 +49,18 @@ class DeviceLinkingService {
     }
 
     final key = encrypt.Key.fromBase64(sessionKey + '=' * (4 - sessionKey.length % 4));
-    final iv = encrypt.IV.fromSecureRandom(16);
     final encrypter = encrypt.Encrypter(
       encrypt.AES(key, mode: encrypt.AESMode.gcm),
     );
 
-    final encryptedPrivateKey = encrypter.encrypt(privateKey, iv: iv);
+    final privateKeyIv = encrypt.IV.fromSecureRandom(16);
+    final encryptedPrivateKey = encrypter.encrypt(privateKey, iv: privateKeyIv);
 
     final archivedKeysJson = jsonEncode(archivedKeys);
+    final archivedKeysIv = encrypt.IV.fromSecureRandom(16);
     final encryptedArchivedKeys = archivedKeys.isEmpty
         ? null
-        : encrypter.encrypt(archivedKeysJson, iv: iv);
+        : encrypter.encrypt(archivedKeysJson, iv: archivedKeysIv);
 
     final expiresAt = DateTime.now().add(const Duration(minutes: 2));
     await _db.collection('deviceLinking').doc(linkToken).set({
@@ -69,7 +70,8 @@ class DeviceLinkingService {
       'publicKey': publicKey,
       'keyVersion': keyVersion,
       'encryptedArchivedKeys': encryptedArchivedKeys?.base64,
-      'iv': iv.base64,
+      'iv': privateKeyIv.base64,
+      'archivedKeysIv': archivedKeysIv.base64,
       'createdAt': FieldValue.serverTimestamp(),
       'expiresAt': Timestamp.fromDate(expiresAt),
       'used': false,
@@ -133,26 +135,28 @@ class DeviceLinkingService {
       final publicKey = linkData['publicKey'] as String;
       final keyVersion = linkData['keyVersion'] as int;
       final encryptedArchivedKeys = linkData['encryptedArchivedKeys'] as String?;
-      final ivBase64 = linkData['iv'] as String;
+      final privateKeyIvBase64 = linkData['iv'] as String;
+      final archivedKeysIvBase64 = linkData['archivedKeysIv'] as String?;
 
       final key = encrypt.Key.fromBase64(sessionKey + '=' * (4 - sessionKey.length % 4));
-      final iv = encrypt.IV.fromBase64(ivBase64);
+      final privateKeyIv = encrypt.IV.fromBase64(privateKeyIvBase64);
       final encrypter = encrypt.Encrypter(
         encrypt.AES(key, mode: encrypt.AESMode.gcm),
       );
 
       final encrypted = encrypt.Encrypted.fromBase64(encryptedPrivateKey);
-      final privateKey = encrypter.decrypt(encrypted, iv: iv);
+      final privateKey = encrypter.decrypt(encrypted, iv: privateKeyIv);
 
       await _secureStorage.storePrivateKey(privateKey);
       await _secureStorage.storePublicKey(publicKey);
       await _secureStorage.storeCurrentKeyVersion(keyVersion);
       await _secureStorage.storeUserId(userId);
 
-      if (encryptedArchivedKeys != null && encryptedArchivedKeys.isNotEmpty) {
+      if (encryptedArchivedKeys != null && encryptedArchivedKeys.isNotEmpty && archivedKeysIvBase64 != null) {
         try {
+          final archivedKeysIv = encrypt.IV.fromBase64(archivedKeysIvBase64);
           final encryptedArchived = encrypt.Encrypted.fromBase64(encryptedArchivedKeys);
-          final archivedKeysJson = encrypter.decrypt(encryptedArchived, iv: iv);
+          final archivedKeysJson = encrypter.decrypt(encryptedArchived, iv: archivedKeysIv);
           final archivedKeys = jsonDecode(archivedKeysJson) as Map<String, dynamic>;
 
           for (final entry in archivedKeys.entries) {
