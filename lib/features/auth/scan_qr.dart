@@ -39,7 +39,6 @@ class _ScanQRScreenState extends State<ScanQRScreen> {
       if (!mounted) return;
 
       if (success) {
-        // Show success dialog
         await showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -50,8 +49,8 @@ class _ScanQRScreenState extends State<ScanQRScreen> {
             actions: [
               TextButton(
                 onPressed: () {
-                  Navigator.pop(context); // Close dialog
-                  Navigator.pop(context, true); // Return to previous screen
+                  Navigator.pop(context);
+                  Navigator.pop(context, true);
                 },
                 child: const Text('OK'),
               ),
@@ -108,7 +107,6 @@ class _ScanQRScreenState extends State<ScanQRScreen> {
             },
           ),
 
-          // Overlay with instructions
           if (!_isProcessing)
             Positioned(
               bottom: 0,
@@ -158,7 +156,6 @@ class _ScanQRScreenState extends State<ScanQRScreen> {
               ),
             ),
 
-          // Processing overlay
           if (_isProcessing)
             Container(
               color: Colors.black.withValues(alpha: 0.7),

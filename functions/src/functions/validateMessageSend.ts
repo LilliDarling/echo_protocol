@@ -2,23 +2,10 @@ import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 import {REPLAY_PROTECTION, RATE_LIMITS} from "../config/constants";
-
-interface ValidateMessageRequest {
-  messageId: string;
-  conversationId: string;
-  recipientId: string;
-  sequenceNumber: number;
-  timestamp: number;
-}
-
-interface ValidateMessageResponse {
-  valid: boolean;
-  token?: string;
-  error?: string;
-  retryAfterMs?: number;
-  remainingMinute?: number;
-  remainingHour?: number;
-}
+import {
+  ValidateMessageRequest,
+  ValidateMessageResponse,
+} from "../types/message";
 
 /**
  * Generate a consistent conversation key from two user IDs
@@ -93,8 +80,7 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
     const rateLimitConfig = RATE_LIMITS.MESSAGE;
 
     try {
-      const result = await db.runTransaction(async (transaction) => {
-        // Rate limit refs
+      return await db.runTransaction(async (transaction) => {
         const userRateLimitRef = db
           .collection("message_rate_limits")
           .doc(senderId);
@@ -102,14 +88,12 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
           .collection("message_rate_limits")
           .doc(`${senderId}_${conversationId}`);
 
-        // Replay protection refs
         const nonceRef = db.collection("message_nonces").doc(messageId);
         const sequenceRef = db
           .collection("message_sequences")
           .doc(`${senderId}_${conversationKey}`);
         const tokenRef = db.collection("message_tokens").doc();
 
-        // Fetch all documents
         const [userDoc, convDoc, nonceDoc, sequenceDoc] = await Promise.all([
           transaction.get(userRateLimitRef),
           transaction.get(convRateLimitRef),
@@ -117,14 +101,13 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
           transaction.get(sequenceRef),
         ]);
 
-        // --- Rate Limiting Check ---
         const hourAgo = new Date(nowTimestamp.toMillis() - 60 * 60 * 1000);
         const minuteAgo = new Date(nowTimestamp.toMillis() - 60 * 1000);
 
         let userAttempts: admin.firestore.Timestamp[] = [];
         if (userDoc.exists) {
-          userAttempts =
-            (userDoc.data()?.attempts || []) as admin.firestore.Timestamp[];
+          const data = userDoc.data();
+          userAttempts = (data?.attempts || []) as admin.firestore.Timestamp[];
           userAttempts = userAttempts.filter(
             (ts: admin.firestore.Timestamp) => ts.toDate() > hourAgo
           );
@@ -132,8 +115,8 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
 
         let convAttempts: admin.firestore.Timestamp[] = [];
         if (convDoc.exists) {
-          convAttempts =
-            (convDoc.data()?.attempts || []) as admin.firestore.Timestamp[];
+          const data = convDoc.data();
+          convAttempts = (data?.attempts || []) as admin.firestore.Timestamp[];
           convAttempts = convAttempts.filter(
             (ts: admin.firestore.Timestamp) => ts.toDate() > hourAgo
           );
@@ -153,57 +136,57 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
         let limitReason = "";
 
         if (userAttemptsInMinute >= rateLimitConfig.maxPerMinute) {
-          type TS = admin.firestore.Timestamp;
-          const oldestInMinute = userAttempts
-            .filter((t: TS) => t.toDate() > minuteAgo)
-            .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
-          if (oldestInMinute) {
-            retryAfterMs = Math.max(
-              retryAfterMs,
-              oldestInMinute.toMillis() + 60000 - nowTimestamp.toMillis()
-            );
-          }
-          limitReason = "global minute limit";
+                type TS = admin.firestore.Timestamp;
+                const oldestInMinute = userAttempts
+                  .filter((t: TS) => t.toDate() > minuteAgo)
+                  .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
+                if (oldestInMinute) {
+                  retryAfterMs = Math.max(
+                    retryAfterMs,
+                    oldestInMinute.toMillis() + 60000 - nowTimestamp.toMillis()
+                  );
+                }
+                limitReason = "global minute limit";
         }
 
         if (userAttemptsInHour >= rateLimitConfig.maxPerHour) {
-          type TS = admin.firestore.Timestamp;
-          const oldestInHour = userAttempts
-            .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
-          if (oldestInHour) {
-            retryAfterMs = Math.max(
-              retryAfterMs,
-              oldestInHour.toMillis() + 3600000 - nowTimestamp.toMillis()
-            );
-          }
-          limitReason = "global hour limit";
+                type TS = admin.firestore.Timestamp;
+                const oldestInHour = userAttempts
+                  .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
+                if (oldestInHour) {
+                  retryAfterMs = Math.max(
+                    retryAfterMs,
+                    oldestInHour.toMillis() + 3600000 - nowTimestamp.toMillis()
+                  );
+                }
+                limitReason = "global hour limit";
         }
 
         if (convAttemptsInMinute >= rateLimitConfig.conversationMaxPerMinute) {
-          type TS = admin.firestore.Timestamp;
-          const oldestInMinute = convAttempts
-            .filter((t: TS) => t.toDate() > minuteAgo)
-            .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
-          if (oldestInMinute) {
-            retryAfterMs = Math.max(
-              retryAfterMs,
-              oldestInMinute.toMillis() + 60000 - nowTimestamp.toMillis()
-            );
-          }
-          limitReason = "conversation minute limit";
+                type TS = admin.firestore.Timestamp;
+                const oldestInMinute = convAttempts
+                  .filter((t: TS) => t.toDate() > minuteAgo)
+                  .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
+                if (oldestInMinute) {
+                  retryAfterMs = Math.max(
+                    retryAfterMs,
+                    oldestInMinute.toMillis() + 60000 - nowTimestamp.toMillis()
+                  );
+                }
+                limitReason = "conversation minute limit";
         }
 
         if (convAttemptsInHour >= rateLimitConfig.conversationMaxPerHour) {
-          type TS = admin.firestore.Timestamp;
-          const oldestInHour = convAttempts
-            .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
-          if (oldestInHour) {
-            retryAfterMs = Math.max(
-              retryAfterMs,
-              oldestInHour.toMillis() + 3600000 - nowTimestamp.toMillis()
-            );
-          }
-          limitReason = "conversation hour limit";
+                type TS = admin.firestore.Timestamp;
+                const oldestInHour = convAttempts
+                  .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
+                if (oldestInHour) {
+                  retryAfterMs = Math.max(
+                    retryAfterMs,
+                    oldestInHour.toMillis() + 3600000 - nowTimestamp.toMillis()
+                  );
+                }
+                limitReason = "conversation hour limit";
         }
 
         if (retryAfterMs > 0) {
@@ -230,7 +213,6 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
           };
         }
 
-        // --- Replay Protection Check ---
         if (nonceDoc.exists) {
           logger.warn("Duplicate nonce detected (replay attack)", {
             senderId,
@@ -251,7 +233,6 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
           return {valid: false, error: "Invalid sequence number"};
         }
 
-        // Prevent sequence gap attacks (jumping to very high numbers)
         const maxGap = 1000;
         if (sequenceNumber > lastSequence + maxGap) {
           logger.warn("Sequence number gap too large", {
@@ -264,7 +245,6 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
           return {valid: false, error: "Invalid sequence number"};
         }
 
-        // --- All checks passed, write updates ---
         const token = tokenRef.id;
         const expiresAt = admin.firestore.Timestamp.fromMillis(now + 30000);
         const nonceExpireAt = admin.firestore.Timestamp.fromMillis(
@@ -277,7 +257,6 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
           nowTimestamp.toMillis() + 2 * 60 * 60 * 1000
         );
 
-        // Update rate limit tracking
         userAttempts.push(nowTimestamp);
         convAttempts.push(nowTimestamp);
 
@@ -305,7 +284,6 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
           {merge: true}
         );
 
-        // Write replay protection data
         transaction.set(nonceRef, {
           senderId,
           conversationId,
@@ -353,8 +331,6 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
           ),
         };
       });
-
-      return result;
     } catch (error) {
       if (error instanceof HttpsError) {
         throw error;

@@ -18,6 +18,7 @@ class EchoModel {
   final DateTime? editedAt;
   final bool isDeleted;
   final DateTime? deletedAt;
+  final int encryptionVersion;
 
   EchoModel({
     required this.id,
@@ -37,6 +38,7 @@ class EchoModel {
     this.editedAt,
     this.isDeleted = false,
     this.deletedAt,
+    this.encryptionVersion = 2,
   });
 
   factory EchoModel.fromJson(String id, Map<String, dynamic> json) {
@@ -62,6 +64,7 @@ class EchoModel {
       deletedAt: json['deletedAt'] != null
           ? (json['deletedAt'] as Timestamp).toDate()
           : null,
+      encryptionVersion: json['encryptionVersion'] as int? ?? 2,
     );
   }
 
@@ -88,6 +91,7 @@ class EchoModel {
       if (editedAt != null) 'editedAt': Timestamp.fromDate(editedAt!),
       'isDeleted': isDeleted,
       if (deletedAt != null) 'deletedAt': Timestamp.fromDate(deletedAt!),
+      'encryptionVersion': encryptionVersion,
     };
   }
 
@@ -109,6 +113,7 @@ class EchoModel {
     DateTime? editedAt,
     bool? isDeleted,
     DateTime? deletedAt,
+    int? encryptionVersion,
   }) {
     return EchoModel(
       id: id ?? this.id,
@@ -128,6 +133,7 @@ class EchoModel {
       editedAt: editedAt ?? this.editedAt,
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: deletedAt ?? this.deletedAt,
+      encryptionVersion: encryptionVersion ?? this.encryptionVersion,
     );
   }
 

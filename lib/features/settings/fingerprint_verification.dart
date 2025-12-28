@@ -64,7 +64,6 @@ class _FingerprintVerificationScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Icon
                   Icon(
                     Icons.verified_user,
                     size: 80,
@@ -73,7 +72,6 @@ class _FingerprintVerificationScreenState
 
                   const SizedBox(height: 24),
 
-                  // Title
                   Text(
                     'Your Security Code',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -84,7 +82,6 @@ class _FingerprintVerificationScreenState
 
                   const SizedBox(height: 12),
 
-                  // Description
                   Text(
                     'Share this code with your conversation partners to verify end-to-end encryption',
                     style: TextStyle(
@@ -96,7 +93,6 @@ class _FingerprintVerificationScreenState
 
                   const SizedBox(height: 32),
 
-                  // Fingerprint Card
                   Card(
                     elevation: 3,
                     shape: RoundedRectangleBorder(
@@ -146,7 +142,6 @@ class _FingerprintVerificationScreenState
 
                   const SizedBox(height: 32),
 
-                  // QR Code Section
                   Card(
                     elevation: 3,
                     shape: RoundedRectangleBorder(
@@ -195,7 +190,6 @@ class _FingerprintVerificationScreenState
 
                   const SizedBox(height: 32),
 
-                  // Instructions
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -245,7 +239,6 @@ class _FingerprintVerificationScreenState
 
                   const SizedBox(height: 24),
 
-                  // Warning
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(

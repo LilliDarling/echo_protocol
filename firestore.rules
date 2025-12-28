@@ -39,18 +39,22 @@ service cloud.firestore {
     }
 
     // Users collection
+    // Server-managed fields (via Cloud Functions Admin SDK):
+    //   - identityKey: { ed25519, x25519, keyId } - X3DH identity key pair (public)
+    //   - signedPrekey: { id, publicKey, signature, expiresAt } - Signed prekey for X3DH
+    //   - registrationId: number - Device registration ID
+    // Client-managed fields: name, avatar, preferences, etc.
     match /users/{userId} {
       // Users can read their own document
-      // Partners can also read each other's documents (for name, avatar, publicKey)
+      // Partners can also read each other's documents (for name, avatar, identity keys)
       // Uses partnerIdHash for security - partnerId itself is encrypted
       allow read: if isOwner(userId)
         || (isAuthenticated() && resource.data.partnerIdHash == hashing.sha256(request.auth.uid.toUtf8()));
 
       // Users can create their own document during signup
+      // Note: identityKey and signedPrekey are set later via Cloud Functions
       allow create: if isOwner(userId)
-        && request.resource.data.keys().hasAll(['email', 'publicKey', 'createdAt'])
-        && request.resource.data.publicKey is string
-        && request.resource.data.publicKey.size() > 0;
+        && request.resource.data.keys().hasAll(['email', 'createdAt']);
 
       // Users can update their own document
       allow update: if isOwner(userId)
@@ -98,6 +102,23 @@ service cloud.firestore {
       match /message_sequences/{conversationId} {
         // Users can only read/write their own message sequences
         allow read, write: if isOwner(userId);
+      }
+
+      // One-time prekeys subcollection - X3DH key exchange
+      // Only Cloud Functions can read/write via Admin SDK
+      // These are atomically claimed and deleted during key exchange
+      match /oneTimePrekeys/{prekeyId} {
+        // No client access - only Cloud Functions via Admin SDK
+        allow read, write: if false;
+      }
+
+      // Metadata subcollection - Stores prekey counts and other metadata
+      // Only Cloud Functions can write via Admin SDK
+      match /metadata/{docId} {
+        // Owner can read their own metadata (e.g., prekey count)
+        allow read: if isOwner(userId);
+        // Only Cloud Functions can write (via Admin SDK)
+        allow write: if false;
       }
     }
 
@@ -186,6 +207,9 @@ service cloud.firestore {
       allow delete: if false;
 
       // Messages subcollection
+      // SECURITY: Message creation is handled by the sendMessage Cloud Function.
+      // This eliminates the slow token validation get() in security rules.
+      // Cloud Functions use Admin SDK which bypasses these rules.
       match /messages/{messageId} {
         function isMessageParticipant() {
           return isAuthenticated() &&
@@ -193,28 +217,14 @@ service cloud.firestore {
              request.auth.uid == resource.data.recipientId);
         }
 
-        function isValidToken(tokenId) {
-          let token = get(/databases/$(database)/documents/message_tokens/$(tokenId));
-          return token != null
-            && token.data.messageId == messageId
-            && token.data.senderId == request.auth.uid
-            && token.data.expiresAt > request.time;
-        }
-
         allow read: if isConversationParticipantForCreate();
 
-        allow create: if isConversationParticipantForCreate()
-          && request.resource.data.senderId == request.auth.uid
-          && request.resource.data.keys().hasAll(['content', 'senderId', 'recipientId', 'timestamp', 'senderKeyVersion', 'recipientKeyVersion', 'validationToken'])
-          && request.resource.data.content is string
-          && request.resource.data.content.size() > 0
-          && request.resource.data.content.size() < 100000
-          && request.resource.data.senderKeyVersion is int
-          && request.resource.data.recipientKeyVersion is int
-          && request.resource.data.timestamp is timestamp
-          && request.resource.data.validationToken is string
-          && request.resource.data.validationToken.size() > 0
-          && isValidToken(request.resource.data.validationToken);
+        // Message creation is only allowed via Cloud Function (Admin SDK)
+        // This provides better performance and security:
+        // - No slow get() call for token validation
+        // - All validation (rate limits, replay protection) happens server-side
+        // - Atomic transaction ensures consistency
+        allow create: if false;
 
         allow update: if isAuthenticated()
           && (
@@ -243,9 +253,9 @@ service cloud.firestore {
 
     // Partner invites collection (for connecting partners)
     match /partnerInvites/{inviteCode} {
-      // Helper function: Check if invite code format is valid (8 alphanumeric chars)
+      // 12-char codes only (32^12 ≈ 1.15 quadrillion combinations)
       function isValidInviteCode() {
-        return inviteCode.size() == 8;
+        return inviteCode.size() == 12;
       }
 
       // Helper function: Check if invite has not expired
@@ -262,12 +272,14 @@ service cloud.firestore {
       allow read: if isAuthenticated();
 
       // Users can create invites for themselves with strict validation
+      // Only v4 signature format (Ed25519 with full metadata signed)
       allow create: if isAuthenticated()
         && isValidInviteCode()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.keys().hasAll([
             'userId', 'userName', 'publicKey', 'publicKeyVersion',
-            'publicKeyFingerprint', 'signature', 'createdAt', 'expiresAt', 'used'
+            'publicKeyFingerprint', 'signature', 'signatureVersion',
+            'ed25519PublicKey', 'publicKeyHash', 'createdAt', 'expiresAt', 'used'
            ])
         && request.resource.data.used == false
         // Validate public key is present and reasonably formatted
@@ -278,9 +290,16 @@ service cloud.firestore {
         // Validate fingerprint is present (32 hex chars with spaces = ~39 chars)
         && request.resource.data.publicKeyFingerprint is string
         && request.resource.data.publicKeyFingerprint.size() >= 32
-        // Validate signature is present (SHA-256 = 64 hex chars)
+        // Only v4 signature format allowed
+        && request.resource.data.signatureVersion == 4
         && request.resource.data.signature is string
-        && request.resource.data.signature.size() == 64
+        && request.resource.data.signature.size() >= 80
+        && request.resource.data.signature.size() <= 100
+        && request.resource.data.ed25519PublicKey is string
+        && request.resource.data.ed25519PublicKey.size() >= 40
+        && request.resource.data.ed25519PublicKey.size() <= 50
+        && request.resource.data.publicKeyHash is string
+        && request.resource.data.publicKeyHash.size() == 64
         // Validate timestamps
         && request.resource.data.createdAt is timestamp
         && request.resource.data.expiresAt is timestamp

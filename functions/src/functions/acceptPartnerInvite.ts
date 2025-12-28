@@ -2,8 +2,19 @@ import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {validateRequest} from "../utils/validation";
+import * as nacl from "tweetnacl";
+import {createHash, randomBytes} from "crypto";
 
 const db = admin.firestore();
+
+/**
+ * Generate a short correlation ID for logging.
+ * Does NOT reveal the actual invite code or user ID.
+ * @return {string} 8-character hex correlation ID
+ */
+function generateCorrelationId(): string {
+  return randomBytes(4).toString("hex");
+}
 
 export const acceptPartnerInvite = onCall(
   {
@@ -13,10 +24,11 @@ export const acceptPartnerInvite = onCall(
   async (request) => {
     validateRequest(request);
 
+    const correlationId = generateCorrelationId();
+
     const userId = request.auth?.uid as string;
     const {inviteCode, myPublicKey, myKeyVersion} = request.data;
 
-    // Validate inputs
     if (!inviteCode || typeof inviteCode !== "string") {
       throw new HttpsError(
         "invalid-argument",
@@ -25,8 +37,8 @@ export const acceptPartnerInvite = onCall(
     }
 
     const normalizedCode = inviteCode.toUpperCase().replace(/[-\s]/g, "");
-    const isValidFormat = normalizedCode.length === 8 &&
-      /^[A-Z0-9]+$/.test(normalizedCode);
+    const isValidFormat =
+      normalizedCode.length === 12 && /^[A-Z0-9]+$/.test(normalizedCode);
     if (!isValidFormat) {
       throw new HttpsError(
         "invalid-argument",
@@ -41,7 +53,6 @@ export const acceptPartnerInvite = onCall(
       );
     }
 
-    // Handle both string and number for myKeyVersion
     let keyVersion: number;
     if (typeof myKeyVersion === "number") {
       keyVersion = myKeyVersion;
@@ -61,12 +72,10 @@ export const acceptPartnerInvite = onCall(
     }
 
     logger.info("Partner invite acceptance attempt", {
-      userId,
-      inviteCode: normalizedCode,
+      correlationId,
     });
 
     try {
-      // Get the invite document
       const inviteRef = db.collection("partnerInvites").doc(normalizedCode);
       const inviteDoc = await inviteRef.get();
 
@@ -79,15 +88,128 @@ export const acceptPartnerInvite = onCall(
         throw new HttpsError("not-found", "Invalid invite code");
       }
 
-      // Check if invite is already used
-      if (inviteData.used) {
-        throw new HttpsError(
-          "failed-precondition",
-          "This invite has already been used"
-        );
+      if (inviteData.signatureVersion !== 4) {
+        logger.warn("Invalid signature version", {correlationId});
+        throw new HttpsError("failed-precondition", "Invalid invite");
       }
 
-      // Check if invite has expired
+      if (!inviteData.ed25519PublicKey ||
+          typeof inviteData.ed25519PublicKey !== "string") {
+        logger.warn("Missing Ed25519 public key", {correlationId});
+        throw new HttpsError("failed-precondition", "Invalid invite");
+      }
+
+      if (!inviteData.signature ||
+          typeof inviteData.signature !== "string") {
+        logger.warn("Missing signature", {correlationId});
+        throw new HttpsError("failed-precondition", "Invalid invite");
+      }
+
+      if (!inviteData.publicKey ||
+          typeof inviteData.publicKey !== "string" ||
+          inviteData.publicKey.length < 50) {
+        logger.warn("Invalid public key", {correlationId});
+        throw new HttpsError("failed-precondition", "Invalid invite");
+      }
+
+      if (!inviteData.userName || typeof inviteData.userName !== "string") {
+        logger.warn("Missing userName", {correlationId});
+        throw new HttpsError("failed-precondition", "Invalid invite");
+      }
+
+      if (!inviteData.publicKeyFingerprint ||
+          typeof inviteData.publicKeyFingerprint !== "string") {
+        logger.warn("Missing fingerprint", {correlationId});
+        throw new HttpsError("failed-precondition", "Invalid invite");
+      }
+
+      if (typeof inviteData.publicKeyVersion !== "number" &&
+          typeof inviteData.publicKeyVersion !== "string") {
+        logger.warn("Missing keyVersion", {correlationId});
+        throw new HttpsError("failed-precondition", "Invalid invite");
+      }
+
+      try {
+        const signatureBytes = Buffer.from(inviteData.signature, "base64");
+        const publicKeyBytes = Buffer.from(
+          inviteData.ed25519PublicKey,
+          "base64"
+        );
+
+        if (publicKeyBytes.length !== 32) {
+          logger.warn("Invalid Ed25519 public key length", {correlationId});
+          throw new HttpsError("failed-precondition", "Invalid invite");
+        }
+
+        if (signatureBytes.length !== 64) {
+          logger.warn("Invalid Ed25519 signature length", {correlationId});
+          throw new HttpsError("failed-precondition", "Invalid invite");
+        }
+
+        const computedHash = createHash("sha256")
+          .update(inviteData.publicKey)
+          .digest("hex");
+
+        if (inviteData.publicKeyHash !== computedHash) {
+          logger.warn("Public key hash mismatch", {correlationId});
+          throw new HttpsError("failed-precondition", "Invalid invite");
+        }
+
+        const expiresAtMs = inviteData.expiresAt.toDate().getTime();
+        const fp = inviteData.publicKeyFingerprint;
+        const ver = inviteData.publicKeyVersion;
+        const payload = `${normalizedCode}:${inviteData.userId}:` +
+          `${computedHash}:${inviteData.userName}:${fp}:${ver}:` +
+          `${expiresAtMs}`;
+        const payloadBytes = Buffer.from(payload, "utf-8");
+
+        const isValid = nacl.sign.detached.verify(
+          new Uint8Array(payloadBytes),
+          new Uint8Array(signatureBytes),
+          new Uint8Array(publicKeyBytes)
+        );
+
+        if (!isValid) {
+          logger.warn("Ed25519 signature verification failed", {correlationId});
+          throw new HttpsError("failed-precondition", "Invalid invite");
+        }
+
+        logger.info("Ed25519 signature verified", {correlationId});
+
+        // CRITICAL: Verify Ed25519 key binding
+        // The ed25519PublicKey MUST match the user's registered identity key
+        const inviteCreatorDoc = await db.collection("users")
+          .doc(inviteData.userId)
+          .get();
+
+        if (!inviteCreatorDoc.exists) {
+          logger.warn("Invite creator not found", {correlationId});
+          throw new HttpsError("failed-precondition", "Invalid invite");
+        }
+
+        const creatorData = inviteCreatorDoc.data();
+        const registeredIdentityKey = creatorData?.identityKey;
+
+        if (!registeredIdentityKey ||
+            typeof registeredIdentityKey.ed25519 !== "string") {
+          logger.warn("No registered identity key", {correlationId});
+          throw new HttpsError("failed-precondition", "Invalid invite");
+        }
+
+        if (inviteData.ed25519PublicKey !== registeredIdentityKey.ed25519) {
+          logger.warn("Ed25519 key binding failed", {correlationId});
+          throw new HttpsError("failed-precondition", "Invalid invite");
+        }
+
+        logger.info("Ed25519 key binding verified", {correlationId});
+      } catch (error) {
+        if (error instanceof HttpsError) {
+          throw error;
+        }
+        logger.error("Signature verification error", {correlationId});
+        throw new HttpsError("failed-precondition", "Invalid invite");
+      }
+
       const expiresAt = inviteData.expiresAt.toDate();
       if (expiresAt < new Date()) {
         throw new HttpsError(
@@ -98,7 +220,6 @@ export const acceptPartnerInvite = onCall(
 
       const partnerId = inviteData.userId;
 
-      // Cannot accept own invite
       if (partnerId === userId) {
         throw new HttpsError(
           "failed-precondition",
@@ -106,35 +227,7 @@ export const acceptPartnerInvite = onCall(
         );
       }
 
-      // Check if current user already has a partner
-      const currentUserDoc = await db.collection("users").doc(userId).get();
-      if (!currentUserDoc.exists) {
-        throw new HttpsError("not-found", "User not found");
-      }
-      const currentUserData = currentUserDoc.data();
-      if (currentUserData?.partnerId) {
-        throw new HttpsError(
-          "failed-precondition",
-          "You already have a partner linked"
-        );
-      }
-
-      // Check if invite creator already has a partner
-      const partnerDoc = await db.collection("users").doc(partnerId).get();
-      if (!partnerDoc.exists) {
-        throw new HttpsError("not-found", "Partner not found");
-      }
-      const partnerData = partnerDoc.data();
-      if (partnerData?.partnerId) {
-        throw new HttpsError(
-          "failed-precondition",
-          "This user is already linked"
-        );
-      }
-
-      // All validations passed - perform the linking transaction
       const partnerPublicKey = inviteData.publicKey;
-      // Handle both string and number types for keyVersion
       let partnerKeyVersion = 1;
       if (typeof inviteData.publicKeyVersion === "string") {
         partnerKeyVersion = parseInt(inviteData.publicKeyVersion, 10) || 1;
@@ -143,15 +236,56 @@ export const acceptPartnerInvite = onCall(
       }
       const partnerName = inviteData.userName;
 
+      // ATOMIC TRANSACTION: All state checks and updates happen atomically
       await db.runTransaction(async (transaction) => {
-        // Mark invite as used
-        transaction.update(inviteDoc.ref, {
+        const txInviteDoc = await transaction.get(inviteRef);
+        const txCurrentUserDoc = await transaction.get(
+          db.collection("users").doc(userId)
+        );
+        const txPartnerDoc = await transaction.get(
+          db.collection("users").doc(partnerId)
+        );
+
+        const txInviteData = txInviteDoc.data();
+        if (!txInviteDoc.exists || !txInviteData) {
+          throw new HttpsError("not-found", "Invalid invite code");
+        }
+
+        if (txInviteData.used) {
+          throw new HttpsError(
+            "failed-precondition",
+            "This invite has already been used"
+          );
+        }
+
+        if (!txCurrentUserDoc.exists) {
+          throw new HttpsError("not-found", "User not found");
+        }
+        const txCurrentUserData = txCurrentUserDoc.data();
+        if (txCurrentUserData?.partnerId) {
+          throw new HttpsError(
+            "failed-precondition",
+            "You already have a partner linked"
+          );
+        }
+
+        if (!txPartnerDoc.exists) {
+          throw new HttpsError("not-found", "Partner not found");
+        }
+        const txPartnerData = txPartnerDoc.data();
+        if (txPartnerData?.partnerId) {
+          throw new HttpsError(
+            "failed-precondition",
+            "This user is already linked"
+          );
+        }
+
+        transaction.update(inviteRef, {
           used: true,
           usedAt: admin.firestore.FieldValue.serverTimestamp(),
           usedBy: userId,
         });
 
-        // Update current user with partner info
         transaction.update(db.collection("users").doc(userId), {
           partnerId: partnerId,
           partnerPublicKey: partnerPublicKey,
@@ -159,7 +293,6 @@ export const acceptPartnerInvite = onCall(
           partnerLinkedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        // Update partner with current user's info
         transaction.update(db.collection("users").doc(partnerId), {
           partnerId: userId,
           partnerPublicKey: myPublicKey,
@@ -167,7 +300,6 @@ export const acceptPartnerInvite = onCall(
           partnerLinkedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        // Create conversation document
         const sortedIds = [userId, partnerId].sort();
         const conversationId = `${sortedIds[0]}_${sortedIds[1]}`;
 
@@ -183,7 +315,6 @@ export const acceptPartnerInvite = onCall(
         });
       });
 
-      // Log security event
       await db.collection("security_logs").add({
         userId,
         event: "partner_linked",
@@ -191,7 +322,7 @@ export const acceptPartnerInvite = onCall(
         details: {partnerId},
       });
 
-      logger.info("Partner linking successful", {userId, partnerId});
+      logger.info("Partner linking successful", {correlationId});
 
       return {
         success: true,
@@ -205,12 +336,7 @@ export const acceptPartnerInvite = onCall(
       if (error instanceof HttpsError) {
         throw error;
       }
-      const errorMessage = error instanceof Error ?
-        error.message : String(error);
-      logger.error("Partner invite acceptance error", {
-        userId,
-        errorMessage,
-      });
+      logger.error("Partner invite acceptance error", {correlationId});
       throw new HttpsError("internal", "Failed to accept invite");
     }
   }

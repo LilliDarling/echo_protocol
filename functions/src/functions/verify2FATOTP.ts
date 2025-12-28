@@ -97,7 +97,6 @@ export const verify2FATOTP = onCall(
         );
       }
 
-      // If pending, activate 2FA on first successful verification
       if (isPending) {
         const pendingBackupCodes = secretData?.pendingBackupCodes;
         await db.collection("users").doc(userId).update({
@@ -120,7 +119,11 @@ export const verify2FATOTP = onCall(
         userAgent: request.rawRequest.headers["user-agent"],
       });
 
-      logger.info("2FA TOTP verification successful", {userId, ip, activated: isPending});
+      logger.info("2FA TOTP verification successful", {
+        userId,
+        ip,
+        activated: isPending,
+      });
 
       return {
         success: true,

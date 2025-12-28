@@ -57,14 +57,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
       );
 
       if (mounted) {
-        // Show recovery phrase screen first, then proceed to onboarding success
         final userId = result.credential.user!.uid;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => RecoveryPhraseDisplayScreen(
               recoveryPhrase: result.recoveryPhrase,
               onComplete: (ctx) {
-                // Clear the entire stack and go to onboarding success
                 Navigator.of(ctx).pushAndRemoveUntil(
                   MaterialPageRoute(
                     builder: (_) => OnboardingSuccessScreen(userId: userId),
@@ -100,14 +98,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       if (mounted) {
         if (result is SignUpResult) {
-          // New user - show recovery phrase first
           final userId = result.credential.user!.uid;
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => RecoveryPhraseDisplayScreen(
                 recoveryPhrase: result.recoveryPhrase,
                 onComplete: (ctx) {
-                  // Clear the entire stack and go to onboarding success
                   Navigator.of(ctx).pushAndRemoveUntil(
                     MaterialPageRoute(
                       builder: (_) => OnboardingSuccessScreen(userId: userId),
@@ -119,7 +115,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
             ),
           );
         } else if (result is SignInResult) {
-          // Existing user - go to onboarding success
           final userId = result.credential.user!.uid;
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
@@ -160,7 +155,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Icon
                   const Icon(
                     Icons.favorite,
                     size: 80,
@@ -186,7 +180,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Display name field
                   CustomTextField(
                     controller: _displayNameController,
                     label: 'Name',
@@ -196,7 +189,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Email field
                   CustomTextField(
                     controller: _emailController,
                     label: 'Email',
@@ -207,7 +199,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Password field
                   CustomTextField(
                     controller: _passwordController,
                     label: 'Password',
@@ -226,7 +217,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Confirm password field
                   CustomTextField(
                     controller: _confirmPasswordController,
                     label: 'Confirm Password',
@@ -245,7 +235,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Sign up button
                   CustomButton(
                     text: 'Create Account',
                     onPressed: _signUp,
@@ -253,7 +242,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Divider
                   Row(
                     children: [
                       Expanded(child: Divider(color: Colors.grey[400])),
@@ -269,7 +257,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Google Sign-Up button
                   SizedBox(
                     height: 50,
                     child: OutlinedButton.icon(
@@ -283,7 +270,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Privacy notice
                   Text(
                     'By signing up, your messages will be end-to-end encrypted and completely private between you and your partner.',
                     style: TextStyle(

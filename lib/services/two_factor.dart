@@ -5,7 +5,6 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'secure_storage.dart';
 import '../utils/logger.dart';
 
-/// Two-Factor Authentication Service (Server-Side via Cloud Functions)
 class TwoFactorService {
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
@@ -168,7 +167,6 @@ class TwoFactorService {
   }
 }
 
-/// Result of 2FA setup (enable2FA)
 class TwoFactorSetup {
   final String secret;
   final String qrCodeData;

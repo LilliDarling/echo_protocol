@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../models/echo.dart';
-import '../../../services/media_encryption.dart';
+import '../../../services/crypto/media_encryption.dart';
 import 'message_status.dart';
 import 'media_message.dart';
 import 'link_preview.dart';
@@ -12,6 +12,7 @@ class MessageBubble extends StatelessWidget {
   final bool isMe;
   final String partnerName;
   final MediaEncryptionService? mediaEncryptionService;
+  final String? myUserId;
   final VoidCallback? onRetry;
   final VoidCallback? onLongPress;
 
@@ -22,6 +23,7 @@ class MessageBubble extends StatelessWidget {
     required this.isMe,
     required this.partnerName,
     this.mediaEncryptionService,
+    this.myUserId,
     this.onRetry,
     this.onLongPress,
   });
@@ -165,6 +167,7 @@ class MessageBubble extends StatelessWidget {
               message: message,
               isMe: isMe,
               encryptionService: mediaEncryptionService,
+              myUserId: myUserId,
             ),
             if (decryptedContent.isNotEmpty && decryptedContent != '[Media]')
               Padding(

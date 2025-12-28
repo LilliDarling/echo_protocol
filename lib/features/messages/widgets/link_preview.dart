@@ -3,7 +3,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../models/echo.dart';
 
-/// Widget displaying a link preview card
 class LinkPreviewWidget extends StatelessWidget {
   final LinkPreview linkPreview;
   final bool isMe;
@@ -44,7 +43,6 @@ class LinkPreviewWidget extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Preview image
             if (linkPreview.imageUrl.isNotEmpty)
               SizedBox(
                 height: 140,
@@ -68,7 +66,6 @@ class LinkPreviewWidget extends StatelessWidget {
                   ),
                 ),
               ),
-            // Title and description
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -123,7 +120,6 @@ class LinkPreviewWidget extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Small image
             if (linkPreview.imageUrl.isNotEmpty)
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
@@ -148,7 +144,6 @@ class LinkPreviewWidget extends StatelessWidget {
                 ),
               ),
             const SizedBox(width: 8),
-            // Title only
             Expanded(
               child: Text(
                 linkPreview.title,

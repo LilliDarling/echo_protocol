@@ -18,7 +18,7 @@ export function validateRequest(request: CallableRequest): void {
     });
   }
 
-  const ip = request.rawRequest.ip;
+  const {ip} = request.rawRequest;
   if (!ip || ip === "0.0.0.0" || ip === "::") {
     throw new HttpsError("invalid-argument", "Invalid request source");
   }

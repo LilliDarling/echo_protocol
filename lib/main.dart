@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'features/auth/login.dart';
 import 'features/home/home.dart';
 import 'services/auth.dart';
-import 'services/encryption.dart';
+import 'services/crypto/protocol_service.dart';
 import 'services/secure_storage.dart';
 import 'core/theme/app.dart';
+import 'core/providers/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,13 +25,20 @@ class EchoProtocolApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Echo Protocol',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      home: const AuthWrapper(),
+    return ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: 'Echo Protocol',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeProvider.themeMode,
+            home: const AuthWrapper(),
+          );
+        },
+      ),
     );
   }
 }
@@ -44,7 +53,7 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   final AuthService _authService = AuthService();
   final SecureStorageService _secureStorage = SecureStorageService();
-  final EncryptionService _encryptionService = EncryptionService();
+  final ProtocolService _protocolService = ProtocolService();
 
   bool _keysLoaded = false;
   bool _isLoadingKeys = false;
@@ -63,7 +72,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
         }
 
         if (snapshot.hasData && snapshot.data != null) {
-          // User is authenticated - ensure keys are loaded before showing home
           if (!_keysLoaded && !_isLoadingKeys) {
             return FutureBuilder(
               future: _loadKeysIfNeeded(),
@@ -82,9 +90,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
           return const HomeScreen();
         }
 
-        // Reset key loading state on logout
         _keysLoaded = false;
         _isLoadingKeys = false;
+        Provider.of<ThemeProvider>(context, listen: false).reset();
         return const LoginScreen();
       },
     );
@@ -95,12 +103,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
     try {
       final hasKeys = await _secureStorage.hasEncryptionKeys();
       if (hasKeys) {
-        final privateKey = await _secureStorage.getPrivateKey();
-        final keyVersion = await _secureStorage.getCurrentKeyVersion();
-        if (privateKey != null) {
-          _encryptionService.setPrivateKey(privateKey, keyVersion: keyVersion);
-        }
+        await _protocolService.initializeFromStorage();
       }
+
+      final userId = _authService.currentUserId;
+      if (userId != null && mounted) {
+        final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+        await themeProvider.loadPreferences(userId);
+      }
+
       _keysLoaded = true;
     } catch (e) {
       // Ignore errors - the app will handle missing keys appropriately

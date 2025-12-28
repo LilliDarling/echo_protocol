@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// User model for partner accounts
 class UserModel {
   final String id;
   final String name;
@@ -64,7 +63,7 @@ class UserModel {
 }
 
 class UserPreferences {
-  final String theme; // "dark" or "light"
+  final String theme;
   final bool notifications;
   final int autoDeleteDays;
 

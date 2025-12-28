@@ -4,12 +4,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../models/echo.dart';
 import '../../../services/partner.dart';
-import '../../../services/encryption.dart';
+import '../../../services/crypto/protocol_service.dart';
+import '../../../services/crypto/media_encryption.dart';
 import '../../../services/secure_storage.dart';
 import '../../../services/message_encryption_helper.dart';
 import '../../../services/message_rate_limiter.dart';
 import '../../../services/replay_protection.dart';
-import '../../../services/media_encryption.dart';
 import '../../../utils/decrypted_content_cache.dart';
 import '../../../services/read_receipt.dart';
 import '../../../services/offline_queue.dart';
@@ -22,7 +22,7 @@ class ConversationController extends ChangeNotifier {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  late final EncryptionService _encryptionService;
+  late final ProtocolService _protocolService;
   late final SecureStorageService _secureStorage;
   late final MessageEncryptionHelper _encryptionHelper;
   late final MessageRateLimiter _rateLimiter;
@@ -93,7 +93,7 @@ class ConversationController extends ChangeNotifier {
 
   Future<void> _initializeServices() async {
     try {
-      _encryptionService = EncryptionService();
+      _protocolService = ProtocolService();
       _secureStorage = SecureStorageService();
       _rateLimiter = MessageRateLimiter();
       _replayProtection = ReplayProtectionService(userId: currentUserId);
@@ -105,25 +105,16 @@ class ConversationController extends ChangeNotifier {
       _subscribeToOfflineQueue();
       _subscribeToTypingIndicator();
 
-      final privateKey = await _secureStorage.getPrivateKey();
-      if (privateKey == null) {
-        throw Exception('Encryption keys not found. Please sign out and sign in again.');
-      }
-
-      final keyVersion = await _secureStorage.getCurrentKeyVersion();
-      _encryptionService.setPrivateKey(privateKey, keyVersion: keyVersion);
-      _encryptionService.setPartnerPublicKey(partner.publicKey);
+      // Initialize protocol service from stored identity
+      await _protocolService.initializeFromStorage();
 
       _encryptionHelper = MessageEncryptionHelper(
-        encryptionService: _encryptionService,
-        secureStorage: _secureStorage,
+        protocolService: _protocolService,
         replayProtection: _replayProtection,
         rateLimiter: _rateLimiter,
       );
 
-      _mediaEncryptionService = MediaEncryptionService(
-        encryptionService: _encryptionService,
-      );
+      _mediaEncryptionService = MediaEncryptionService();
 
       _isServicesInitialized = true;
       notifyListeners();

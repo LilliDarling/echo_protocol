@@ -51,7 +51,6 @@ class _TwoFactorSettingsScreenState extends State<TwoFactorSettingsScreen> {
       ),
     );
 
-    // Refresh status after returning
     if (result == true || mounted) {
       _load2FAStatus();
     }
@@ -85,7 +84,6 @@ class _TwoFactorSettingsScreenState extends State<TwoFactorSettingsScreen> {
 
     if (confirmed != true) return;
 
-    // Show TOTP verification dialog
     final code = await _showCodeVerificationDialog();
     if (code == null) return;
 
@@ -198,7 +196,6 @@ class _TwoFactorSettingsScreenState extends State<TwoFactorSettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Status Card
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -246,7 +243,6 @@ class _TwoFactorSettingsScreenState extends State<TwoFactorSettingsScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Info Box
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -280,7 +276,6 @@ class _TwoFactorSettingsScreenState extends State<TwoFactorSettingsScreen> {
 
                   const SizedBox(height: 32),
 
-                  // Actions
                   if (!_is2FAEnabled) ...[
                     CustomButton(
                       text: 'Enable Two-Factor Authentication',
@@ -288,7 +283,6 @@ class _TwoFactorSettingsScreenState extends State<TwoFactorSettingsScreen> {
                       icon: Icons.security,
                     ),
                   ] else ...[
-                    // Regenerate backup codes
                     ListTile(
                       leading: Container(
                         padding: const EdgeInsets.all(8),
@@ -306,7 +300,6 @@ class _TwoFactorSettingsScreenState extends State<TwoFactorSettingsScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Disable 2FA
                     ListTile(
                       leading: Container(
                         padding: const EdgeInsets.all(8),

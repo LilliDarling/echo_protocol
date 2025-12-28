@@ -49,12 +49,10 @@ class _TwoFactorVerifyScreenState extends State<TwoFactorVerifyScreen> {
       final isValid = await _twoFactorService.verifyTOTP(_totpCode, userId: widget.userId);
 
       if (isValid) {
-        // Mark 2FA as verified for this session
         await _secureStorage.set2FASessionVerified(true);
 
         if (!mounted) return;
 
-        // If callback provided, use it; otherwise navigate to HomeScreen
         if (widget.onVerified != null) {
           widget.onVerified!();
         } else {
@@ -93,12 +91,10 @@ class _TwoFactorVerifyScreenState extends State<TwoFactorVerifyScreen> {
       final isValid = await _twoFactorService.verifyBackupCode(code, widget.userId);
 
       if (isValid) {
-        // Mark 2FA as verified for this session
         await _secureStorage.set2FASessionVerified(true);
 
         if (!mounted) return;
 
-        // If callback provided, use it; otherwise navigate to HomeScreen
         if (widget.onVerified != null) {
           widget.onVerified!();
         } else {

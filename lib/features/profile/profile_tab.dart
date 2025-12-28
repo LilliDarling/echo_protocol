@@ -4,6 +4,8 @@ import '../../services/auth.dart';
 import '../settings/fingerprint_verification.dart';
 import '../settings/device_linking.dart';
 import '../settings/two_factor_settings.dart';
+import '../settings/preferences.dart';
+import 'edit_profile.dart';
 
 class ProfileTab extends StatelessWidget {
   final AuthService _authService = AuthService();
@@ -16,7 +18,6 @@ class ProfileTab extends StatelessWidget {
 
     return ListView(
       children: [
-        // User Info Header
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
@@ -66,7 +67,6 @@ class ProfileTab extends StatelessWidget {
 
         const SizedBox(height: 8),
 
-        // Security Section
         _buildSectionHeader(context, 'Security'),
 
         ListTile(
@@ -150,27 +150,8 @@ class ProfileTab extends StatelessWidget {
           },
         ),
 
-        ListTile(
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              Icons.vpn_key,
-              color: Colors.green.shade700,
-            ),
-          ),
-          title: const Text('Rotate Encryption Keys'),
-          subtitle: const Text('Generate new encryption keys'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _showKeyRotationDialog(context),
-        ),
-
         const Divider(height: 32),
 
-        // Account Section
         _buildSectionHeader(context, 'Account'),
 
         ListTile(
@@ -189,9 +170,11 @@ class ProfileTab extends StatelessWidget {
           subtitle: const Text('Update your name and photo'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            // TODO: Implement profile editing
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Coming soon!')),
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const EditProfileScreen(),
+              ),
             );
           },
         ),
@@ -212,16 +195,17 @@ class ProfileTab extends StatelessWidget {
           subtitle: const Text('Theme, notifications, auto-delete'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            // TODO: Implement preferences
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Coming soon!')),
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const PreferencesScreen(),
+              ),
             );
           },
         ),
 
         const Divider(height: 32),
 
-        // Legal Section
         _buildSectionHeader(context, 'Legal'),
 
         ListTile(
@@ -262,7 +246,6 @@ class ProfileTab extends StatelessWidget {
 
         const SizedBox(height: 32),
 
-        // About Section
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
@@ -345,140 +328,6 @@ class ProfileTab extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not open Terms of Service')),
       );
-    }
-  }
-
-  Future<void> _showKeyRotationDialog(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Rotate Encryption Keys?'),
-        content: const Text(
-          'This will generate new encryption keys for your account.\n\n'
-          '⚠️ WARNING: This will invalidate all existing encrypted conversations. '
-          'Only do this if you suspect your keys may be compromised.\n\n'
-          'Your conversation partners will need to re-verify your security code.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-            ),
-            child: const Text('Rotate Keys'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && context.mounted) {
-      await _performKeyRotation(context);
-    }
-  }
-
-  Future<void> _performKeyRotation(BuildContext context) async {
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: Card(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Rotating encryption keys...'),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    try {
-      final result = await _authService.rotateEncryptionKeys();
-
-      if (context.mounted) {
-        Navigator.pop(context); // Close loading dialog
-
-        // Show success with new fingerprint
-        await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.green),
-                SizedBox(width: 8),
-                Text('Keys Rotated Successfully'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Your encryption keys have been updated.\n\n'
-                  'New security code:',
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SelectableText(
-                    result['fingerprint']!,
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => FingerprintVerificationScreen(
-                        userId: _authService.currentUserId!,
-                      ),
-                    ),
-                  );
-                },
-                child: const Text('View Security Code'),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        Navigator.pop(context); // Close loading dialog
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to rotate keys: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 }

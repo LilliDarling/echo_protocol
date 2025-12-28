@@ -51,7 +51,7 @@ export const regenerateBackupCodes = onCall(
 
       const backupCodes = generateBackupCodes();
       const hashedBackupCodes = backupCodes.map((code) =>
-        hashBackupCode(code, userId)
+        hashBackupCode(code)
       );
 
       await db.collection("users").doc(userId).update({

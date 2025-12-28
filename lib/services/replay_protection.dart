@@ -161,7 +161,6 @@ class ReplayProtectionService {
       );
     }
 
-    // Try with cached token first, then retry with refresh if auth fails
     return await _callValidateFunction(
       user: user,
       messageId: messageId,
@@ -183,7 +182,6 @@ class ReplayProtectionService {
     required bool forceRefresh,
   }) async {
     try {
-      // Get token (cached or refreshed based on forceRefresh flag)
       if (forceRefresh) {
         try {
           await user.getIdToken(true);
@@ -214,7 +212,6 @@ class ReplayProtectionService {
         remainingHour: data['remainingHour'] as int?,
       );
     } on FirebaseFunctionsException catch (e) {
-      // If we get an auth error and haven't tried refreshing yet, retry with refresh
       if (e.code == 'unauthenticated' && !forceRefresh) {
         return await _callValidateFunction(
           user: user,
@@ -232,7 +229,6 @@ class ReplayProtectionService {
         error: 'Functions error [${e.code}]: ${e.message}',
       );
     } catch (e) {
-      // Catch any other exceptions
       if (!forceRefresh) {
         return await _callValidateFunction(
           user: user,

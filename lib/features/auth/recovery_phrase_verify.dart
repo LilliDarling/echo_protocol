@@ -1,9 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
-/// Screen to verify user has saved their recovery phrase.
-/// Asks user to enter 3 random words from their phrase.
-/// Returns true via Navigator.pop() when verification succeeds.
 class RecoveryPhraseVerifyScreen extends StatefulWidget {
   final String recoveryPhrase;
 
@@ -43,14 +40,12 @@ class _RecoveryPhraseVerifyScreenState extends State<RecoveryPhraseVerifyScreen>
     super.dispose();
   }
 
-  /// Generate 3 random, non-consecutive indices to verify.
   List<int> _generateRandomIndices() {
     final random = Random();
     final indices = <int>{};
 
     while (indices.length < 3) {
       final index = random.nextInt(12);
-      // Ensure indices aren't consecutive
       if (!indices.contains(index - 1) && !indices.contains(index + 1)) {
         indices.add(index);
       }
@@ -72,13 +67,11 @@ class _RecoveryPhraseVerifyScreenState extends State<RecoveryPhraseVerifyScreen>
   bool get _allVerified => _verified.values.every((v) => v);
 
   void _submit() {
-    // Verify all words first
     for (final index in _verifyIndices) {
       _verifyWord(index);
     }
 
     if (_allVerified) {
-      // Pop with success result - let the display screen handle navigation
       Navigator.of(context).pop(true);
     } else {
       setState(() {

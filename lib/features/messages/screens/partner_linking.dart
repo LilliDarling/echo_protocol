@@ -8,7 +8,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../../services/partner.dart';
 import '../../settings/fingerprint_verification.dart';
 
-/// Screen for linking with a partner via QR code or invite code
 class PartnerLinkingScreen extends StatefulWidget {
   final VoidCallback? onPartnerLinked;
 
@@ -46,7 +45,6 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
     _listenForPartnerLink();
   }
 
-  /// Listen for when our partner link is established (e.g., when someone accepts our invite)
   void _listenForPartnerLink() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -58,7 +56,6 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
         .listen((snapshot) {
       final partnerId = snapshot.data()?['partnerId'] as String?;
       if (partnerId != null && mounted) {
-        // Partner link established! Notify parent to refresh
         widget.onPartnerLinked?.call();
       }
     });
@@ -89,7 +86,6 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
       setState(() {
         _error = errorMsg;
       });
-      // If user already has a partner, also refresh to show the conversation
       if (errorMsg.toLowerCase().contains('already have a partner')) {
         widget.onPartnerLinked?.call();
       }
@@ -111,7 +107,7 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
     try {
       final partner = await _partnerService.acceptInvite(code);
       if (mounted) {
-        // Show security verification prompt for newly linked partner
+
         await _showSecurityVerificationPrompt(partner);
       }
       if (mounted) {
@@ -136,7 +132,6 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
     }
   }
 
-  /// Show security verification prompt after successful partner linking
   Future<void> _showSecurityVerificationPrompt(PartnerInfo partner) async {
     if (!mounted) return;
 
@@ -238,7 +233,6 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
           ElevatedButton.icon(
             onPressed: () {
               Navigator.of(context).pop();
-              // Navigate to full verification screen
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => FingerprintVerificationScreen(
@@ -270,7 +264,6 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
     final barcode = capture.barcodes.firstOrNull;
     if (barcode?.rawValue != null && !_isAcceptingInvite) {
       final code = barcode!.rawValue!;
-      // Check if it looks like our invite code format
       if (code.length == 8 && RegExp(r'^[A-Z0-9]+$').hasMatch(code)) {
         _scannerController.stop();
         _acceptInvite(code);
@@ -378,7 +371,6 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
               ),
             ),
           ] else ...[
-            // QR Code
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -401,7 +393,6 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
               ),
             ),
             const SizedBox(height: 24),
-            // Invite code text
             Text(
               'Or share this code:',
               style: TextStyle(
@@ -452,7 +443,6 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
               ),
             ),
             const SizedBox(height: 24),
-            // Expiry notice
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -537,7 +527,6 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
             ),
             const SizedBox(height: 16),
           ],
-          // QR Scanner
           Container(
             height: 250,
             decoration: BoxDecoration(
@@ -579,7 +568,6 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
             ],
           ),
           const SizedBox(height: 24),
-          // Manual code entry
           TextField(
             controller: _codeController,
             textCapitalization: TextCapitalization.characters,
@@ -642,7 +630,6 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
   }
 }
 
-/// Text formatter to convert input to uppercase
 class UpperCaseTextFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(

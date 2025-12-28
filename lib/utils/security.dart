@@ -3,9 +3,8 @@ import 'dart:typed_data';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:pointycastle/export.dart';
+import 'package:cryptography/cryptography.dart' as crypto;
 
-/// Security utilities for Echo Protocol
-/// Provides constant-time operations and additional security hardening
 class SecurityUtils {
   static bool constantTimeEquals(String a, String b) {
     final bytesA = utf8.encode(a);
@@ -19,7 +18,6 @@ class SecurityUtils {
       return false;
     }
 
-    // XOR all bytes - result is 0 only if all bytes match
     int result = 0;
     for (int i = 0; i < a.length; i++) {
       result |= a[i] ^ b[i];
@@ -29,8 +27,29 @@ class SecurityUtils {
   }
 
   static void secureClear(Uint8List data) {
+    if (data.isEmpty) return;
+
+    final random = Random.secure();
+    for (int i = 0; i < data.length; i++) {
+      data[i] = random.nextInt(256);
+    }
+
     for (int i = 0; i < data.length; i++) {
       data[i] = 0;
+    }
+
+    for (int i = 0; i < data.length; i++) {
+      data[i] = 0xFF;
+    }
+
+    for (int i = 0; i < data.length; i++) {
+      data[i] = 0;
+    }
+  }
+
+  static void secureClearAll(List<Uint8List> buffers) {
+    for (final buffer in buffers) {
+      secureClear(buffer);
     }
   }
 
@@ -40,21 +59,6 @@ class SecurityUtils {
 
   static bool isValidKeyLength(int lengthInBytes) {
     return lengthInBytes == 16 || lengthInBytes == 24 || lengthInBytes == 32;
-  }
-
-  static String generateSecureToken(int lengthInBytes) {
-    if (lengthInBytes < 16) {
-      throw ArgumentError('Token must be at least 16 bytes for security');
-    }
-
-    // Maximum practical size to prevent DoS
-    if (lengthInBytes > 256) {
-      throw ArgumentError('Token size exceeds maximum of 256 bytes');
-    }
-
-    // Note: This would use Random.secure() in production
-    // Keeping existing implementation from device_linking_service.dart
-    return '';
   }
 
   static String sanitizeError(String error) {
@@ -136,6 +140,10 @@ class SecurityUtils {
   ) {
     if (outputLength > 255 * 32) {
       throw ArgumentError('Output length exceeds HKDF-SHA256 maximum');
+    }
+
+    if (inputKeyMaterial.isEmpty) {
+      throw ArgumentError('Input key material cannot be empty');
     }
 
     final hmacExtract = Hmac(sha256, salt);
@@ -276,5 +284,41 @@ class SecurityUtils {
         'Invalid ciphertext: too short to contain GCM authentication tag',
       );
     }
+  }
+
+  static Future<Uint8List> argon2idDerive({
+    required String passphrase,
+    required Uint8List salt,
+    int outputLength = 32,
+    int memory = 65536,
+    int iterations = 3,
+    int parallelism = 4,
+  }) async {
+    if (salt.length < 16) {
+      throw ArgumentError('Salt must be at least 16 bytes');
+    }
+
+    final argon2id = crypto.Argon2id(
+      memory: memory,
+      iterations: iterations,
+      parallelism: parallelism,
+      hashLength: outputLength,
+    );
+
+    final passphraseBytes = utf8.encode(passphrase);
+    final result = await argon2id.deriveKey(
+      secretKey: crypto.SecretKey(passphraseBytes),
+      nonce: salt,
+    );
+
+    final keyBytes = await result.extractBytes();
+    return Uint8List.fromList(keyBytes);
+  }
+
+  static bool isHighEntropySeed(Uint8List seed) {
+    if (seed.length < 32) return false;
+
+    final uniqueBytes = seed.toSet();
+    return uniqueBytes.length > seed.length * 0.7;
   }
 }

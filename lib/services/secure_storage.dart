@@ -1,5 +1,123 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:cryptography/cryptography.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../utils/security.dart';
+
+class _WebEncryptionLayer {
+  static const String _webSaltStorageKey = '_web_device_salt_v2';
+  static Uint8List? _cachedKey;
+  static String? _cachedUserId;
+  static final AesGcm _aesGcm = AesGcm.with256bits();
+
+  static Future<Uint8List> _deriveKey(
+    FlutterSecureStorage storage,
+    String userId,
+  ) async {
+    if (_cachedKey != null && _cachedUserId == userId) {
+      return _cachedKey!;
+    }
+
+    String? storedSalt = await storage.read(key: _webSaltStorageKey);
+    Uint8List deviceSalt;
+    if (storedSalt != null) {
+      deviceSalt = base64Decode(storedSalt);
+    } else {
+      deviceSalt = SecurityUtils.generateSecureRandomBytes(32);
+      await storage.write(key: _webSaltStorageKey, value: base64Encode(deviceSalt));
+    }
+
+    final userIdBytes = utf8.encode(userId);
+    final ikm = Uint8List.fromList([...deviceSalt, ...userIdBytes]);
+
+    _cachedKey = SecurityUtils.hkdfSha256(
+      ikm,
+      Uint8List.fromList(utf8.encode('EchoProtocol-WebStorage-v2')),
+      Uint8List.fromList(utf8.encode('aes-256-gcm-key')),
+      32,
+    );
+    _cachedUserId = userId;
+
+    SecurityUtils.secureClear(ikm);
+    return _cachedKey!;
+  }
+
+  static Future<String> encrypt(
+    String value,
+    FlutterSecureStorage storage,
+    String? userId,
+  ) async {
+    if (!kIsWeb) return value;
+
+    if (userId == null) {
+      throw Exception('Authentication required for secure storage');
+    }
+
+    final key = await _deriveKey(storage, userId);
+    final secretKey = SecretKey(key);
+    final nonce = SecurityUtils.generateSecureRandomBytes(12);
+
+    final plaintext = utf8.encode(value);
+    final secretBox = await _aesGcm.encrypt(
+      plaintext,
+      secretKey: secretKey,
+      nonce: nonce,
+    );
+
+    final combined = Uint8List.fromList([
+      ...nonce,
+      ...secretBox.cipherText,
+      ...secretBox.mac.bytes,
+    ]);
+    return base64Encode(combined);
+  }
+
+  static Future<String?> decrypt(
+    String? encrypted,
+    FlutterSecureStorage storage,
+    String? userId,
+  ) async {
+    if (encrypted == null) return null;
+    if (!kIsWeb) return encrypted;
+
+    if (userId == null) {
+      return null;
+    }
+
+    try {
+      final key = await _deriveKey(storage, userId);
+      final secretKey = SecretKey(key);
+      final combined = base64Decode(encrypted);
+
+      if (combined.length < 28) return null;
+
+      final nonce = combined.sublist(0, 12);
+      final ciphertext = combined.sublist(12, combined.length - 16);
+      final mac = combined.sublist(combined.length - 16);
+
+      final secretBox = SecretBox(
+        ciphertext,
+        nonce: nonce,
+        mac: Mac(mac),
+      );
+
+      final plaintext = await _aesGcm.decrypt(secretBox, secretKey: secretKey);
+      return utf8.decode(plaintext);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static void clearCache() {
+    if (_cachedKey != null) {
+      SecurityUtils.secureClear(_cachedKey!);
+      _cachedKey = null;
+    }
+    _cachedUserId = null;
+  }
+}
 
 class SecureStorageService {
   static const _storage = FlutterSecureStorage(
@@ -17,9 +135,29 @@ class SecureStorageService {
 
   static String get securityLevel {
     if (kIsWeb) {
-      return 'limited';
+      return 'encrypted';
     }
     return 'hardware';
+  }
+
+  String? get _currentUserId => FirebaseAuth.instance.currentUser?.uid;
+
+  Future<void> _secureWrite(String key, String value) async {
+    final encryptedValue = await _WebEncryptionLayer.encrypt(
+      value,
+      _storage,
+      _currentUserId,
+    );
+    await _storage.write(key: key, value: encryptedValue);
+  }
+
+  Future<String?> _secureRead(String key) async {
+    final encrypted = await _storage.read(key: key);
+    return _WebEncryptionLayer.decrypt(encrypted, _storage, _currentUserId);
+  }
+
+  Future<void> _secureDelete(String key) async {
+    await _storage.delete(key: key);
   }
 
   static const String _privateKeyKey = 'user_private_key';
@@ -29,61 +167,47 @@ class SecureStorageService {
   static const String _sessionKeyKey = 'session_key';
 
   Future<void> storePrivateKey(String privateKey) async {
-    await _storage.write(
-      key: _privateKeyKey,
-      value: privateKey,
-    );
+    await _secureWrite(_privateKeyKey, privateKey);
   }
 
   Future<String?> getPrivateKey() async {
-    return await _storage.read(key: _privateKeyKey);
+    return await _secureRead(_privateKeyKey);
   }
 
   Future<void> storePublicKey(String publicKey) async {
-    await _storage.write(
-      key: _publicKeyKey,
-      value: publicKey,
-    );
+    await _secureWrite(_publicKeyKey, publicKey);
   }
 
   Future<String?> getPublicKey() async {
-    return await _storage.read(key: _publicKeyKey);
+    return await _secureRead(_publicKeyKey);
   }
 
   Future<void> storePartnerPublicKey(String partnerPublicKey) async {
-    await _storage.write(
-      key: _partnerPublicKeyKey,
-      value: partnerPublicKey,
-    );
+    await _secureWrite(_partnerPublicKeyKey, partnerPublicKey);
   }
 
   Future<String?> getPartnerPublicKey() async {
-    return await _storage.read(key: _partnerPublicKeyKey);
+    return await _secureRead(_partnerPublicKeyKey);
   }
 
   Future<void> storeUserId(String userId) async {
-    await _storage.write(
-      key: _userIdKey,
-      value: userId,
-    );
+    await _secureWrite(_userIdKey, userId);
   }
 
   Future<String?> getUserId() async {
-    return await _storage.read(key: _userIdKey);
+    return await _secureRead(_userIdKey);
   }
 
   Future<void> storeSessionKey(String sessionKey) async {
-    await _storage.write(
-      key: _sessionKeyKey,
-      value: sessionKey,
-    );
+    await _secureWrite(_sessionKeyKey, sessionKey);
   }
 
   Future<String?> getSessionKey() async {
-    return await _storage.read(key: _sessionKeyKey);
+    return await _secureRead(_sessionKeyKey);
   }
 
   Future<void> clearAll() async {
+    _WebEncryptionLayer.clearCache();
     await _storage.deleteAll();
   }
 
@@ -93,13 +217,12 @@ class SecureStorageService {
     return privateKey != null && publicKey != null;
   }
 
-  /// Clear only encryption keys and user ID, preserving other data
   Future<void> clearEncryptionKeys() async {
-    await _storage.delete(key: _privateKeyKey);
-    await _storage.delete(key: _publicKeyKey);
-    await _storage.delete(key: _partnerPublicKeyKey);
-    await _storage.delete(key: _userIdKey);
-    await _storage.delete(key: 'current_key_version');
+    await _secureDelete(_privateKeyKey);
+    await _secureDelete(_publicKeyKey);
+    await _secureDelete(_partnerPublicKeyKey);
+    await _secureDelete(_userIdKey);
+    await _secureDelete('current_key_version');
   }
 
   Future<bool> hasPartnerKey() async {
@@ -108,33 +231,33 @@ class SecureStorageService {
   }
 
   Future<void> storeTwoFactorSecret(String secret) async {
-    await _storage.write(key: 'totp_secret', value: secret);
+    await _secureWrite('totp_secret', secret);
   }
 
   Future<String?> getTwoFactorSecret() async {
-    return await _storage.read(key: 'totp_secret');
+    return await _secureRead('totp_secret');
   }
 
   Future<void> storeBackupCodes(List<String> codes) async {
-    await _storage.write(key: 'backup_codes', value: codes.join(','));
+    await _secureWrite('backup_codes', codes.join(','));
   }
 
   Future<List<String>?> getBackupCodes() async {
-    final stored = await _storage.read(key: 'backup_codes');
+    final stored = await _secureRead('backup_codes');
     return stored?.split(',');
   }
 
   Future<void> clearTwoFactor() async {
-    await _storage.delete(key: 'totp_secret');
-    await _storage.delete(key: 'backup_codes');
+    await _secureDelete('totp_secret');
+    await _secureDelete('backup_codes');
   }
 
   Future<void> storeDeviceId(String deviceId) async {
-    await _storage.write(key: 'device_id', value: deviceId);
+    await _secureWrite('device_id', deviceId);
   }
 
   Future<String?> getDeviceId() async {
-    return await _storage.read(key: 'device_id');
+    return await _secureRead('device_id');
   }
 
   Future<void> storeArchivedKeyPair({
@@ -142,22 +265,16 @@ class SecureStorageService {
     required String publicKey,
     required String privateKey,
   }) async {
-    await _storage.write(
-      key: 'archived_public_key_$version',
-      value: publicKey,
-    );
-    await _storage.write(
-      key: 'archived_private_key_$version',
-      value: privateKey,
-    );
+    await _secureWrite('archived_public_key_$version', publicKey);
+    await _secureWrite('archived_private_key_$version', privateKey);
   }
 
   Future<String?> getArchivedPrivateKey(int version) async {
-    return await _storage.read(key: 'archived_private_key_$version');
+    return await _secureRead('archived_private_key_$version');
   }
 
   Future<String?> getArchivedPublicKey(int version) async {
-    return await _storage.read(key: 'archived_public_key_$version');
+    return await _secureRead('archived_public_key_$version');
   }
 
   Future<List<int>> getArchivedKeyVersions() async {
@@ -178,41 +295,40 @@ class SecureStorageService {
   }
 
   Future<void> storeCurrentKeyVersion(int version) async {
-    await _storage.write(
-      key: 'current_key_version',
-      value: version.toString(),
-    );
+    await _secureWrite('current_key_version', version.toString());
   }
 
   Future<int?> getCurrentKeyVersion() async {
-    final versionStr = await _storage.read(key: 'current_key_version');
+    final versionStr = await _secureRead('current_key_version');
     return versionStr != null ? int.tryParse(versionStr) : null;
   }
 
   static const String _cacheKeyKey = 'decrypted_content_cache_key';
 
   Future<void> storeCacheKey(String cacheKey) async {
-    await _storage.write(key: _cacheKeyKey, value: cacheKey);
+    await _secureWrite(_cacheKeyKey, cacheKey);
   }
 
   Future<String?> getCacheKey() async {
-    return await _storage.read(key: _cacheKeyKey);
+    return await _secureRead(_cacheKeyKey);
   }
 
   Future<void> deleteCacheKey() async {
-    await _storage.delete(key: _cacheKeyKey);
+    await _secureDelete(_cacheKeyKey);
   }
 
   static Map<String, dynamic> getSecurityInfo() {
     return {
       'platform': kIsWeb ? 'web' : 'native',
       'securityLevel': securityLevel,
-      'storageType': kIsWeb ? 'IndexedDB' : 'Hardware-backed Keystore',
+      'storageType': kIsWeb
+          ? 'Auth-bound encrypted IndexedDB'
+          : 'Hardware-backed Keystore',
       'warnings': kIsWeb
           ? [
-              'Web storage is less secure than native apps',
-              'Data may be vulnerable to browser-based attacks',
-              'For maximum security, use the mobile app',
+              'Web storage uses AES-256-GCM with auth-derived keys',
+              'Encryption key requires active authentication',
+              'For maximum security, use the mobile app with hardware keystore',
             ]
           : <String>[],
     };
@@ -228,17 +344,13 @@ class SecureStorageService {
     return null;
   }
 
-  // 2FA session verification with timeout
-  // Stores timestamp of verification instead of just true/false
   static const String _twoFaSessionVerifiedKey = '2fa_session_verified';
   static const Duration _twoFaSessionTimeout = Duration(hours: 24);
 
-  /// Check if 2FA session is verified and not expired
   Future<bool> get2FASessionVerified() async {
-    final value = await _storage.read(key: _twoFaSessionVerifiedKey);
+    final value = await _secureRead(_twoFaSessionVerifiedKey);
     if (value == null) return false;
 
-    // Handle legacy 'true'/'false' values - treat as expired
     final timestamp = int.tryParse(value);
     if (timestamp == null) {
       await clear2FASessionVerified();
@@ -256,27 +368,23 @@ class SecureStorageService {
     return true;
   }
 
-  /// Set 2FA session as verified with current timestamp
   Future<void> set2FASessionVerified(bool verified) async {
     if (verified) {
-      await _storage.write(
-        key: _twoFaSessionVerifiedKey,
-        value: DateTime.now().millisecondsSinceEpoch.toString(),
+      await _secureWrite(
+        _twoFaSessionVerifiedKey,
+        DateTime.now().millisecondsSinceEpoch.toString(),
       );
     } else {
       await clear2FASessionVerified();
     }
   }
 
-  /// Clear 2FA session verification
   Future<void> clear2FASessionVerified() async {
-    await _storage.delete(key: _twoFaSessionVerifiedKey);
+    await _secureDelete(_twoFaSessionVerifiedKey);
   }
 
-  /// Get remaining time until 2FA session expires
-  /// Returns null if not verified or expired
   Future<Duration?> get2FASessionTimeRemaining() async {
-    final value = await _storage.read(key: _twoFaSessionVerifiedKey);
+    final value = await _secureRead(_twoFaSessionVerifiedKey);
     if (value == null) return null;
 
     final timestamp = int.tryParse(value);

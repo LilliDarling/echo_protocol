@@ -32,7 +32,7 @@ export const enable2FA = onCall(
 
       const backupCodes = generateBackupCodes();
       const hashedBackupCodes = backupCodes.map((code) =>
-        hashBackupCode(code, userId)
+        hashBackupCode(code)
       );
 
       await db.collection("2fa_secrets").doc(userId).set({

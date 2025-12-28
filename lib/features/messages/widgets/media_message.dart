@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../models/echo.dart';
-import '../../../services/media_encryption.dart';
+import '../../../services/crypto/media_encryption.dart';
 import 'media_placeholders.dart';
 import 'full_screen_media_view.dart';
 
@@ -10,12 +10,14 @@ class MediaMessage extends StatefulWidget {
   final EchoModel message;
   final bool isMe;
   final MediaEncryptionService? encryptionService;
+  final String? myUserId;
 
   const MediaMessage({
     super.key,
     required this.message,
     required this.isMe,
     this.encryptionService,
+    this.myUserId,
   });
 
   @override
@@ -37,13 +39,17 @@ class _MediaMessageState extends State<MediaMessage> {
     final thumbnailUrl = widget.message.metadata.thumbnailUrl;
     if (thumbnailUrl == null || thumbnailUrl.isEmpty) return;
 
-    if (widget.message.metadata.isEncrypted && widget.encryptionService != null) {
+    if (widget.message.metadata.isEncrypted &&
+        widget.encryptionService != null &&
+        widget.myUserId != null) {
       setState(() => _isDecrypting = true);
       try {
-        final fileId = MediaEncryptionService.generateFileId(thumbnailUrl);
-        final decryptedPath = await widget.encryptionService!.getDecryptedMedia(
+        final mediaId = MediaEncryptionService.generateFileId(thumbnailUrl);
+        final decryptedPath = await widget.encryptionService!.downloadAndDecrypt(
           encryptedUrl: thumbnailUrl,
-          fileId: '${fileId}_thumb',
+          mediaId: '${mediaId}_thumb',
+          senderId: widget.message.senderId,
+          myUserId: widget.myUserId!,
           isVideo: false,
         );
         if (mounted) {
@@ -135,6 +141,8 @@ class _MediaMessageState extends State<MediaMessage> {
           isVideo: widget.message.type == EchoType.video,
           isEncrypted: widget.message.metadata.isEncrypted,
           encryptionService: widget.encryptionService,
+          senderId: widget.message.senderId,
+          myUserId: widget.myUserId,
         ),
       ),
     );

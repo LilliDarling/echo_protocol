@@ -97,7 +97,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       } else {
-        // 2FA not enabled - go directly to home
         Navigator.of(ctx).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
           (route) => false,
@@ -114,14 +113,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (mounted) {
         if (result is SignUpResult) {
-          // New user - show recovery phrase first
           final userId = result.credential.user!.uid;
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => RecoveryPhraseDisplayScreen(
                 recoveryPhrase: result.recoveryPhrase,
                 onComplete: (ctx) {
-                  // Clear the entire stack and go to onboarding success
                   Navigator.of(ctx).pushAndRemoveUntil(
                     MaterialPageRoute(
                       builder: (_) => OnboardingSuccessScreen(userId: userId),
@@ -136,7 +133,6 @@ class _LoginScreenState extends State<LoginScreen> {
           final userId = result.credential.user!.uid;
 
           if (result.needsRecovery) {
-            // Keys not found - need recovery phrase
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
                 builder: (_) => RecoveryEntryScreen(
@@ -195,7 +191,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo/Title
                   const Icon(
                     Icons.favorite,
                     size: 80,
@@ -221,7 +216,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 48),
 
-                  // Email field
                   CustomTextField(
                     controller: _emailController,
                     label: 'Email',
@@ -232,7 +226,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Password field
                   CustomTextField(
                     controller: _passwordController,
                     label: 'Password',
@@ -251,7 +244,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Forgot password
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
@@ -261,7 +253,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Sign in button
                   CustomButton(
                     text: 'Sign In',
                     onPressed: _signInWithEmail,
@@ -269,7 +260,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Divider
                   Row(
                     children: [
                       Expanded(child: Divider(color: Colors.grey[400])),
@@ -285,7 +275,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Google Sign-In button
                   SizedBox(
                     height: 50,
                     child: OutlinedButton.icon(
@@ -299,7 +288,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Sign up link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

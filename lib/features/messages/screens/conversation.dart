@@ -310,6 +310,7 @@ class _ConversationScreenState extends State<ConversationScreen>
               isMe: isMe,
               partnerName: widget.partner.name,
               mediaEncryptionService: _controller.mediaEncryptionService,
+              myUserId: _controller.currentUserId,
               onRetry: message.status.isFailed
                   ? () => _controller.offlineQueue.retry(message.id)
                   : null,

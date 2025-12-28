@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Notification model for user notifications
 class NotificationModel {
   final String id;
   final String userId;
@@ -74,12 +73,10 @@ class NotificationModel {
     );
   }
 
-  /// Mark notification as read
   NotificationModel markAsRead() {
     return copyWith(read: true);
   }
 
-  /// Mark notification as unread
   NotificationModel markAsUnread() {
     return copyWith(read: false);
   }

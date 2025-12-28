@@ -19,4 +19,8 @@ export {enable2FA} from "./functions/enable2FA";
 export {disable2FA} from "./functions/disable2FA";
 export {regenerateBackupCodes} from "./functions/regenerateBackupCodes";
 export {validateMessageSend} from "./functions/validateMessageSend";
+export {sendMessage} from "./functions/sendMessage";
 export {acceptPartnerInvite} from "./functions/acceptPartnerInvite";
+export {getPreKeyBundle} from "./functions/getPreKeyBundle";
+export {uploadPreKeys} from "./functions/uploadPreKeys";
+export {checkPreKeyCount} from "./functions/checkPreKeyCount";

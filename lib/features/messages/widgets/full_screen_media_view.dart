@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../../services/media_encryption.dart';
+import '../../../services/crypto/media_encryption.dart';
 import 'media_placeholders.dart';
 import 'video_player_view.dart';
 
@@ -12,6 +12,8 @@ class FullScreenMediaView extends StatefulWidget {
   final bool isVideo;
   final bool isEncrypted;
   final MediaEncryptionService? encryptionService;
+  final String? senderId;
+  final String? myUserId;
 
   const FullScreenMediaView({
     super.key,
@@ -21,6 +23,8 @@ class FullScreenMediaView extends StatefulWidget {
     this.decryptedThumbnailPath,
     this.isEncrypted = false,
     this.encryptionService,
+    this.senderId,
+    this.myUserId,
   });
 
   @override
@@ -44,13 +48,18 @@ class _FullScreenMediaViewState extends State<FullScreenMediaView> {
 
     setState(() => _isLoadingFullResolution = true);
 
-    if (widget.isEncrypted && widget.encryptionService != null) {
+    if (widget.isEncrypted &&
+        widget.encryptionService != null &&
+        widget.senderId != null &&
+        widget.myUserId != null) {
       setState(() => _isDecrypting = true);
       try {
-        final fileId = MediaEncryptionService.generateFileId(widget.url);
-        final decryptedPath = await widget.encryptionService!.getDecryptedMedia(
+        final mediaId = MediaEncryptionService.generateFileId(widget.url);
+        final decryptedPath = await widget.encryptionService!.downloadAndDecrypt(
           encryptedUrl: widget.url,
-          fileId: fileId,
+          mediaId: mediaId,
+          senderId: widget.senderId!,
+          myUserId: widget.myUserId!,
           isVideo: widget.isVideo,
         );
         if (mounted) {

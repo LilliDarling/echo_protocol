@@ -4,12 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/user.dart';
 import '../utils/validators.dart';
-import 'encryption.dart';
+import 'crypto/protocol_service.dart';
 import 'secure_storage.dart';
 import '../utils/logger.dart';
-import '../utils/recovery_phrase.dart';
 
-/// Result of a sign-up operation that includes the recovery phrase.
 class SignUpResult {
   final UserCredential credential;
   final String recoveryPhrase;
@@ -17,7 +15,6 @@ class SignUpResult {
   SignUpResult({required this.credential, required this.recoveryPhrase});
 }
 
-/// Result of a sign-in operation.
 class SignInResult {
   final UserCredential credential;
   final bool needsRecovery;
@@ -28,21 +25,18 @@ class SignInResult {
 class AuthService {
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
-  final EncryptionService _encryptionService;
+  final ProtocolService _protocolService;
   final SecureStorageService _secureStorage;
-  final RecoveryPhraseService _recoveryPhraseService;
 
   AuthService({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
-    EncryptionService? encryptionService,
+    ProtocolService? protocolService,
     SecureStorageService? secureStorage,
-    RecoveryPhraseService? recoveryPhraseService,
   })  : _auth = auth ?? FirebaseAuth.instance,
         _db = firestore ?? FirebaseFirestore.instance,
-        _encryptionService = encryptionService ?? EncryptionService(),
-        _secureStorage = secureStorage ?? SecureStorageService(),
-        _recoveryPhraseService = recoveryPhraseService ?? RecoveryPhraseService();
+        _protocolService = protocolService ?? ProtocolService(),
+        _secureStorage = secureStorage ?? SecureStorageService();
 
   User? get currentUser => _auth.currentUser;
 
@@ -113,8 +107,6 @@ class AuthService {
     }
   }
 
-  /// Sign in with Google. Returns SignUpResult for new users (with recovery phrase)
-  /// or SignInResult for existing users.
   Future<dynamic> signInWithGoogle() async {
     try {
       final UserCredential userCredential;
@@ -177,8 +169,6 @@ class AuthService {
     try {
       final userId = currentUserId;
 
-      _encryptionService.clearKeys();
-
       if (!kIsWeb) {
         try {
           await GoogleSignIn.instance.signOut();
@@ -190,9 +180,6 @@ class AuthService {
       await _auth.signOut();
 
       LoggerService.auth('Sign out successful', userId: userId);
-      // Only clear session-related data, preserve encryption keys and partner key
-      // This allows users to log back in without needing their recovery phrase
-      // and maintains their partner connection
       await _secureStorage.clear2FASessionVerified();
     } catch (e) {
       LoggerService.error('Sign out failed');
@@ -265,157 +252,68 @@ class AuthService {
     }
   }
 
-  Future<Map<String, String>> rotateEncryptionKeys() async {
-    final user = currentUser;
-    if (user == null) throw Exception('No user signed in');
-
-    try {
-      final oldPublicKey = await _secureStorage.getPublicKey();
-      final oldPrivateKey = await _secureStorage.getPrivateKey();
-      final oldVersion = await _secureStorage.getCurrentKeyVersion();
-      final oldFingerprint = oldPublicKey != null
-          ? _encryptionService.generateFingerprint(oldPublicKey)
-          : 'none';
-
-      final rotationData = await _encryptionService.rotateKeys();
-      final newVersion = rotationData['version'] as int;
-
-      if (oldPublicKey != null && oldPrivateKey != null && oldVersion != null) {
-        await _secureStorage.storeArchivedKeyPair(
-          version: oldVersion,
-          publicKey: oldPublicKey,
-          privateKey: oldPrivateKey,
-        );
-
-        await _db.collection('users').doc(user.uid)
-            .collection('keyHistory').doc(oldVersion.toString()).set({
-          'publicKey': oldPublicKey,
-          'version': oldVersion,
-          'fingerprint': oldFingerprint,
-          'archivedAt': DateTime.now().toIso8601String(),
-        });
-      }
-
-      await _secureStorage.storePrivateKey(rotationData['privateKey'] as String);
-      await _secureStorage.storePublicKey(rotationData['publicKey'] as String);
-      await _secureStorage.storeCurrentKeyVersion(newVersion);
-
-      await _db.collection('users').doc(user.uid).update({
-        'publicKey': rotationData['publicKey'],
-        'publicKeyVersion': newVersion,
-        'publicKeyRotatedAt': rotationData['rotatedAt'],
-        'publicKeyFingerprint': rotationData['fingerprint'],
-      });
-
-      return {
-        'publicKey': rotationData['publicKey'] as String,
-        'fingerprint': rotationData['fingerprint'] as String,
-      };
-    } catch (e) {
-      LoggerService.error('Key rotation failed');
-      throw Exception('Failed to rotate encryption keys');
-    }
-  }
-
   Future<String?> getMyPublicKeyFingerprint() async {
-    final publicKey = await _secureStorage.getPublicKey();
-    if (publicKey == null) return null;
-
-    return _encryptionService.generateFingerprint(publicKey);
+    return _protocolService.getFingerprint();
   }
 
-  bool verifyPartnerFingerprint(String publicKey, String expectedFingerprint) {
-    return _encryptionService.verifyFingerprint(publicKey, expectedFingerprint);
+  Future<String?> getPartnerFingerprint(String partnerId) async {
+    return _protocolService.getPartnerFingerprint(partnerId);
   }
 
-  /// Generate keys from a new mnemonic and store them.
-  /// Returns map with 'publicKey', 'privateKey', and 'mnemonic'.
   Future<Map<String, String>> _generateAndStoreKeys(String userId) async {
-    // Generate new recovery phrase
-    final mnemonic = _recoveryPhraseService.generateMnemonic();
+    final mnemonic = await _protocolService.generateRecoveryPhrase();
 
-    // Derive seed from mnemonic
-    final seed = _recoveryPhraseService.deriveSeedFromMnemonic(mnemonic);
+    await _protocolService.setupKeys(mnemonic);
 
-    // Generate keys from seed (deterministic)
-    final keyPair = await _encryptionService.generateKeyPairFromSeed(seed);
+    final fingerprint = await _protocolService.getFingerprint();
 
-    // Use deterministic version based on public key
-    final keyVersion = _recoveryPhraseService.deriveKeyVersion(keyPair['publicKey']!);
-
-    await _secureStorage.storePrivateKey(keyPair['privateKey']!);
-    await _secureStorage.storePublicKey(keyPair['publicKey']!);
-    await _secureStorage.storeCurrentKeyVersion(keyVersion);
     await _secureStorage.storeUserId(userId);
 
     return {
-      'publicKey': keyPair['publicKey']!,
-      'privateKey': keyPair['privateKey']!,
+      'publicKey': fingerprint ?? '',
       'mnemonic': mnemonic,
     };
   }
 
-  /// Try to load user keys from secure storage.
-  /// Returns true if keys were loaded, false if recovery is needed.
   Future<bool> _tryLoadUserKeys(String userId) async {
-    final privateKey = await _secureStorage.getPrivateKey();
     final storedUserId = await _secureStorage.getUserId();
 
-    // Check if keys belong to a different user
     if (storedUserId != null && storedUserId != userId) {
-      // Clear keys from previous user for security
       await _secureStorage.clearEncryptionKeys();
+      _protocolService.dispose();
       return false;
     }
 
-    if (privateKey != null) {
-      final keyVersion = await _secureStorage.getCurrentKeyVersion();
-      _encryptionService.setPrivateKey(privateKey, keyVersion: keyVersion);
+    try {
+      await _protocolService.initializeFromStorage();
       await _secureStorage.storeUserId(userId);
       return true;
+    } catch (e) {
+      return false;
     }
-
-    return false;
   }
 
-  /// Recover keys using a recovery phrase.
-  /// Validates that the derived public key matches what's stored in Firestore.
   Future<void> recoverWithPhrase(String mnemonic) async {
     final user = currentUser;
     if (user == null) throw Exception('No user signed in');
 
-    // Validate mnemonic format
-    if (!_recoveryPhraseService.validateMnemonic(mnemonic)) {
-      throw Exception('Invalid recovery phrase');
-    }
+    await _protocolService.initialize(recoveryPhrase: mnemonic);
 
-    // Derive keys from mnemonic
-    final seed = _recoveryPhraseService.deriveSeedFromMnemonic(mnemonic);
-    final keyPair = await _encryptionService.generateKeyPairFromSeed(seed);
+    final derivedFingerprint = await _protocolService.getFingerprint();
 
-    // Get the expected public key from Firestore
     final userDoc = await _db.collection('users').doc(user.uid).get();
-    final storedPublicKey = userDoc.data()?['publicKey'] as String?;
+    final storedFingerprint = userDoc.data()?['publicKey'] as String?;
 
-    if (storedPublicKey == null) {
+    if (storedFingerprint == null) {
       throw Exception('User account not found');
     }
 
-    // Verify the derived public key matches
-    if (keyPair['publicKey'] != storedPublicKey) {
+    if (derivedFingerprint != storedFingerprint) {
+      _protocolService.dispose();
       throw Exception('Recovery phrase does not match this account');
     }
 
-    // Keys match - store them
-    final keyVersion = _recoveryPhraseService.deriveKeyVersion(keyPair['publicKey']!);
-
-    await _secureStorage.storePrivateKey(keyPair['privateKey']!);
-    await _secureStorage.storePublicKey(keyPair['publicKey']!);
-    await _secureStorage.storeCurrentKeyVersion(keyVersion);
     await _secureStorage.storeUserId(user.uid);
-
-    _encryptionService.setPrivateKey(keyPair['privateKey']!, keyVersion: keyVersion);
-
     await _updateLastActive(user.uid);
     LoggerService.auth('Recovery successful', userId: user.uid);
   }
@@ -429,7 +327,7 @@ class AuthService {
   }) async {
     final now = DateTime.now();
     final initialVersion = now.millisecondsSinceEpoch ~/ 1000;
-    final fingerprint = _encryptionService.generateFingerprint(publicKey);
+    final fingerprint = publicKey;
 
     final userModel = UserModel(
       id: userId,
