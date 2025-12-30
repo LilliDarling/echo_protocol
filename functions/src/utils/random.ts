@@ -1,5 +1,5 @@
 import {randomBytes} from "crypto";
-import {BACKUP_CODE_CONFIG} from "../config/constants";
+import {BACKUP_CODE_CONFIG} from "../config/constants.js";
 
 /**
  * Generate cryptographically secure backup codes

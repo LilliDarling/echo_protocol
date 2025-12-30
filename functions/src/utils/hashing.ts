@@ -1,5 +1,5 @@
 import {randomBytes, pbkdf2Sync} from "crypto";
-import {BACKUP_CODE_CONFIG} from "../config/constants";
+import {BACKUP_CODE_CONFIG} from "../config/constants.js";
 
 /**
  * Hash a backup code using PBKDF2 with a random salt.

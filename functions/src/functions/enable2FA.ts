@@ -1,13 +1,12 @@
-import * as admin from "firebase-admin";
+import {FieldValue} from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as speakeasy from "speakeasy";
-import {validateRequest} from "../utils/validation";
-import {hashBackupCode} from "../utils/hashing";
-import {generateBackupCodes} from "../utils/random";
-import {TOTP_CONFIG} from "../config/constants";
-
-const db = admin.firestore();
+import {validateRequest} from "../utils/validation.js";
+import {hashBackupCode} from "../utils/hashing.js";
+import {generateBackupCodes} from "../utils/random.js";
+import {TOTP_CONFIG} from "../config/constants.js";
+import {db} from "../firebase.js";
 
 export const enable2FA = onCall(
   {maxInstances: 5},
@@ -37,19 +36,19 @@ export const enable2FA = onCall(
 
       await db.collection("2fa_secrets").doc(userId).set({
         secret: secret.base32,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
         pendingBackupCodes: hashedBackupCodes,
       });
 
       await db.collection("users").doc(userId).update({
         twoFactorPending: true,
-        twoFactorPendingAt: admin.firestore.FieldValue.serverTimestamp(),
+        twoFactorPendingAt: FieldValue.serverTimestamp(),
       });
 
       await db.collection("security_logs").add({
         userId,
         event: "2fa_enabled",
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: FieldValue.serverTimestamp(),
         ip: ip,
       });
 

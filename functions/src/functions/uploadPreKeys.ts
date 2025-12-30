@@ -1,15 +1,17 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
-import * as admin from "firebase-admin";
+import {FieldValue} from "firebase-admin/firestore";
 import {
   UploadPreKeysRequest,
   UploadPreKeysResponse,
-} from "../types/prekey";
+} from "../types/prekey.js";
+import {db} from "../firebase.js";
 
 const MAX_BATCH_SIZE = 100;
 
 export const uploadPreKeys = onCall<UploadPreKeysRequest>(
   {
-    enforceAppCheck: true,
+    // TODO: Re-enable after configuring AppCheck on client
+    // enforceAppCheck: true,
     maxInstances: 10,
     cors: true,
   },
@@ -37,12 +39,20 @@ export const uploadPreKeys = onCall<UploadPreKeysRequest>(
       );
     }
 
-    const db = admin.firestore();
     const userRef = db.collection("users").doc(userId);
 
     let uploadedCount = 0;
 
     await db.runTransaction(async (transaction) => {
+      // READS FIRST: Firestore requires all reads before any writes
+      const metadataCol = userRef.collection("metadata");
+      const countRef = metadataCol.doc("prekeyCount");
+      let countDoc = null;
+      if (oneTimePrekeys && oneTimePrekeys.length > 0) {
+        countDoc = await transaction.get(countRef);
+      }
+
+      // VALIDATION AND PREPARE DATA
       const updateData: Record<string, unknown> = {};
 
       if (identityKey) {
@@ -72,6 +82,7 @@ export const uploadPreKeys = onCall<UploadPreKeysRequest>(
         updateData.signedPrekey = signedPrekey;
       }
 
+      // WRITES: All writes happen after reads
       if (Object.keys(updateData).length > 0) {
         transaction.set(userRef, updateData, {merge: true});
       }
@@ -87,7 +98,7 @@ export const uploadPreKeys = onCall<UploadPreKeysRequest>(
             );
           }
           const otpRef = otpCollection.doc(otp.id.toString());
-          const timestamp = admin.firestore.FieldValue.serverTimestamp();
+          const timestamp = FieldValue.serverTimestamp();
           transaction.set(otpRef, {
             id: otp.id,
             publicKey: otp.publicKey,
@@ -96,11 +107,8 @@ export const uploadPreKeys = onCall<UploadPreKeysRequest>(
           uploadedCount++;
         }
 
-        const metadataCol = userRef.collection("metadata");
-        const countRef = metadataCol.doc("prekeyCount");
-        const countDoc = await transaction.get(countRef);
-        const countData = countDoc.data();
-        const currentCount = countDoc.exists ? countData?.count || 0 : 0;
+        const countData = countDoc?.data();
+        const currentCount = countDoc?.exists ? countData?.count || 0 : 0;
         const newCount = currentCount + uploadedCount;
         transaction.set(countRef, {count: newCount}, {merge: true});
       }

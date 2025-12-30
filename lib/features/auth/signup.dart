@@ -202,7 +202,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   CustomTextField(
                     controller: _passwordController,
                     label: 'Password',
-                    hint: 'At least 6 characters',
+                    hint: 'At least 12 characters',
                     obscureText: _obscurePassword,
                     validator: Validators.validatePassword,
                     prefixIcon: const Icon(Icons.lock),

@@ -1,11 +1,10 @@
-import * as admin from "firebase-admin";
+import {FieldValue} from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
-import {validateRequest} from "../utils/validation";
-import {verifyBackupCode} from "../utils/hashing";
-import {checkUserRateLimit, checkIpRateLimit} from "../services/rateLimit";
-
-const db = admin.firestore();
+import {validateRequest} from "../utils/validation.js";
+import {verifyBackupCode} from "../utils/hashing.js";
+import {checkUserRateLimit, checkIpRateLimit} from "../services/rateLimit.js";
+import {db} from "../firebase.js";
 
 export const verify2FABackupCode = onCall(
   {maxInstances: 5},
@@ -56,7 +55,7 @@ export const verify2FABackupCode = onCall(
         await db.collection("security_logs").add({
           userId,
           event: "2fa_backup_code_failed",
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          timestamp: FieldValue.serverTimestamp(),
           ip: ip,
           userAgent: request.rawRequest.headers["user-agent"],
         });
@@ -78,7 +77,7 @@ export const verify2FABackupCode = onCall(
       await db.collection("security_logs").add({
         userId,
         event: "2fa_backup_code_success",
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: FieldValue.serverTimestamp(),
         ip: ip,
         userAgent: request.rawRequest.headers["user-agent"],
         remainingBackupCodes: hashedBackupCodes.length,

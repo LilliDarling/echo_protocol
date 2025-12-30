@@ -3,9 +3,7 @@
  */
 
 import {setGlobalOptions} from "firebase-functions";
-import * as admin from "firebase-admin";
-
-admin.initializeApp();
+import "./firebase.js"; // Initialize Firebase first
 
 setGlobalOptions({
   maxInstances: 10,
@@ -13,14 +11,14 @@ setGlobalOptions({
   timeoutSeconds: 10,
 });
 
-export {verify2FATOTP} from "./functions/verify2FATOTP";
-export {verify2FABackupCode} from "./functions/verify2FABackupCode";
-export {enable2FA} from "./functions/enable2FA";
-export {disable2FA} from "./functions/disable2FA";
-export {regenerateBackupCodes} from "./functions/regenerateBackupCodes";
-export {validateMessageSend} from "./functions/validateMessageSend";
-export {sendMessage} from "./functions/sendMessage";
-export {acceptPartnerInvite} from "./functions/acceptPartnerInvite";
-export {getPreKeyBundle} from "./functions/getPreKeyBundle";
-export {uploadPreKeys} from "./functions/uploadPreKeys";
-export {checkPreKeyCount} from "./functions/checkPreKeyCount";
+export {verify2FATOTP} from "./functions/verify2FATOTP.js";
+export {verify2FABackupCode} from "./functions/verify2FABackupCode.js";
+export {enable2FA} from "./functions/enable2FA.js";
+export {disable2FA} from "./functions/disable2FA.js";
+export {regenerateBackupCodes} from "./functions/regenerateBackupCodes.js";
+export {validateMessageSend} from "./functions/validateMessageSend.js";
+export {sendMessage} from "./functions/sendMessage.js";
+export {acceptPartnerInvite} from "./functions/acceptPartnerInvite.js";
+export {getPreKeyBundle} from "./functions/getPreKeyBundle.js";
+export {uploadPreKeys} from "./functions/uploadPreKeys.js";
+export {checkPreKeyCount} from "./functions/checkPreKeyCount.js";

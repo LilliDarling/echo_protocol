@@ -1,18 +1,18 @@
-import * as admin from "firebase-admin";
+import {Firestore, Timestamp} from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import {HttpsError} from "firebase-functions/v2/https";
-import {RATE_LIMITS, ANOMALY_THRESHOLDS} from "../config/constants";
-import {alertSuspiciousActivity} from "./anomaly";
+import {RATE_LIMITS, ANOMALY_THRESHOLDS} from "../config/constants.js";
+import {alertSuspiciousActivity} from "./anomaly.js";
 
 /**
  * Check and enforce user-based rate limiting
- * @param {admin.firestore.Firestore} db - Firestore database instance
+ * @param {Firestore} db - Firestore database instance
  * @param {string} userId - User ID to check rate limit for
  * @param {"TOTP" | "BACKUP_CODE"} limitType - Type of rate limit to check
  * @return {Promise<void>}
  */
 export async function checkUserRateLimit(
-  db: admin.firestore.Firestore,
+  db: Firestore,
   userId: string,
   limitType: "TOTP" | "BACKUP_CODE"
 ): Promise<void> {
@@ -22,18 +22,18 @@ export async function checkUserRateLimit(
   try {
     await db.runTransaction(async (transaction) => {
       const attemptsDoc = await transaction.get(attemptsRef);
-      const now = admin.firestore.Timestamp.now();
+      const now = Timestamp.now();
       const windowStart = new Date(
         now.toMillis() - config.windowMinutes * 60 * 1000
       );
 
-      let attempts: admin.firestore.Timestamp[] = [];
+      let attempts: Timestamp[] = [];
       if (attemptsDoc.exists) {
         const data = attemptsDoc.data();
         const key = limitType.toLowerCase();
-        attempts = (data?.[key] || []) as admin.firestore.Timestamp[];
+        attempts = (data?.[key] || []) as Timestamp[];
         attempts = attempts.filter(
-          (timestamp: admin.firestore.Timestamp) =>
+          (timestamp: Timestamp) =>
             timestamp.toDate() > windowStart
         );
       }
@@ -70,13 +70,13 @@ export async function checkUserRateLimit(
 
 /**
  * Check and enforce IP-based rate limiting (prevents distributed attacks)
- * @param {admin.firestore.Firestore} db - Firestore database instance
+ * @param {Firestore} db - Firestore database instance
  * @param {string} ip - IP address to check rate limit for
  * @param {string} userId - User ID making the request
  * @return {Promise<void>}
  */
 export async function checkIpRateLimit(
-  db: admin.firestore.Firestore,
+  db: Firestore,
   ip: string,
   userId: string
 ): Promise<void> {
@@ -86,13 +86,13 @@ export async function checkIpRateLimit(
   try {
     await db.runTransaction(async (transaction) => {
       const ipDoc = await transaction.get(ipRef);
-      const now = admin.firestore.Timestamp.now();
+      const now = Timestamp.now();
       const windowStart = new Date(
         now.toMillis() - config.windowMinutes * 60 * 1000
       );
 
       type AttemptRecord = {
-        timestamp: admin.firestore.Timestamp;
+        timestamp: Timestamp;
         userId: string;
       };
       let attempts: AttemptRecord[] = [];

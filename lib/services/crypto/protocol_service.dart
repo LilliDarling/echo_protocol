@@ -45,7 +45,7 @@ class ProtocolService {
   }
 
   Future<String> generateRecoveryPhrase() async {
-    return bip39.generateMnemonic(strength: 256);
+    return bip39.generateMnemonic(strength: 128);
   }
 
   Future<void> setupKeys(String recoveryPhrase) async {
@@ -71,6 +71,17 @@ class ProtocolService {
   Future<void> replenishPreKeysIfNeeded() async {
     _ensureInitialized();
     await _sessionManager.replenishPreKeysIfNeeded(identityKey: _identityKey!);
+  }
+
+  Future<void> uploadPreKeys() async {
+    _ensureInitialized();
+    final signedPrekey = await _sessionManager.getOrCreateSignedPrekey(_identityKey!);
+    final oneTimePrekeys = await _sessionManager.generateAndSaveOneTimePrekeys(count: 50);
+    await _sessionManager.uploadPreKeys(
+      identityKey: _identityKey!,
+      signedPrekey: signedPrekey,
+      oneTimePrekeys: oneTimePrekeys,
+    );
   }
 
   Future<String> encryptMessage({
@@ -133,6 +144,12 @@ class ProtocolService {
     _ensureInitialized();
     final publicKey = await _identityKey!.toPublicKey();
     return publicKey.fingerprint;
+  }
+
+  Future<String?> getPublicKey() async {
+    _ensureInitialized();
+    final publicKey = await _identityKey!.toPublicKey();
+    return base64Encode(publicKey.toBytes());
   }
 
   Future<({Uint8List signature, Uint8List publicKey})> sign(Uint8List data) async {

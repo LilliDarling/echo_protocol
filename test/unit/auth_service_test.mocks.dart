@@ -1313,6 +1313,15 @@ class MockProtocolService extends _i1.Mock implements _i10.ProtocolService {
           as _i7.Future<void>);
 
   @override
+  _i7.Future<void> uploadPreKeys() =>
+      (super.noSuchMethod(
+            Invocation.method(#uploadPreKeys, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
   _i7.Future<String> encryptMessage({
     required String? plaintext,
     required String? recipientId,
@@ -1865,7 +1874,7 @@ class MockSecureStorageService extends _i1.Mock
 /// A class which mocks [CollectionReference].
 ///
 /// See the documentation for Mockito's code generation for more information.
-
+// ignore: must_be_immutable
 class MockCollectionReference extends _i1.Mock
     implements _i6.CollectionReference<Map<String, dynamic>> {
   MockCollectionReference() {
@@ -2292,7 +2301,7 @@ class MockCollectionReference extends _i1.Mock
 /// A class which mocks [DocumentReference].
 ///
 /// See the documentation for Mockito's code generation for more information.
-
+// ignore: must_be_immutable
 class MockDocumentReference extends _i1.Mock
     implements _i6.DocumentReference<Map<String, dynamic>> {
   MockDocumentReference() {

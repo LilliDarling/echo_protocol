@@ -1,13 +1,14 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
-import * as admin from "firebase-admin";
 import {
   GetPreKeyBundleRequest,
   PreKeyBundleResponse,
-} from "../types/prekey";
+} from "../types/prekey.js";
+import {db} from "../firebase.js";
 
 export const getPreKeyBundle = onCall<GetPreKeyBundleRequest>(
   {
-    enforceAppCheck: true,
+    // TODO: Re-enable after configuring AppCheck on client
+    // enforceAppCheck: true,
     maxInstances: 10,
     cors: true,
   },
@@ -29,7 +30,6 @@ export const getPreKeyBundle = onCall<GetPreKeyBundleRequest>(
       );
     }
 
-    const db = admin.firestore();
     const userRef = db.collection("users").doc(recipientId);
 
     return await db.runTransaction(async (transaction) => {

@@ -1,11 +1,14 @@
-import * as admin from "firebase-admin";
+import {FieldValue} from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
-import {validateRequest} from "../utils/validation";
-import * as nacl from "tweetnacl";
+import {validateRequest} from "../utils/validation.js";
 import {createHash, randomBytes} from "crypto";
+import * as ed from "@noble/ed25519";
+import {sha512} from "@noble/hashes/sha2.js";
+import {db} from "../firebase.js";
 
-const db = admin.firestore();
+// Enable sync methods for @noble/ed25519 v3
+ed.hashes.sha512 = sha512;
 
 /**
  * Generate a short correlation ID for logging.
@@ -163,15 +166,44 @@ export const acceptPartnerInvite = onCall(
           `${expiresAtMs}`;
         const payloadBytes = Buffer.from(payload, "utf-8");
 
-        const isValid = nacl.sign.detached.verify(
-          new Uint8Array(payloadBytes),
-          new Uint8Array(signatureBytes),
-          new Uint8Array(publicKeyBytes)
-        );
+        // Debug logging
+        logger.info("Signature debug", {
+          correlationId,
+          payload,
+          signatureLen: signatureBytes.length,
+          pubKeyLen: publicKeyBytes.length,
+          signatureHex: signatureBytes.toString("hex").substring(0, 32),
+          pubKeyHex: publicKeyBytes.toString("hex"),
+        });
 
-        if (!isValid) {
-          logger.warn("Ed25519 signature verification failed", {correlationId});
-          throw new HttpsError("failed-precondition", "Invalid invite");
+        try {
+          // Convert standard Node Buffers to Uint8Arrays for Noble
+          // Using sync verify with sha512Sync configured above
+          const isValid = ed.verify(
+            new Uint8Array(signatureBytes),
+            new Uint8Array(payloadBytes),
+            new Uint8Array(publicKeyBytes)
+          );
+
+          if (!isValid) {
+            logger.warn(
+              "Ed25519 signature verification failed",
+              {correlationId}
+            );
+            throw new HttpsError(
+              "failed-precondition",
+              "Invalid invite signature"
+            );
+          }
+        } catch (err) {
+          if (err instanceof HttpsError) {
+            throw err;
+          }
+          logger.error(
+            "Noble Ed25519 verification error",
+            {error: err, correlationId}
+          );
+          throw new HttpsError("internal", "Signature processing failed");
         }
 
         logger.info("Ed25519 signature verified", {correlationId});
@@ -282,7 +314,7 @@ export const acceptPartnerInvite = onCall(
 
         transaction.update(inviteRef, {
           used: true,
-          usedAt: admin.firestore.FieldValue.serverTimestamp(),
+          usedAt: FieldValue.serverTimestamp(),
           usedBy: userId,
         });
 
@@ -290,14 +322,14 @@ export const acceptPartnerInvite = onCall(
           partnerId: partnerId,
           partnerPublicKey: partnerPublicKey,
           partnerKeyVersion: partnerKeyVersion,
-          partnerLinkedAt: admin.firestore.FieldValue.serverTimestamp(),
+          partnerLinkedAt: FieldValue.serverTimestamp(),
         });
 
         transaction.update(db.collection("users").doc(partnerId), {
           partnerId: userId,
           partnerPublicKey: myPublicKey,
           partnerKeyVersion: keyVersion,
-          partnerLinkedAt: admin.firestore.FieldValue.serverTimestamp(),
+          partnerLinkedAt: FieldValue.serverTimestamp(),
         });
 
         const sortedIds = [userId, partnerId].sort();
@@ -305,8 +337,8 @@ export const acceptPartnerInvite = onCall(
 
         transaction.set(db.collection("conversations").doc(conversationId), {
           participants: [userId, partnerId],
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          lastMessageAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
+          lastMessageAt: FieldValue.serverTimestamp(),
           lastMessage: null,
           unreadCount: {
             [userId]: 0,
@@ -318,7 +350,7 @@ export const acceptPartnerInvite = onCall(
       await db.collection("security_logs").add({
         userId,
         event: "partner_linked",
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: FieldValue.serverTimestamp(),
         details: {partnerId},
       });
 

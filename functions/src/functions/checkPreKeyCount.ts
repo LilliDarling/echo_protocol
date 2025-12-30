@@ -1,13 +1,14 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
-import * as admin from "firebase-admin";
-import {CheckPreKeyCountResponse} from "../types/prekey";
+import {CheckPreKeyCountResponse} from "../types/prekey.js";
+import {db} from "../firebase.js";
 
 const REPLENISH_THRESHOLD = 10;
 const SIGNED_PREKEY_WARNING_DAYS = 7;
 
 export const checkPreKeyCount = onCall(
   {
-    enforceAppCheck: true,
+    // TODO: Re-enable after configuring AppCheck on client
+    // enforceAppCheck: true,
     maxInstances: 10,
     cors: true,
   },
@@ -17,7 +18,6 @@ export const checkPreKeyCount = onCall(
     }
 
     const userId = request.auth.uid;
-    const db = admin.firestore();
     const userRef = db.collection("users").doc(userId);
 
     const [userDoc, countDoc] = await Promise.all([

@@ -264,7 +264,7 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
     final barcode = capture.barcodes.firstOrNull;
     if (barcode?.rawValue != null && !_isAcceptingInvite) {
       final code = barcode!.rawValue!;
-      if (code.length == 8 && RegExp(r'^[A-Z0-9]+$').hasMatch(code)) {
+      if (code.length == 12 && RegExp(r'^[A-Z0-9]+$').hasMatch(code)) {
         _scannerController.stop();
         _acceptInvite(code);
       }
@@ -578,7 +578,7 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
               letterSpacing: 4,
             ),
             decoration: InputDecoration(
-              hintText: 'ABCD1234',
+              hintText: 'ABCD12345678',
               hintStyle: TextStyle(
                 color: Colors.grey.shade400,
                 letterSpacing: 4,
@@ -593,7 +593,7 @@ class _PartnerLinkingScreenState extends State<PartnerLinkingScreen>
             ),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
-              LengthLimitingTextInputFormatter(8),
+              LengthLimitingTextInputFormatter(12),
               UpperCaseTextFormatter(),
             ],
             onSubmitted: _acceptInvite,

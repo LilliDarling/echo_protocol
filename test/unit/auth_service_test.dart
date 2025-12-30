@@ -417,8 +417,10 @@ void main() {
 
         when(mockProtocol.generateRecoveryPhrase())
             .thenAnswer((_) async => mnemonic);
-        when(mockProtocol.setupKeys(any)).thenAnswer((_) async {});
+        when(mockProtocol.initialize(recoveryPhrase: anyNamed('recoveryPhrase')))
+            .thenAnswer((_) async {});
         when(mockProtocol.getFingerprint()).thenAnswer((_) async => fingerprint);
+        when(mockProtocol.uploadPreKeys()).thenAnswer((_) async {});
 
         when(mockSecureStorage.storeUserId(any))
             .thenAnswer((_) async {});
@@ -434,7 +436,8 @@ void main() {
         );
 
         verify(mockProtocol.generateRecoveryPhrase()).called(1);
-        verify(mockProtocol.setupKeys(mnemonic)).called(1);
+        verify(mockProtocol.initialize(recoveryPhrase: mnemonic)).called(1);
+        verify(mockProtocol.uploadPreKeys()).called(1);
         verify(mockSecureStorage.storeUserId(userId)).called(1);
       });
 

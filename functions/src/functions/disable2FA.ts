@@ -1,11 +1,10 @@
-import * as admin from "firebase-admin";
+import {FieldValue} from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as speakeasy from "speakeasy";
-import {validateRequest} from "../utils/validation";
-import {TOTP_CONFIG} from "../config/constants";
-
-const db = admin.firestore();
+import {validateRequest} from "../utils/validation.js";
+import {TOTP_CONFIG} from "../config/constants.js";
+import {db} from "../firebase.js";
 
 export const disable2FA = onCall(
   {maxInstances: 5},
@@ -55,7 +54,7 @@ export const disable2FA = onCall(
       await db.collection("users").doc(userId).update({
         twoFactorEnabled: false,
         backupCodes: [],
-        twoFactorDisabledAt: admin.firestore.FieldValue.serverTimestamp(),
+        twoFactorDisabledAt: FieldValue.serverTimestamp(),
       });
 
       await db.collection("2fa_rate_limits").doc(userId).delete();
@@ -63,7 +62,7 @@ export const disable2FA = onCall(
       await db.collection("security_logs").add({
         userId,
         event: "2fa_disabled",
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: FieldValue.serverTimestamp(),
         ip: ip,
       });
 

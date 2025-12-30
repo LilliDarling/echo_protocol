@@ -63,20 +63,38 @@ class AuthService {
       final sanitizedName = displayName.trim();
       await credential.user?.updateDisplayName(sanitizedName);
 
-      final keyResult = await _generateAndStoreKeys(credential.user!.uid);
+      // Store userId first for any fallback operations
+      await _secureStorage.storeUserId(credential.user!.uid);
 
+      // Generate keys locally first (without uploading)
+      final mnemonic = await _protocolService.generateRecoveryPhrase();
+      await _protocolService.initialize(recoveryPhrase: mnemonic);
+      final fingerprint = await _protocolService.getFingerprint();
+      final publicKey = await _protocolService.getPublicKey();
+
+      // Store public key for partner linking
+      if (publicKey != null) {
+        await _secureStorage.storePublicKey(publicKey);
+      }
+
+      // Create user document BEFORE uploading prekeys
+      // This ensures Firestore rules are satisfied for any fallback writes
       await _createUserDocument(
         userId: credential.user!.uid,
         email: email,
         displayName: displayName,
         photoUrl: null,
-        publicKey: keyResult['publicKey']!,
+        publicKey: publicKey ?? '',
+        fingerprint: fingerprint ?? '',
       );
+
+      // Now upload prekeys (safe to do after user doc exists)
+      await _protocolService.uploadPreKeys();
 
       LoggerService.auth('Sign up successful', userId: credential.user!.uid);
       return SignUpResult(
         credential: credential,
-        recoveryPhrase: keyResult['mnemonic']!,
+        recoveryPhrase: mnemonic,
       );
     } on FirebaseAuthException catch (e) {
       LoggerService.error('Sign up failed: ${e.code}');
@@ -132,20 +150,37 @@ class AuthService {
       final isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
 
       if (isNewUser) {
-        final keyResult = await _generateAndStoreKeys(userCredential.user!.uid);
+        // Store userId first for any fallback operations
+        await _secureStorage.storeUserId(userCredential.user!.uid);
 
+        // Generate keys locally first (without uploading)
+        final mnemonic = await _protocolService.generateRecoveryPhrase();
+        await _protocolService.initialize(recoveryPhrase: mnemonic);
+        final fingerprint = await _protocolService.getFingerprint();
+        final publicKey = await _protocolService.getPublicKey();
+
+        // Store public key for partner linking
+        if (publicKey != null) {
+          await _secureStorage.storePublicKey(publicKey);
+        }
+
+        // Create user document BEFORE uploading prekeys
         await _createUserDocument(
           userId: userCredential.user!.uid,
           email: userCredential.user!.email!,
           displayName: userCredential.user!.displayName ?? 'User',
           photoUrl: userCredential.user!.photoURL,
-          publicKey: keyResult['publicKey']!,
+          publicKey: publicKey ?? '',
+          fingerprint: fingerprint ?? '',
         );
+
+        // Now upload prekeys (safe to do after user doc exists)
+        await _protocolService.uploadPreKeys();
 
         LoggerService.auth('Google sign-up successful', userId: userCredential.user!.uid);
         return SignUpResult(
           credential: userCredential,
-          recoveryPhrase: keyResult['mnemonic']!,
+          recoveryPhrase: mnemonic,
         );
       } else {
         final needsRecovery = !await _tryLoadUserKeys(userCredential.user!.uid);
@@ -260,21 +295,6 @@ class AuthService {
     return _protocolService.getPartnerFingerprint(partnerId);
   }
 
-  Future<Map<String, String>> _generateAndStoreKeys(String userId) async {
-    final mnemonic = await _protocolService.generateRecoveryPhrase();
-
-    await _protocolService.setupKeys(mnemonic);
-
-    final fingerprint = await _protocolService.getFingerprint();
-
-    await _secureStorage.storeUserId(userId);
-
-    return {
-      'publicKey': fingerprint ?? '',
-      'mnemonic': mnemonic,
-    };
-  }
-
   Future<bool> _tryLoadUserKeys(String userId) async {
     final storedUserId = await _secureStorage.getUserId();
 
@@ -324,10 +344,10 @@ class AuthService {
     required String displayName,
     String? photoUrl,
     required String publicKey,
+    required String fingerprint,
   }) async {
     final now = DateTime.now();
     final initialVersion = now.millisecondsSinceEpoch ~/ 1000;
-    final fingerprint = publicKey;
 
     final userModel = UserModel(
       id: userId,

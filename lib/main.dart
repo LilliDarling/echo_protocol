@@ -13,6 +13,9 @@ import 'core/providers/theme_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Note: cryptography_flutter auto-enables native implementations
+  // for Ed25519/X25519 which are compatible with @noble/ed25519
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

@@ -1,11 +1,12 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
-import * as admin from "firebase-admin";
+import {FieldValue, Timestamp} from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
-import {REPLAY_PROTECTION, RATE_LIMITS} from "../config/constants";
+import {REPLAY_PROTECTION, RATE_LIMITS} from "../config/constants.js";
+import {db} from "../firebase.js";
 import {
   ValidateMessageRequest,
   ValidateMessageResponse,
-} from "../types/message";
+} from "../types/message.js";
 
 /**
  * Generate a consistent conversation key from two user IDs
@@ -19,7 +20,8 @@ function getConversationKey(userId1: string, userId2: string): string {
 
 export const validateMessageSend = onCall<ValidateMessageRequest>(
   {
-    enforceAppCheck: true,
+    // TODO: Re-enable after configuring AppCheck on client
+    // enforceAppCheck: true,
     maxInstances: 10,
     cors: true,
   },
@@ -50,9 +52,8 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
       throw new HttpsError("invalid-argument", "timestamp is required");
     }
 
-    const db = admin.firestore();
     const now = Date.now();
-    const nowTimestamp = admin.firestore.Timestamp.now();
+    const nowTimestamp = Timestamp.now();
     const messageTime = timestamp;
 
     const maxAge = REPLAY_PROTECTION.nonceExpiryHours * 60 * 60 * 1000;
@@ -104,31 +105,31 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
         const hourAgo = new Date(nowTimestamp.toMillis() - 60 * 60 * 1000);
         const minuteAgo = new Date(nowTimestamp.toMillis() - 60 * 1000);
 
-        let userAttempts: admin.firestore.Timestamp[] = [];
+        let userAttempts: Timestamp[] = [];
         if (userDoc.exists) {
           const data = userDoc.data();
-          userAttempts = (data?.attempts || []) as admin.firestore.Timestamp[];
+          userAttempts = (data?.attempts || []) as Timestamp[];
           userAttempts = userAttempts.filter(
-            (ts: admin.firestore.Timestamp) => ts.toDate() > hourAgo
+            (ts: Timestamp) => ts.toDate() > hourAgo
           );
         }
 
-        let convAttempts: admin.firestore.Timestamp[] = [];
+        let convAttempts: Timestamp[] = [];
         if (convDoc.exists) {
           const data = convDoc.data();
-          convAttempts = (data?.attempts || []) as admin.firestore.Timestamp[];
+          convAttempts = (data?.attempts || []) as Timestamp[];
           convAttempts = convAttempts.filter(
-            (ts: admin.firestore.Timestamp) => ts.toDate() > hourAgo
+            (ts: Timestamp) => ts.toDate() > hourAgo
           );
         }
 
         const userAttemptsInMinute = userAttempts.filter(
-          (t: admin.firestore.Timestamp) => t.toDate() > minuteAgo
+          (t: Timestamp) => t.toDate() > minuteAgo
         ).length;
         const userAttemptsInHour = userAttempts.length;
 
         const convAttemptsInMinute = convAttempts.filter(
-          (t: admin.firestore.Timestamp) => t.toDate() > minuteAgo
+          (t: Timestamp) => t.toDate() > minuteAgo
         ).length;
         const convAttemptsInHour = convAttempts.length;
 
@@ -136,7 +137,7 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
         let limitReason = "";
 
         if (userAttemptsInMinute >= rateLimitConfig.maxPerMinute) {
-                type TS = admin.firestore.Timestamp;
+                type TS = Timestamp;
                 const oldestInMinute = userAttempts
                   .filter((t: TS) => t.toDate() > minuteAgo)
                   .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
@@ -150,7 +151,7 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
         }
 
         if (userAttemptsInHour >= rateLimitConfig.maxPerHour) {
-                type TS = admin.firestore.Timestamp;
+                type TS = Timestamp;
                 const oldestInHour = userAttempts
                   .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
                 if (oldestInHour) {
@@ -163,7 +164,7 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
         }
 
         if (convAttemptsInMinute >= rateLimitConfig.conversationMaxPerMinute) {
-                type TS = admin.firestore.Timestamp;
+                type TS = Timestamp;
                 const oldestInMinute = convAttempts
                   .filter((t: TS) => t.toDate() > minuteAgo)
                   .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
@@ -177,7 +178,7 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
         }
 
         if (convAttemptsInHour >= rateLimitConfig.conversationMaxPerHour) {
-                type TS = admin.firestore.Timestamp;
+                type TS = Timestamp;
                 const oldestInHour = convAttempts
                   .sort((a: TS, b: TS) => a.toMillis() - b.toMillis())[0];
                 if (oldestInHour) {
@@ -246,14 +247,14 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
         }
 
         const token = tokenRef.id;
-        const expiresAt = admin.firestore.Timestamp.fromMillis(now + 30000);
-        const nonceExpireAt = admin.firestore.Timestamp.fromMillis(
+        const expiresAt = Timestamp.fromMillis(now + 30000);
+        const nonceExpireAt = Timestamp.fromMillis(
           now + maxAge + 60000
         );
-        const tokenExpireAt = admin.firestore.Timestamp.fromMillis(
+        const tokenExpireAt = Timestamp.fromMillis(
           now + 60 * 60 * 1000
         );
-        const rateLimitExpireAt = admin.firestore.Timestamp.fromMillis(
+        const rateLimitExpireAt = Timestamp.fromMillis(
           nowTimestamp.toMillis() + 2 * 60 * 60 * 1000
         );
 
@@ -287,12 +288,12 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
         transaction.set(nonceRef, {
           senderId,
           conversationId,
-          timestamp: admin.firestore.Timestamp.fromMillis(messageTime),
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          timestamp: Timestamp.fromMillis(messageTime),
+          createdAt: FieldValue.serverTimestamp(),
           expireAt: nonceExpireAt,
         });
 
-        const sequenceExpireAt = admin.firestore.Timestamp.fromMillis(
+        const sequenceExpireAt = Timestamp.fromMillis(
           now + 30 * 24 * 60 * 60 * 1000
         );
 
@@ -300,7 +301,7 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
           sequenceRef,
           {
             lastSequence: sequenceNumber,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
             expireAt: sequenceExpireAt,
           },
           {merge: true}
@@ -314,7 +315,7 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
           sequenceNumber,
           expiresAt,
           used: false,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
           expireAt: tokenExpireAt,
         });
 

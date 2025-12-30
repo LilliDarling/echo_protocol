@@ -1,11 +1,10 @@
-import * as admin from "firebase-admin";
+import {FieldValue} from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as speakeasy from "speakeasy";
-import {validateRequest} from "../utils/validation";
-import {checkUserRateLimit, checkIpRateLimit} from "../services/rateLimit";
-
-const db = admin.firestore();
+import {validateRequest} from "../utils/validation.js";
+import {checkUserRateLimit, checkIpRateLimit} from "../services/rateLimit.js";
+import {db} from "../firebase.js";
 
 export const verify2FATOTP = onCall(
   {maxInstances: 5},
@@ -84,7 +83,7 @@ export const verify2FATOTP = onCall(
         await db.collection("security_logs").add({
           userId,
           event: "2fa_totp_failed",
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          timestamp: FieldValue.serverTimestamp(),
           ip: ip,
           userAgent: request.rawRequest.headers["user-agent"],
         });
@@ -101,20 +100,20 @@ export const verify2FATOTP = onCall(
         const pendingBackupCodes = secretData?.pendingBackupCodes;
         await db.collection("users").doc(userId).update({
           twoFactorEnabled: true,
-          twoFactorEnabledAt: admin.firestore.FieldValue.serverTimestamp(),
-          twoFactorPending: admin.firestore.FieldValue.delete(),
-          twoFactorPendingAt: admin.firestore.FieldValue.delete(),
+          twoFactorEnabledAt: FieldValue.serverTimestamp(),
+          twoFactorPending: FieldValue.delete(),
+          twoFactorPendingAt: FieldValue.delete(),
           backupCodes: pendingBackupCodes || [],
         });
         await db.collection("2fa_secrets").doc(userId).update({
-          pendingBackupCodes: admin.firestore.FieldValue.delete(),
+          pendingBackupCodes: FieldValue.delete(),
         });
       }
 
       await db.collection("security_logs").add({
         userId,
         event: isPending ? "2fa_activated" : "2fa_totp_success",
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: FieldValue.serverTimestamp(),
         ip: ip,
         userAgent: request.rawRequest.headers["user-agent"],
       });
