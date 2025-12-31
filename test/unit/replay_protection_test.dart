@@ -1,26 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:mockito/annotations.dart';
 import 'package:echo_protocol/services/replay_protection.dart';
 import 'package:echo_protocol/utils/security.dart';
-
-@GenerateMocks([FirebaseFunctions])
-import 'replay_protection_test.mocks.dart';
 
 void main() {
   group('ReplayProtectionService', () {
     late ReplayProtectionService replayProtection;
     late FakeFirebaseFirestore fakeFirestore;
-    late MockFirebaseFunctions mockFunctions;
 
     setUp(() {
       fakeFirestore = FakeFirebaseFirestore();
-      mockFunctions = MockFirebaseFunctions();
       replayProtection = ReplayProtectionService(
         userId: 'test-user',
         firestore: fakeFirestore,
-        functions: mockFunctions,
       );
     });
 
@@ -232,15 +224,12 @@ void main() {
   group('Replay attack scenarios', () {
     late ReplayProtectionService replayProtection;
     late FakeFirebaseFirestore fakeFirestore;
-    late MockFirebaseFunctions mockFunctions;
 
     setUp(() {
       fakeFirestore = FakeFirebaseFirestore();
-      mockFunctions = MockFirebaseFunctions();
       replayProtection = ReplayProtectionService(
         userId: 'test-user',
         firestore: fakeFirestore,
-        functions: mockFunctions,
       );
     });
 
@@ -354,7 +343,6 @@ void main() {
       final device1 = ReplayProtectionService(
         userId: 'bob',
         firestore: fakeFirestore,
-        functions: mockFunctions,
       );
       await device1.validateMessage(
         messageId: 'msg-1',
@@ -367,7 +355,6 @@ void main() {
       final device2 = ReplayProtectionService(
         userId: 'bob',
         firestore: fakeFirestore,
-        functions: mockFunctions,
       );
       final replayOnNewDevice = await device2.validateMessage(
         messageId: 'msg-1',

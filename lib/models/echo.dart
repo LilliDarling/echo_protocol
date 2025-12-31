@@ -12,7 +12,6 @@ class EchoModel {
   final int senderKeyVersion;
   final int recipientKeyVersion;
   final int sequenceNumber;
-  final String? validationToken;
   final String? conversationId;
   final bool isEdited;
   final DateTime? editedAt;
@@ -32,7 +31,6 @@ class EchoModel {
     required this.senderKeyVersion,
     required this.recipientKeyVersion,
     required this.sequenceNumber,
-    this.validationToken,
     this.conversationId,
     this.isEdited = false,
     this.editedAt,
@@ -60,7 +58,6 @@ class EchoModel {
       senderKeyVersion: (json['senderKeyVersion'] as num?)?.toInt() ?? 0,
       recipientKeyVersion: (json['recipientKeyVersion'] as num?)?.toInt() ?? 0,
       sequenceNumber: (json['sequenceNumber'] as num?)?.toInt() ?? 0,
-      validationToken: json['validationToken'] as String?,
       conversationId: json['conversationId'] as String?,
       isEdited: json['isEdited'] as bool? ?? false,
       editedAt: json['editedAt'] != null
@@ -91,7 +88,6 @@ class EchoModel {
       'senderKeyVersion': senderKeyVersion,
       'recipientKeyVersion': recipientKeyVersion,
       'sequenceNumber': sequenceNumber,
-      if (validationToken != null) 'validationToken': validationToken,
       if (conversationId != null) 'conversationId': conversationId,
       'isEdited': isEdited,
       if (editedAt != null) 'editedAt': Timestamp.fromDate(editedAt!),
@@ -113,7 +109,6 @@ class EchoModel {
     int? senderKeyVersion,
     int? recipientKeyVersion,
     int? sequenceNumber,
-    String? validationToken,
     String? conversationId,
     bool? isEdited,
     DateTime? editedAt,
@@ -133,7 +128,6 @@ class EchoModel {
       senderKeyVersion: senderKeyVersion ?? this.senderKeyVersion,
       recipientKeyVersion: recipientKeyVersion ?? this.recipientKeyVersion,
       sequenceNumber: sequenceNumber ?? this.sequenceNumber,
-      validationToken: validationToken ?? this.validationToken,
       conversationId: conversationId ?? this.conversationId,
       isEdited: isEdited ?? this.isEdited,
       editedAt: editedAt ?? this.editedAt,

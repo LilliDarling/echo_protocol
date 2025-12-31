@@ -8,13 +8,10 @@ rules_version = '2';
 // 1. message_nonces collection:
 //    Field: expireAt | Deletes documents ~1 hour after message creation
 //
-// 2. message_tokens collection:
-//    Field: expireAt | Deletes documents ~1 hour after token creation
-//
-// 3. message_sequences collection:
+// 2. message_sequences collection:
 //    Field: expireAt | Deletes documents 30 days after last update
 //
-// 4. message_rate_limits collection:
+// 3. message_rate_limits collection:
 //    Field: expireAt | Deletes documents 2 hours after last attempt
 //
 // To create TTL policies via gcloud:
@@ -22,7 +19,7 @@ rules_version = '2';
 //     --collection-group=message_nonces \
 //     --enable-ttl
 //
-// Repeat for: message_tokens, message_sequences, message_rate_limits
+// Repeat for: message_sequences, message_rate_limits
 // =============================================================================
 
 service cloud.firestore {
@@ -165,12 +162,6 @@ service cloud.firestore {
     // Message sequences collection - Server-side sequence tracking
     // Only Cloud Functions can write via Admin SDK
     match /message_sequences/{sequenceId} {
-      allow read, write: if false;
-    }
-
-    // Message tokens collection - One-time validation tokens
-    // Only Cloud Functions can write via Admin SDK
-    match /message_tokens/{tokenId} {
       allow read, write: if false;
     }
 
