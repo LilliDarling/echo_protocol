@@ -73,7 +73,6 @@ class DecryptedContentCacheService {
       final cacheData = json.decode(decryptedJson) as Map<String, dynamic>;
       final version = cacheData['version'] as int? ?? 0;
 
-      // Clear cache if version changed or contains old failure entries
       if (version != _cacheVersion) {
         await _deleteCacheFile();
         return;
@@ -81,7 +80,6 @@ class DecryptedContentCacheService {
 
       final content = cacheData['content'] as Map<String, dynamic>? ?? {};
 
-      // Clear cache if it contains old failure entries
       if (content.values.any((v) => v == '[Unable to decrypt message]')) {
         await _deleteCacheFile();
         return;
@@ -107,7 +105,6 @@ class DecryptedContentCacheService {
     try {
       final cacheKey = await _getOrCreateCacheKey();
 
-      // Filter out failed decryption placeholders - only cache successful decryptions
       final successfulCache = Map<String, String>.fromEntries(
         _memoryCache.entries.where((e) => e.value != '[Unable to decrypt message]'),
       );
@@ -193,7 +190,7 @@ class DecryptedContentCacheService {
         true,
         AEADParameters(
           KeyParameter(key),
-          128, // 128-bit auth tag
+          128,
           iv,
           Uint8List(0),
         ),

@@ -6,25 +6,27 @@ import 'dart:convert';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
-import 'media_encryption.dart';
+import 'crypto/media_encryption.dart';
 
-/// Service for uploading media files to Firebase Storage
-/// Supports optional end-to-end encryption of media files
 class MediaUploadService {
   final FirebaseStorage _storage;
   final MediaEncryptionService? _encryptionService;
+  final String? _senderId;
+  final String? _recipientId;
 
   MediaUploadService({
     FirebaseStorage? storage,
     MediaEncryptionService? encryptionService,
+    String? senderId,
+    String? recipientId,
   })  : _storage = storage ?? FirebaseStorage.instance,
-        _encryptionService = encryptionService;
+        _encryptionService = encryptionService,
+        _senderId = senderId,
+        _recipientId = recipientId;
 
-  /// Whether encryption is enabled for this service instance
-  bool get isEncryptionEnabled => _encryptionService != null;
+  bool get isEncryptionEnabled =>
+      _encryptionService != null && _senderId != null && _recipientId != null;
 
-  /// Upload an image with thumbnail generation
-  /// If encryption service is provided, encrypts file before upload
   Future<Map<String, String>> uploadImage({
     required XFile file,
     required String userId,
@@ -32,31 +34,47 @@ class MediaUploadService {
     final fileBytes = await file.readAsBytes();
     final hashedFilename = _generateHashedFilename(fileBytes, userId);
 
-    // Generate thumbnail before encryption (for preview display)
     final thumbnailBytes = await _generateImageThumbnail(fileBytes);
     final thumbnailFilename = '${hashedFilename}_thumb';
 
-    // Encrypt files if encryption service is available
-    final uploadBytes = _encryptionService != null
-        ? _encryptionService.encryptFileBytes(Uint8List.fromList(fileBytes))
-        : Uint8List.fromList(fileBytes);
-    final uploadThumbnailBytes = _encryptionService != null
-        ? _encryptionService.encryptFileBytes(thumbnailBytes)
-        : thumbnailBytes;
+    Uint8List uploadBytes;
+    Uint8List uploadThumbnailBytes;
+    String? mediaId;
+    String? thumbMediaId;
+    String? mediaKey;
+    String? thumbMediaKey;
 
-    // Use application/octet-stream for encrypted files to indicate binary data
-    final contentType = _encryptionService != null
-        ? 'application/octet-stream'
-        : 'image/jpeg';
+    if (isEncryptionEnabled) {
+      final result = await _encryptionService!.encryptMedia(
+        plainBytes: Uint8List.fromList(fileBytes),
+        recipientId: _recipientId!,
+        senderId: _senderId!,
+      );
+      uploadBytes = result.encrypted;
+      mediaId = result.mediaId;
+      mediaKey = base64Encode(result.mediaKey);
 
-    // Upload full image
+      final thumbResult = await _encryptionService.encryptMedia(
+        plainBytes: thumbnailBytes,
+        recipientId: _recipientId,
+        senderId: _senderId,
+      );
+      uploadThumbnailBytes = thumbResult.encrypted;
+      thumbMediaId = thumbResult.mediaId;
+      thumbMediaKey = base64Encode(thumbResult.mediaKey);
+    } else {
+      uploadBytes = Uint8List.fromList(fileBytes);
+      uploadThumbnailBytes = thumbnailBytes;
+    }
+
+    final contentType = isEncryptionEnabled ? 'application/octet-stream' : 'image/jpeg';
+
     final imageUrl = await _uploadToStorage(
       bytes: uploadBytes,
       path: 'media/images/$userId/$hashedFilename',
       contentType: contentType,
     );
 
-    // Upload thumbnail
     final thumbnailUrl = await _uploadToStorage(
       bytes: uploadThumbnailBytes,
       path: 'media/thumbnails/$userId/$thumbnailFilename',
@@ -67,12 +85,14 @@ class MediaUploadService {
       'fileUrl': imageUrl,
       'thumbnailUrl': thumbnailUrl,
       'fileName': hashedFilename,
-      'isEncrypted': _encryptionService != null ? 'true' : 'false',
+      'isEncrypted': isEncryptionEnabled ? 'true' : 'false',
+      if (mediaId != null) 'mediaId': mediaId,
+      if (thumbMediaId != null) 'thumbMediaId': thumbMediaId,
+      if (mediaKey != null) 'mediaKey': mediaKey,
+      if (thumbMediaKey != null) 'thumbMediaKey': thumbMediaKey,
     };
   }
 
-  /// Upload a video with thumbnail extraction
-  /// If encryption service is provided, encrypts file before upload
   Future<Map<String, String>> uploadVideo({
     required XFile file,
     required String userId,
@@ -80,39 +100,56 @@ class MediaUploadService {
     final fileBytes = await file.readAsBytes();
     final hashedFilename = _generateHashedFilename(Uint8List.fromList(fileBytes), userId);
 
-    // Extract video thumbnail before encryption (for preview display)
     final thumbnailPath = await _extractVideoThumbnail(file.path);
     final thumbnailBytes = thumbnailPath != null
         ? await File(thumbnailPath).readAsBytes()
         : null;
     final thumbnailFilename = '${hashedFilename}_thumb';
 
-    // Encrypt video if encryption service is available
-    final uploadBytes = _encryptionService != null
-        ? _encryptionService.encryptFileBytes(Uint8List.fromList(fileBytes))
-        : Uint8List.fromList(fileBytes);
+    Uint8List uploadBytes;
+    String? mediaId;
+    String? thumbMediaId;
+    String? mediaKey;
+    String? thumbMediaKey;
 
-    // Use application/octet-stream for encrypted files
-    final videoContentType = _encryptionService != null
-        ? 'application/octet-stream'
-        : 'video/mp4';
-    final thumbnailContentType = _encryptionService != null
-        ? 'application/octet-stream'
-        : 'image/jpeg';
+    if (isEncryptionEnabled) {
+      final result = await _encryptionService!.encryptMedia(
+        plainBytes: Uint8List.fromList(fileBytes),
+        recipientId: _recipientId!,
+        senderId: _senderId!,
+      );
+      uploadBytes = result.encrypted;
+      mediaId = result.mediaId;
+      mediaKey = base64Encode(result.mediaKey);
+    } else {
+      uploadBytes = Uint8List.fromList(fileBytes);
+    }
 
-    // Upload video
+    final videoContentType = isEncryptionEnabled ? 'application/octet-stream' : 'video/mp4';
+    final thumbnailContentType = isEncryptionEnabled ? 'application/octet-stream' : 'image/jpeg';
+
     final videoUrl = await _uploadToStorage(
       bytes: uploadBytes,
       path: 'media/videos/$userId/$hashedFilename',
       contentType: videoContentType,
     );
 
-    // Upload thumbnail if available
     String? thumbnailUrl;
     if (thumbnailBytes != null) {
-      final uploadThumbnailBytes = _encryptionService != null
-          ? _encryptionService.encryptFileBytes(Uint8List.fromList(thumbnailBytes))
-          : Uint8List.fromList(thumbnailBytes);
+      Uint8List uploadThumbnailBytes;
+
+      if (isEncryptionEnabled) {
+        final thumbResult = await _encryptionService!.encryptMedia(
+          plainBytes: Uint8List.fromList(thumbnailBytes),
+          recipientId: _recipientId!,
+          senderId: _senderId!,
+        );
+        uploadThumbnailBytes = thumbResult.encrypted;
+        thumbMediaId = thumbResult.mediaId;
+        thumbMediaKey = base64Encode(thumbResult.mediaKey);
+      } else {
+        uploadThumbnailBytes = Uint8List.fromList(thumbnailBytes);
+      }
 
       thumbnailUrl = await _uploadToStorage(
         bytes: uploadThumbnailBytes,
@@ -135,11 +172,14 @@ class MediaUploadService {
       'fileUrl': videoUrl,
       'thumbnailUrl': thumbnailUrl ?? '',
       'fileName': hashedFilename,
-      'isEncrypted': _encryptionService != null ? 'true' : 'false',
+      'isEncrypted': isEncryptionEnabled ? 'true' : 'false',
+      if (mediaId != null) 'mediaId': mediaId,
+      if (thumbMediaId != null) 'thumbMediaId': thumbMediaId,
+      if (mediaKey != null) 'mediaKey': mediaKey,
+      if (thumbMediaKey != null) 'thumbMediaKey': thumbMediaKey,
     };
   }
 
-  /// Generate hashed filename using SHA-256 for privacy
   String _generateHashedFilename(Uint8List bytes, String userId) {
     final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
     final input = '$userId:$timestamp:${bytes.length}';
@@ -175,7 +215,6 @@ class MediaUploadService {
     }
   }
 
-  /// Extract thumbnail from video
   Future<String?> _extractVideoThumbnail(String videoPath) async {
     try {
       final thumbnailPath = await VideoThumbnail.thumbnailFile(
@@ -192,7 +231,6 @@ class MediaUploadService {
     }
   }
 
-  /// Upload bytes to Firebase Storage
   Future<String> _uploadToStorage({
     required Uint8List bytes,
     required String path,
@@ -215,40 +253,30 @@ class MediaUploadService {
     }
   }
 
-  /// Delete a file from storage
   Future<void> deleteFile(String fileUrl) async {
-    try {
-      final ref = _storage.refFromURL(fileUrl);
-      await ref.delete();
-    } catch (e) {
-      // Silently fail - file might already be deleted
-    }
+    final ref = _storage.refFromURL(fileUrl);
+    await ref.delete().catchError((_) {});
   }
 
-  /// Get file size estimate
   static Future<int> getFileSize(XFile file) async {
     final bytes = await file.readAsBytes();
     return bytes.length;
   }
 
-  /// Validate file size (max 50MB)
   static bool isFileSizeValid(int bytes) {
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const maxSize = 50 * 1024 * 1024;
     return bytes <= maxSize;
   }
 
-  /// Get file extension
   static String getFileExtension(String path) {
     return path.split('.').last.toLowerCase();
   }
 
-  /// Validate image format
   static bool isValidImageFormat(String extension) {
     const validFormats = ['jpg', 'jpeg', 'png', 'webp', 'heic'];
     return validFormats.contains(extension.toLowerCase());
   }
 
-  /// Validate video format
   static bool isValidVideoFormat(String extension) {
     const validFormats = ['mp4', 'mov', 'avi', 'mkv'];
     return validFormats.contains(extension.toLowerCase());

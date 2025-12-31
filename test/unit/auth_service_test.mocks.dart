@@ -9,7 +9,7 @@ import 'dart:typed_data' as _i9;
 import 'package:cloud_firestore/cloud_firestore.dart' as _i6;
 import 'package:cloud_firestore_platform_interface/cloud_firestore_platform_interface.dart'
     as _i5;
-import 'package:echo_protocol/services/encryption.dart' as _i10;
+import 'package:echo_protocol/services/crypto/protocol_service.dart' as _i10;
 import 'package:echo_protocol/services/secure_storage.dart' as _i11;
 import 'package:firebase_auth/firebase_auth.dart' as _i4;
 import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart'
@@ -1248,145 +1248,141 @@ class MockUser extends _i1.Mock implements _i4.User {
           as _i7.Future<void>);
 }
 
-/// A class which mocks [EncryptionService].
+/// A class which mocks [ProtocolService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockEncryptionService extends _i1.Mock implements _i10.EncryptionService {
-  MockEncryptionService() {
+class MockProtocolService extends _i1.Mock implements _i10.ProtocolService {
+  MockProtocolService() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i7.Future<Map<String, String>> generateKeyPair() =>
-      (super.noSuchMethod(
-            Invocation.method(#generateKeyPair, []),
-            returnValue: _i7.Future<Map<String, String>>.value(
-              <String, String>{},
-            ),
-          )
-          as _i7.Future<Map<String, String>>);
-
-  @override
-  void setPrivateKey(String? privateKeyPem, {int? keyVersion}) =>
-      super.noSuchMethod(
-        Invocation.method(
-          #setPrivateKey,
-          [privateKeyPem],
-          {#keyVersion: keyVersion},
-        ),
-        returnValueForMissingStub: null,
-      );
-
-  @override
-  void setPartnerPublicKey(String? publicKeyPem) => super.noSuchMethod(
-    Invocation.method(#setPartnerPublicKey, [publicKeyPem]),
-    returnValueForMissingStub: null,
-  );
-
-  @override
-  String encryptMessage(String? plaintext) =>
-      (super.noSuchMethod(
-            Invocation.method(#encryptMessage, [plaintext]),
-            returnValue: _i8.dummyValue<String>(
-              this,
-              Invocation.method(#encryptMessage, [plaintext]),
-            ),
-          )
-          as String);
-
-  @override
-  String decryptMessage(String? encryptedText) =>
-      (super.noSuchMethod(
-            Invocation.method(#decryptMessage, [encryptedText]),
-            returnValue: _i8.dummyValue<String>(
-              this,
-              Invocation.method(#decryptMessage, [encryptedText]),
-            ),
-          )
-          as String);
-
-  @override
-  String decryptMessageWithKeyVersions({
-    required String? encryptedText,
-    required String? myPrivateKeyPem,
-    required String? partnerPublicKeyPem,
-  }) =>
-      (super.noSuchMethod(
-            Invocation.method(#decryptMessageWithKeyVersions, [], {
-              #encryptedText: encryptedText,
-              #myPrivateKeyPem: myPrivateKeyPem,
-              #partnerPublicKeyPem: partnerPublicKeyPem,
-            }),
-            returnValue: _i8.dummyValue<String>(
-              this,
-              Invocation.method(#decryptMessageWithKeyVersions, [], {
-                #encryptedText: encryptedText,
-                #myPrivateKeyPem: myPrivateKeyPem,
-                #partnerPublicKeyPem: partnerPublicKeyPem,
-              }),
-            ),
-          )
-          as String);
-
-  @override
-  _i9.Uint8List encryptFile(_i9.Uint8List? fileData) =>
-      (super.noSuchMethod(
-            Invocation.method(#encryptFile, [fileData]),
-            returnValue: _i9.Uint8List(0),
-          )
-          as _i9.Uint8List);
-
-  @override
-  _i9.Uint8List decryptFile(_i9.Uint8List? encryptedData) =>
-      (super.noSuchMethod(
-            Invocation.method(#decryptFile, [encryptedData]),
-            returnValue: _i9.Uint8List(0),
-          )
-          as _i9.Uint8List);
-
-  @override
-  String hashValue(String? value) =>
-      (super.noSuchMethod(
-            Invocation.method(#hashValue, [value]),
-            returnValue: _i8.dummyValue<String>(
-              this,
-              Invocation.method(#hashValue, [value]),
-            ),
-          )
-          as String);
-
-  @override
-  String generateFingerprint(String? publicKeyPem) =>
-      (super.noSuchMethod(
-            Invocation.method(#generateFingerprint, [publicKeyPem]),
-            returnValue: _i8.dummyValue<String>(
-              this,
-              Invocation.method(#generateFingerprint, [publicKeyPem]),
-            ),
-          )
-          as String);
-
-  @override
-  bool verifyFingerprint(String? publicKeyPem, String? expectedFingerprint) =>
-      (super.noSuchMethod(
-            Invocation.method(#verifyFingerprint, [
-              publicKeyPem,
-              expectedFingerprint,
-            ]),
-            returnValue: false,
-          )
+  bool get isInitialized =>
+      (super.noSuchMethod(Invocation.getter(#isInitialized), returnValue: false)
           as bool);
 
   @override
-  void clearKeys() => super.noSuchMethod(
-    Invocation.method(#clearKeys, []),
-    returnValueForMissingStub: null,
-  );
+  _i7.Future<void> initialize({String? recoveryPhrase}) =>
+      (super.noSuchMethod(
+            Invocation.method(#initialize, [], {
+              #recoveryPhrase: recoveryPhrase,
+            }),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
 
   @override
-  _i7.Future<Map<String, dynamic>> rotateKeys() =>
+  _i7.Future<void> initializeFromStorage() =>
       (super.noSuchMethod(
-            Invocation.method(#rotateKeys, []),
+            Invocation.method(#initializeFromStorage, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String> generateRecoveryPhrase() =>
+      (super.noSuchMethod(
+            Invocation.method(#generateRecoveryPhrase, []),
+            returnValue: _i7.Future<String>.value(
+              _i8.dummyValue<String>(
+                this,
+                Invocation.method(#generateRecoveryPhrase, []),
+              ),
+            ),
+          )
+          as _i7.Future<String>);
+
+  @override
+  _i7.Future<void> setupKeys(String? recoveryPhrase) =>
+      (super.noSuchMethod(
+            Invocation.method(#setupKeys, [recoveryPhrase]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> replenishPreKeysIfNeeded() =>
+      (super.noSuchMethod(
+            Invocation.method(#replenishPreKeysIfNeeded, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> uploadPreKeys() =>
+      (super.noSuchMethod(
+            Invocation.method(#uploadPreKeys, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String> encryptMessage({
+    required String? plaintext,
+    required String? recipientId,
+    required String? senderId,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#encryptMessage, [], {
+              #plaintext: plaintext,
+              #recipientId: recipientId,
+              #senderId: senderId,
+            }),
+            returnValue: _i7.Future<String>.value(
+              _i8.dummyValue<String>(
+                this,
+                Invocation.method(#encryptMessage, [], {
+                  #plaintext: plaintext,
+                  #recipientId: recipientId,
+                  #senderId: senderId,
+                }),
+              ),
+            ),
+          )
+          as _i7.Future<String>);
+
+  @override
+  _i7.Future<String> decryptMessage({
+    required String? encryptedContent,
+    required String? senderId,
+    required String? myUserId,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#decryptMessage, [], {
+              #encryptedContent: encryptedContent,
+              #senderId: senderId,
+              #myUserId: myUserId,
+            }),
+            returnValue: _i7.Future<String>.value(
+              _i8.dummyValue<String>(
+                this,
+                Invocation.method(#decryptMessage, [], {
+                  #encryptedContent: encryptedContent,
+                  #senderId: senderId,
+                  #myUserId: myUserId,
+                }),
+              ),
+            ),
+          )
+          as _i7.Future<String>);
+
+  @override
+  _i7.Future<Map<String, dynamic>> encryptForSending({
+    required String? plaintext,
+    required String? recipientId,
+    required String? senderId,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#encryptForSending, [], {
+              #plaintext: plaintext,
+              #recipientId: recipientId,
+              #senderId: senderId,
+            }),
             returnValue: _i7.Future<Map<String, dynamic>>.value(
               <String, dynamic>{},
             ),
@@ -1394,20 +1390,185 @@ class MockEncryptionService extends _i1.Mock implements _i10.EncryptionService {
           as _i7.Future<Map<String, dynamic>>);
 
   @override
-  bool isValidPublicKey(String? publicKeyPem) =>
+  _i7.Future<bool> hasActiveSession(String? recipientId, String? ourUserId) =>
       (super.noSuchMethod(
-            Invocation.method(#isValidPublicKey, [publicKeyPem]),
-            returnValue: false,
+            Invocation.method(#hasActiveSession, [recipientId, ourUserId]),
+            returnValue: _i7.Future<bool>.value(false),
           )
-          as bool);
+          as _i7.Future<bool>);
 
   @override
-  bool isValidPrivateKey(String? privateKeyPem) =>
+  _i7.Future<String?> getFingerprint() =>
       (super.noSuchMethod(
-            Invocation.method(#isValidPrivateKey, [privateKeyPem]),
-            returnValue: false,
+            Invocation.method(#getFingerprint, []),
+            returnValue: _i7.Future<String?>.value(),
           )
-          as bool);
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<String?> getPublicKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#getPublicKey, []),
+            returnValue: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<({_i9.Uint8List publicKey, _i9.Uint8List signature})> sign(
+    _i9.Uint8List? data,
+  ) =>
+      (super.noSuchMethod(
+            Invocation.method(#sign, [data]),
+            returnValue:
+                _i7.Future<
+                  ({_i9.Uint8List publicKey, _i9.Uint8List signature})
+                >.value((
+                  publicKey: _i9.Uint8List(0),
+                  signature: _i9.Uint8List(0),
+                )),
+          )
+          as _i7.Future<({_i9.Uint8List publicKey, _i9.Uint8List signature})>);
+
+  @override
+  _i7.Future<String?> getPartnerFingerprint(String? partnerId) =>
+      (super.noSuchMethod(
+            Invocation.method(#getPartnerFingerprint, [partnerId]),
+            returnValue: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<void> deleteSession(String? recipientId, String? ourUserId) =>
+      (super.noSuchMethod(
+            Invocation.method(#deleteSession, [recipientId, ourUserId]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> cleanupSessions() =>
+      (super.noSuchMethod(
+            Invocation.method(#cleanupSessions, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<
+    ({_i9.Uint8List encrypted, String mediaId, _i9.Uint8List mediaKey})
+  >
+  encryptMedia({
+    required _i9.Uint8List? plainBytes,
+    required String? recipientId,
+    required String? senderId,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#encryptMedia, [], {
+              #plainBytes: plainBytes,
+              #recipientId: recipientId,
+              #senderId: senderId,
+            }),
+            returnValue:
+                _i7.Future<
+                  ({
+                    _i9.Uint8List encrypted,
+                    String mediaId,
+                    _i9.Uint8List mediaKey,
+                  })
+                >.value((
+                  encrypted: _i9.Uint8List(0),
+                  mediaId: _i8.dummyValue<String>(
+                    this,
+                    Invocation.method(#encryptMedia, [], {
+                      #plainBytes: plainBytes,
+                      #recipientId: recipientId,
+                      #senderId: senderId,
+                    }),
+                  ),
+                  mediaKey: _i9.Uint8List(0),
+                )),
+          )
+          as _i7.Future<
+            ({_i9.Uint8List encrypted, String mediaId, _i9.Uint8List mediaKey})
+          >);
+
+  @override
+  _i7.Future<_i9.Uint8List> decryptMedia({
+    required _i9.Uint8List? encryptedBytes,
+    required String? mediaId,
+    required _i9.Uint8List? mediaKey,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#decryptMedia, [], {
+              #encryptedBytes: encryptedBytes,
+              #mediaId: mediaId,
+              #mediaKey: mediaKey,
+            }),
+            returnValue: _i7.Future<_i9.Uint8List>.value(_i9.Uint8List(0)),
+          )
+          as _i7.Future<_i9.Uint8List>);
+
+  @override
+  _i7.Future<void> deleteMedia({required String? mediaId}) =>
+      (super.noSuchMethod(
+            Invocation.method(#deleteMedia, [], {#mediaId: mediaId}),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String> downloadAndDecryptMedia({
+    required String? encryptedUrl,
+    required String? mediaId,
+    required _i9.Uint8List? mediaKey,
+    required bool? isVideo,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#downloadAndDecryptMedia, [], {
+              #encryptedUrl: encryptedUrl,
+              #mediaId: mediaId,
+              #mediaKey: mediaKey,
+              #isVideo: isVideo,
+            }),
+            returnValue: _i7.Future<String>.value(
+              _i8.dummyValue<String>(
+                this,
+                Invocation.method(#downloadAndDecryptMedia, [], {
+                  #encryptedUrl: encryptedUrl,
+                  #mediaId: mediaId,
+                  #mediaKey: mediaKey,
+                  #isVideo: isVideo,
+                }),
+              ),
+            ),
+          )
+          as _i7.Future<String>);
+
+  @override
+  _i7.Future<void> clearMediaCache() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearMediaCache, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<int> getMediaCacheSize() =>
+      (super.noSuchMethod(
+            Invocation.method(#getMediaCacheSize, []),
+            returnValue: _i7.Future<int>.value(0),
+          )
+          as _i7.Future<int>);
+
+  @override
+  void dispose() => super.noSuchMethod(
+    Invocation.method(#dispose, []),
+    returnValueForMissingStub: null,
+  );
 }
 
 /// A class which mocks [SecureStorageService].
@@ -1520,6 +1681,15 @@ class MockSecureStorageService extends _i1.Mock
             returnValue: _i7.Future<bool>.value(false),
           )
           as _i7.Future<bool>);
+
+  @override
+  _i7.Future<void> clearEncryptionKeys() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearEncryptionKeys, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
 
   @override
   _i7.Future<bool> hasPartnerKey() =>
@@ -1672,6 +1842,40 @@ class MockSecureStorageService extends _i1.Mock
             returnValueForMissingStub: _i7.Future<void>.value(),
           )
           as _i7.Future<void>);
+
+  @override
+  _i7.Future<bool> get2FASessionVerified() =>
+      (super.noSuchMethod(
+            Invocation.method(#get2FASessionVerified, []),
+            returnValue: _i7.Future<bool>.value(false),
+          )
+          as _i7.Future<bool>);
+
+  @override
+  _i7.Future<void> set2FASessionVerified(bool? verified) =>
+      (super.noSuchMethod(
+            Invocation.method(#set2FASessionVerified, [verified]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> clear2FASessionVerified() =>
+      (super.noSuchMethod(
+            Invocation.method(#clear2FASessionVerified, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<Duration?> get2FASessionTimeRemaining() =>
+      (super.noSuchMethod(
+            Invocation.method(#get2FASessionTimeRemaining, []),
+            returnValue: _i7.Future<Duration?>.value(),
+          )
+          as _i7.Future<Duration?>);
 }
 
 /// A class which mocks [CollectionReference].

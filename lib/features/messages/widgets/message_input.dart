@@ -1,9 +1,14 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:crypto/crypto.dart';
 import '../../../models/echo.dart';
 import '../../../services/media_upload.dart';
-import '../../../services/media_encryption.dart';
+import '../../../services/crypto/media_encryption.dart';
 import '../../../utils/gif.dart';
 
 class MessageInput extends StatefulWidget {
@@ -51,8 +56,11 @@ class _MessageInputState extends State<MessageInput> {
   }
 
   void _initUploadService() {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     _uploadService = MediaUploadService(
       encryptionService: widget.mediaEncryptionService,
+      senderId: currentUserId,
+      recipientId: widget.partnerId,
     );
   }
 
@@ -120,35 +128,42 @@ class _MessageInputState extends State<MessageInput> {
     setState(() => _isUploading = true);
 
     try {
-      // Validate file size
       final fileSize = await MediaUploadService.getFileSize(image);
       if (!MediaUploadService.isFileSizeValid(fileSize)) {
         throw Exception('File too large (max 50MB)');
       }
 
-      // Get current user
       final userId = FirebaseAuth.instance.currentUser?.uid;
       if (userId == null) {
         throw Exception('User not authenticated');
       }
 
-      // Upload image
       final result = await _uploadService.uploadImage(
         file: image,
         userId: userId,
       );
 
-      // Send message with image
       if (mounted) {
+        final isEncrypted = result['isEncrypted'] == 'true';
         final metadata = EchoMetadata(
           fileUrl: result['fileUrl']!,
           thumbnailUrl: result['thumbnailUrl']!,
           fileName: result['fileName'],
-          isEncrypted: result['isEncrypted'] == 'true',
+          mediaId: result['mediaId'],
+          thumbMediaId: result['thumbMediaId'],
+          isEncrypted: isEncrypted,
         );
 
+        final messageContent = isEncrypted
+            ? jsonEncode({
+                'type': 'image',
+                'mediaKey': result['mediaKey'],
+                'thumbKey': result['thumbMediaKey'],
+              })
+            : '[Image]';
+
         await widget.onSend(
-          '[Image]',
+          messageContent,
           type: EchoType.image,
           metadata: metadata,
         );
@@ -195,35 +210,42 @@ class _MessageInputState extends State<MessageInput> {
     setState(() => _isUploading = true);
 
     try {
-      // Validate file size
       final fileSize = await MediaUploadService.getFileSize(video);
       if (!MediaUploadService.isFileSizeValid(fileSize)) {
         throw Exception('File too large (max 50MB)');
       }
 
-      // Get current user
       final userId = FirebaseAuth.instance.currentUser?.uid;
       if (userId == null) {
         throw Exception('User not authenticated');
       }
 
-      // Upload video
       final result = await _uploadService.uploadVideo(
         file: video,
         userId: userId,
       );
 
-      // Send message with video
       if (mounted) {
+        final isEncrypted = result['isEncrypted'] == 'true';
         final metadata = EchoMetadata(
           fileUrl: result['fileUrl']!,
           thumbnailUrl: result['thumbnailUrl'],
           fileName: result['fileName'],
-          isEncrypted: result['isEncrypted'] == 'true',
+          mediaId: result['mediaId'],
+          thumbMediaId: result['thumbMediaId'],
+          isEncrypted: isEncrypted,
         );
 
+        final messageContent = isEncrypted
+            ? jsonEncode({
+                'type': 'video',
+                'mediaKey': result['mediaKey'],
+                'thumbKey': result['thumbMediaKey'],
+              })
+            : '[Video]';
+
         await widget.onSend(
-          '[Video]',
+          messageContent,
           type: EchoType.video,
           metadata: metadata,
         );
@@ -250,18 +272,93 @@ class _MessageInputState extends State<MessageInput> {
       final gifResult = await GifService.pickGif(context);
 
       if (gifResult != null && mounted) {
-        final metadata = EchoMetadata(
-          fileUrl: gifResult.url,
-          thumbnailUrl: gifResult.previewUrl,
-          fileName: gifResult.title,
-          isEncrypted: false, // GIFs from Giphy are not encrypted
-        );
+        final userId = FirebaseAuth.instance.currentUser?.uid;
 
-        await widget.onSend(
-          '[GIF]',
-          type: EchoType.gif,
-          metadata: metadata,
-        );
+        if (_uploadService.isEncryptionEnabled && widget.mediaEncryptionService != null && userId != null) {
+          setState(() => _isUploading = true);
+
+          try {
+            final gifResponse = await http.get(Uri.parse(gifResult.url));
+            final previewResponse = await http.get(Uri.parse(gifResult.previewUrl));
+
+            if (gifResponse.statusCode != 200 || previewResponse.statusCode != 200) {
+              throw Exception('Failed to download GIF');
+            }
+
+            final gifBytes = Uint8List.fromList(gifResponse.bodyBytes);
+            final previewBytes = Uint8List.fromList(previewResponse.bodyBytes);
+
+            final gifEncrypted = await widget.mediaEncryptionService!.encryptMedia(
+              plainBytes: gifBytes,
+              recipientId: widget.partnerId,
+              senderId: userId,
+            );
+
+            final previewEncrypted = await widget.mediaEncryptionService!.encryptMedia(
+              plainBytes: previewBytes,
+              recipientId: widget.partnerId,
+              senderId: userId,
+            );
+
+            final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+            final hash = sha256.convert(utf8.encode('$userId:$timestamp:${gifBytes.length}'));
+            final hashedFilename = hash.toString();
+
+            final storage = FirebaseStorage.instance;
+
+            final gifRef = storage.ref().child('media/gifs/$userId/$hashedFilename');
+            await gifRef.putData(
+              gifEncrypted.encrypted,
+              SettableMetadata(contentType: 'application/octet-stream'),
+            );
+            final gifUrl = await gifRef.getDownloadURL();
+
+            final previewRef = storage.ref().child('media/thumbnails/$userId/${hashedFilename}_preview');
+            await previewRef.putData(
+              previewEncrypted.encrypted,
+              SettableMetadata(contentType: 'application/octet-stream'),
+            );
+            final previewUrl = await previewRef.getDownloadURL();
+
+            final metadata = EchoMetadata(
+              fileUrl: gifUrl,
+              thumbnailUrl: previewUrl,
+              fileName: gifResult.title,
+              mediaId: gifEncrypted.mediaId,
+              thumbMediaId: previewEncrypted.mediaId,
+              isEncrypted: true,
+            );
+
+            final messageContent = jsonEncode({
+              'type': 'gif',
+              'mediaKey': base64Encode(gifEncrypted.mediaKey),
+              'thumbKey': base64Encode(previewEncrypted.mediaKey),
+            });
+
+            await widget.onSend(
+              messageContent,
+              type: EchoType.gif,
+              metadata: metadata,
+            );
+          } finally {
+            if (mounted) {
+              setState(() => _isUploading = false);
+            }
+          }
+        } else {
+          final metadata = EchoMetadata(
+            fileUrl: gifResult.url,
+            thumbnailUrl: gifResult.previewUrl,
+            fileName: gifResult.title,
+            isEncrypted: false,
+          );
+
+          await widget.onSend(
+            '[GIF]',
+            type: EchoType.gif,
+            metadata: metadata,
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -382,7 +479,6 @@ class _MessageInputState extends State<MessageInput> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Attachment button
               IconButton(
                 icon: Icon(
                   Icons.add_circle_outline,
@@ -390,7 +486,6 @@ class _MessageInputState extends State<MessageInput> {
                 ),
                 onPressed: _showAttachmentOptions,
               ),
-              // Text field
               Expanded(
                 child: Container(
                   constraints: const BoxConstraints(maxHeight: 120),
@@ -421,7 +516,6 @@ class _MessageInputState extends State<MessageInput> {
                 ),
               ),
               const SizedBox(width: 8),
-              // Send button or upload indicator
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 child: (widget.isSending || _isUploading)

@@ -2,13 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../services/partner.dart';
-import '../../../services/encryption.dart';
 import 'partner_linking.dart';
 import 'conversation.dart';
 
-// ignore warnings about unused imports - needed for _ConversationPreview
-
-/// Main messages tab that shows either partner linking or conversation
 class MessagesTab extends StatefulWidget {
   const MessagesTab({super.key});
 
@@ -38,7 +34,6 @@ class _MessagesTabState extends State<MessagesTab> {
     });
 
     try {
-      // Force fresh read from server to avoid stale cache issues
       final partner = await _partnerService.getPartner(forceRefresh: true);
       final conversationId = await _partnerService.getConversationId();
 
@@ -76,7 +71,6 @@ class _MessagesTabState extends State<MessagesTab> {
       );
     }
 
-    // Show error if there is one
     if (_error != null) {
       return Center(
         child: Padding(
@@ -112,14 +106,12 @@ class _MessagesTabState extends State<MessagesTab> {
       );
     }
 
-    // No partner linked - show linking screen
     if (_partner == null) {
       return PartnerLinkingScreen(
         onPartnerLinked: _onPartnerLinked,
       );
     }
 
-    // Partner linked - show conversation preview
     return _ConversationPreview(
       partner: _partner!,
       conversationId: _conversationId!,
@@ -127,7 +119,6 @@ class _MessagesTabState extends State<MessagesTab> {
   }
 }
 
-/// Widget showing the conversation preview with partner info
 class _ConversationPreview extends StatelessWidget {
   final PartnerInfo partner;
   final String conversationId;
@@ -141,13 +132,7 @@ class _ConversationPreview extends StatelessWidget {
     if (encryptedMessage == null || encryptedMessage.isEmpty) {
       return 'Start a conversation';
     }
-    try {
-      final encryptionService = EncryptionService();
-      return encryptionService.decryptMessage(encryptedMessage);
-    } catch (e) {
-      // If decryption fails, show generic message
-      return 'Encrypted message';
-    }
+    return 'Tap to view message';
   }
 
   String _truncatePreview(String text, {int maxLength = 50}) {
@@ -171,8 +156,6 @@ class _ConversationPreview extends StatelessWidget {
         final unreadCounts =
             conversationData?['unreadCount'] as Map<String, dynamic>?;
         final myUnreadCount = unreadCounts?[currentUserId] as int? ?? 0;
-
-        // Decrypt the preview message
         final decryptedPreview = _decryptPreview(lastMessageEncrypted);
         final displayMessage = _truncatePreview(decryptedPreview);
 
@@ -247,7 +230,6 @@ class _ConversationPreview extends StatelessWidget {
                           )
                         : null,
                   ),
-                  // Online indicator
                   if (partner.isOnline)
                     Positioned(
                       right: 0,
@@ -265,7 +247,6 @@ class _ConversationPreview extends StatelessWidget {
                 ],
               ),
               const SizedBox(width: 16),
-              // Partner name and last message
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,7 +334,6 @@ class _ConversationPreview extends StatelessWidget {
     final diff = now.difference(timestamp);
 
     if (diff.inDays == 0) {
-      // Today - show time
       final hour = timestamp.hour;
       final minute = timestamp.minute.toString().padLeft(2, '0');
       final period = hour >= 12 ? 'PM' : 'AM';

@@ -1,11 +1,10 @@
-import * as admin from "firebase-admin";
+import {FieldValue} from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
-import {validateRequest} from "../utils/validation";
-import {verifyBackupCode} from "../utils/hashing";
-import {checkUserRateLimit, checkIpRateLimit} from "../services/rateLimit";
-
-const db = admin.firestore();
+import {validateRequest} from "../utils/validation.js";
+import {verifyBackupCode} from "../utils/hashing.js";
+import {checkUserRateLimit, checkIpRateLimit} from "../services/rateLimit.js";
+import {db} from "../firebase.js";
 
 export const verify2FABackupCode = onCall(
   {maxInstances: 5},
@@ -23,7 +22,7 @@ export const verify2FABackupCode = onCall(
       );
     }
 
-    logger.info("2FA backup code verification attempt", {userId, ip});
+    logger.info("Backup code verification attempt");
 
     await checkIpRateLimit(db, ip, userId);
     await checkUserRateLimit(db, userId, "BACKUP_CODE");
@@ -56,12 +55,12 @@ export const verify2FABackupCode = onCall(
         await db.collection("security_logs").add({
           userId,
           event: "2fa_backup_code_failed",
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          timestamp: FieldValue.serverTimestamp(),
           ip: ip,
           userAgent: request.rawRequest.headers["user-agent"],
         });
 
-        logger.warn("Invalid backup code", {userId, ip});
+        logger.warn("Backup code verification failed");
 
         throw new HttpsError(
           "permission-denied",
@@ -78,17 +77,13 @@ export const verify2FABackupCode = onCall(
       await db.collection("security_logs").add({
         userId,
         event: "2fa_backup_code_success",
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: FieldValue.serverTimestamp(),
         ip: ip,
         userAgent: request.rawRequest.headers["user-agent"],
         remainingBackupCodes: hashedBackupCodes.length,
       });
 
-      logger.info("2FA backup code verification successful", {
-        userId,
-        ip,
-        remainingCodes: hashedBackupCodes.length,
-      });
+      logger.info("Backup code verification successful");
 
       return {
         success: true,
@@ -99,12 +94,7 @@ export const verify2FABackupCode = onCall(
       if (error instanceof HttpsError) {
         throw error;
       }
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error("2FA backup code verification error", {
-        userId,
-        errorMessage,
-      });
+      logger.error("Backup code verification error");
       throw new HttpsError("internal", "Verification failed");
     }
   }

@@ -1490,6 +1490,15 @@ class MockSecureStorageService extends _i1.Mock
           as _i5.Future<bool>);
 
   @override
+  _i5.Future<void> clearEncryptionKeys() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearEncryptionKeys, []),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
   _i5.Future<bool> hasPartnerKey() =>
       (super.noSuchMethod(
             Invocation.method(#hasPartnerKey, []),
@@ -1640,6 +1649,40 @@ class MockSecureStorageService extends _i1.Mock
             returnValueForMissingStub: _i5.Future<void>.value(),
           )
           as _i5.Future<void>);
+
+  @override
+  _i5.Future<bool> get2FASessionVerified() =>
+      (super.noSuchMethod(
+            Invocation.method(#get2FASessionVerified, []),
+            returnValue: _i5.Future<bool>.value(false),
+          )
+          as _i5.Future<bool>);
+
+  @override
+  _i5.Future<void> set2FASessionVerified(bool? verified) =>
+      (super.noSuchMethod(
+            Invocation.method(#set2FASessionVerified, [verified]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> clear2FASessionVerified() =>
+      (super.noSuchMethod(
+            Invocation.method(#clear2FASessionVerified, []),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<Duration?> get2FASessionTimeRemaining() =>
+      (super.noSuchMethod(
+            Invocation.method(#get2FASessionTimeRemaining, []),
+            returnValue: _i5.Future<Duration?>.value(),
+          )
+          as _i5.Future<Duration?>);
 }
 
 /// A class which mocks [HttpsCallable].

@@ -1,33 +1,31 @@
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'secure_storage.dart';
-import 'encryption.dart';
+import 'crypto/protocol_service.dart';
 import '../utils/security.dart';
 
-/// Service for managing partner relationships
-/// Partners connect via invite codes/QR codes for secure 1-to-1 messaging
 class PartnerService {
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
   final SecureStorageService _secureStorage;
-  final EncryptionService _encryptionService;
+  final ProtocolService _protocolService;
 
   PartnerService({
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
     SecureStorageService? secureStorage,
-    EncryptionService? encryptionService,
+    ProtocolService? protocolService,
   })  : _db = firestore ?? FirebaseFirestore.instance,
         _auth = auth ?? FirebaseAuth.instance,
         _secureStorage = secureStorage ?? SecureStorageService(),
-        _encryptionService = encryptionService ?? EncryptionService();
+        _protocolService = protocolService ?? ProtocolService();
 
-  static const int _inviteCodeLength = 8;
+  static const int _inviteCodeLength = 12;
   static const Duration _inviteExpiry = Duration(hours: 24);
 
   static const int _maxInviteCreationsPerHour = 5;
@@ -43,65 +41,33 @@ class PartnerService {
     ).join();
   }
 
-  /// Generate cryptographic signature for invite integrity
-  Future<String> _generateInviteSignature({
+  Future<({String signature, String ed25519PublicKey, String publicKeyHash})> _generateInviteSignature({
     required String inviteCode,
     required String userId,
     required String publicKey,
+    required String userName,
+    required String publicKeyFingerprint,
+    required int publicKeyVersion,
     required DateTime expiresAt,
   }) async {
-    final privateKey = await _secureStorage.getPrivateKey();
-    if (privateKey == null) {
-      throw Exception('Key not available');
+    if (!_protocolService.isInitialized) {
+      throw Exception('Encryption keys not available');
     }
 
-    final payload = '$inviteCode:$userId:${publicKey.substring(0, 32)}:${expiresAt.millisecondsSinceEpoch}';
-    final privateKeyBytes = base64.decode(privateKey);
-    final derivedKey = SecurityUtils.hkdfSha256(
-      Uint8List.fromList(privateKeyBytes),
-      Uint8List.fromList(utf8.encode('invite-signature-key')),
-      Uint8List.fromList(utf8.encode('PartnerInviteSignature-v1')),
-      32,
+    final publicKeyHash = sha256.convert(utf8.encode(publicKey)).toString();
+
+    final payload = '$inviteCode:$userId:$publicKeyHash:$userName:$publicKeyFingerprint:$publicKeyVersion:${expiresAt.millisecondsSinceEpoch}';
+    final payloadBytes = Uint8List.fromList(utf8.encode(payload));
+
+    final result = await _protocolService.sign(payloadBytes);
+
+    return (
+      signature: base64Encode(result.signature),
+      ed25519PublicKey: base64Encode(result.publicKey),
+      publicKeyHash: publicKeyHash,
     );
-
-    final hmac = Hmac(sha256, derivedKey);
-    final digest = hmac.convert(utf8.encode(payload));
-
-    return digest.toString();
   }
 
-  // TODO: Move signature verification to Cloud Function (acceptPartnerInvite)
-  // The Cloud Function should verify the invite signature server-side using
-  // the creator's public key before allowing the partner link to be established.
-  // This prevents malicious clients from bypassing verification.
-  // ignore: unused_element
-  bool _verifyInviteSignature({
-    required String inviteCode,
-    required String userId,
-    required String publicKey,
-    required DateTime expiresAt,
-    required String signature,
-  }) {
-    if (inviteCode.isEmpty || userId.isEmpty || publicKey.length < 32) {
-      return false;
-    }
-
-    if (signature.length != 64 || !RegExp(r'^[a-fA-F0-9]+$').hasMatch(signature)) {
-      return false;
-    }
-
-    final now = DateTime.now();
-    final minTime = now.subtract(const Duration(days: 30));
-    final maxTime = now.add(const Duration(days: 2));
-    if (expiresAt.isBefore(minTime) || expiresAt.isAfter(maxTime)) {
-      return false;
-    }
-
-    return true;
-  }
-
-  /// Create an invite for a potential partner
-  /// Returns the invite code that can be shared via QR or text
   Future<String> createInvite() async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -117,17 +83,14 @@ class PartnerService {
       throw Exception('Too many invite attempts. Please try again later.');
     }
 
-    // Check if user already has a partner
     final userDoc = await _db.collection('users').doc(user.uid).get();
     final existingPartnerId = userDoc.data()?['partnerId'] as String?;
     if (existingPartnerId != null) {
       throw Exception('You already have a partner linked');
     }
 
-    // Cancel any existing invites
     await cancelExistingInvites();
 
-    // Generate unique code
     String inviteCode;
     bool codeExists = true;
     int attempts = 0;
@@ -147,24 +110,19 @@ class PartnerService {
       throw Exception('Failed to generate unique invite code');
     }
 
-    // Get user's public key - try local storage first, then Firestore
     var publicKey = await _secureStorage.getPublicKey();
     if (publicKey == null) {
-      // Try to get from Firestore as fallback
       final storedPublicKey = userDoc.data()?['publicKey'] as String?;
       if (storedPublicKey != null) {
         publicKey = storedPublicKey;
-        // Re-store locally for future use
         await _secureStorage.storePublicKey(storedPublicKey);
       } else {
         throw Exception('Public key not found. Please sign out and sign in again.');
       }
     }
 
-    // Get user's name for display
     final userName = userDoc.data()?['name'] as String? ?? 'Unknown';
 
-    // Handle both int and string types for publicKeyVersion
     final storedVersion = userDoc.data()?['publicKeyVersion'];
     int publicKeyVersion;
     if (storedVersion is int) {
@@ -175,28 +133,31 @@ class PartnerService {
       publicKeyVersion = 1;
     }
 
-    // Create invite document
     final now = DateTime.now();
     final expiresAt = now.add(_inviteExpiry);
 
-    // Generate signature for integrity verification
-    final signature = await _generateInviteSignature(
+    final fingerprint = await _protocolService.getFingerprint() ?? publicKey;
+
+    final signatureResult = await _generateInviteSignature(
       inviteCode: inviteCode,
       userId: user.uid,
       publicKey: publicKey,
+      userName: userName,
+      publicKeyFingerprint: fingerprint,
+      publicKeyVersion: publicKeyVersion,
       expiresAt: expiresAt,
     );
-
-    // Generate fingerprint for out-of-band verification
-    final fingerprint = _encryptionService.generateFingerprint(publicKey);
 
     await _db.collection('partnerInvites').doc(inviteCode).set({
       'userId': user.uid,
       'userName': userName,
       'publicKey': publicKey,
+      'publicKeyHash': signatureResult.publicKeyHash,
       'publicKeyVersion': publicKeyVersion,
       'publicKeyFingerprint': fingerprint,
-      'signature': signature,
+      'ed25519PublicKey': signatureResult.ed25519PublicKey,
+      'signature': signatureResult.signature,
+      'signatureVersion': 4,
       'createdAt': Timestamp.fromDate(now),
       'expiresAt': Timestamp.fromDate(expiresAt),
       'used': false,
@@ -205,7 +166,6 @@ class PartnerService {
     return inviteCode;
   }
 
-  /// Cancel any existing invites created by the current user
   Future<void> cancelExistingInvites() async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -223,8 +183,6 @@ class PartnerService {
     await batch.commit();
   }
 
-  /// Accept an invite from a partner
-  /// This establishes the bidirectional partner relationship
   Future<PartnerInfo> acceptInvite(String inviteCode) async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -240,7 +198,6 @@ class PartnerService {
       throw Exception('Too many attempts. Please try again later.');
     }
 
-    // Normalize code (uppercase, remove spaces, dashes)
     final normalizedCode = inviteCode.toUpperCase().replaceAll(RegExp(r'[\s\-]'), '');
 
     if (normalizedCode.length != _inviteCodeLength ||
@@ -248,12 +205,10 @@ class PartnerService {
       throw Exception('Invalid invite code');
     }
 
-    // Get my public key to send to partner - try local storage first, then Firestore
     var myPublicKey = await _secureStorage.getPublicKey();
     var myKeyVersion = await _secureStorage.getCurrentKeyVersion();
 
     if (myPublicKey == null || myKeyVersion == null) {
-      // Try to get from Firestore as fallback
       final userDoc = await _db.collection('users').doc(user.uid).get();
       final userData = userDoc.data();
 
@@ -268,7 +223,6 @@ class PartnerService {
       }
 
       if (myKeyVersion == null) {
-        // Handle both int and string types from Firestore
         final storedVersion = userData?['publicKeyVersion'];
         if (storedVersion is int) {
           myKeyVersion = storedVersion;
@@ -281,7 +235,6 @@ class PartnerService {
       }
     }
 
-    // Call Cloud Function to handle the partner linking
     final functions = FirebaseFunctions.instance;
     final callable = functions.httpsCallable('acceptPartnerInvite');
 
@@ -299,16 +252,14 @@ class PartnerService {
       final partnerKeyVersion = data['partnerKeyVersion'] as int;
       final partnerFingerprint = data['partnerFingerprint'] as String?;
 
-      // Store partner's public key locally
       await _secureStorage.storePartnerPublicKey(partnerPublicKey);
-      _encryptionService.setPartnerPublicKey(partnerPublicKey);
 
       return PartnerInfo(
         id: partnerId,
         name: partnerName,
         publicKey: partnerPublicKey,
         keyVersion: partnerKeyVersion,
-        fingerprint: partnerFingerprint ?? _encryptionService.generateFingerprint(partnerPublicKey),
+        fingerprint: partnerFingerprint ?? partnerPublicKey,
         isNewlyLinked: true,
       );
     } on FirebaseFunctionsException catch (e) {
@@ -321,8 +272,6 @@ class PartnerService {
     return '${sorted[0]}_${sorted[1]}';
   }
 
-  /// Get the current user's partner info
-  /// Set [forceRefresh] to true to bypass Firestore cache
   Future<PartnerInfo?> getPartner({bool forceRefresh = false}) async {
     final user = _auth.currentUser;
     if (user == null) return null;
@@ -338,7 +287,6 @@ class PartnerService {
 
     if (partnerId == null) return null;
 
-    // Fetch partner's document (allowed by Firestore rules for linked partners)
     final partnerDoc = getOptions != null
         ? await _db.collection('users').doc(partnerId).get(getOptions)
         : await _db.collection('users').doc(partnerId).get();
@@ -346,7 +294,6 @@ class PartnerService {
 
     final partnerData = partnerDoc.data()!;
 
-    // Handle publicKeyVersion that might be stored as string or int
     final storedKeyVersion = partnerData['publicKeyVersion'];
     int keyVersion;
     if (storedKeyVersion is int) {
@@ -370,7 +317,6 @@ class PartnerService {
     );
   }
 
-  /// Check if current user has a partner linked
   Future<bool> hasPartner() async {
     final user = _auth.currentUser;
     if (user == null) return false;
@@ -379,7 +325,6 @@ class PartnerService {
     return userDoc.data()?['partnerId'] != null;
   }
 
-  /// Get the conversation ID for the current user and their partner
   Future<String?> getConversationId() async {
     final user = _auth.currentUser;
     if (user == null) return null;
@@ -392,7 +337,6 @@ class PartnerService {
     return _generateConversationId(user.uid, partnerId);
   }
 
-  /// Stream of partner info for real-time updates
   Stream<PartnerInfo?> partnerStream() {
     final user = _auth.currentUser;
     if (user == null) return Stream.value(null);
@@ -438,6 +382,7 @@ class PartnerService {
     final batch = _db.batch();
     batch.update(_db.collection('users').doc(user.uid), {
       'partnerId': FieldValue.delete(),
+      'partnerIdHash': FieldValue.delete(),
       'partnerPublicKey': FieldValue.delete(),
       'partnerKeyVersion': FieldValue.delete(),
       'partnerLinkedAt': FieldValue.delete(),
@@ -445,6 +390,7 @@ class PartnerService {
 
     batch.update(_db.collection('users').doc(partnerId), {
       'partnerId': FieldValue.delete(),
+      'partnerIdHash': FieldValue.delete(),
       'partnerPublicKey': FieldValue.delete(),
       'partnerKeyVersion': FieldValue.delete(),
       'partnerLinkedAt': FieldValue.delete(),
@@ -457,11 +403,12 @@ class PartnerService {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    // First, ensure user's own private key is loaded
-    final privateKey = await _secureStorage.getPrivateKey();
-    if (privateKey != null) {
-      final keyVersion = await _secureStorage.getCurrentKeyVersion();
-      _encryptionService.setPrivateKey(privateKey, keyVersion: keyVersion);
+    if (!_protocolService.isInitialized) {
+      try {
+        await _protocolService.initializeFromStorage();
+      } catch (e) {
+        return;
+      }
     }
 
     final userDoc = await _db.collection('users').doc(user.uid).get();
@@ -469,7 +416,6 @@ class PartnerService {
 
     if (partnerPublicKey != null) {
       await _secureStorage.storePartnerPublicKey(partnerPublicKey);
-      _encryptionService.setPartnerPublicKey(partnerPublicKey);
     }
   }
 
@@ -497,7 +443,6 @@ class PartnerService {
       });
 
       await _secureStorage.storePartnerPublicKey(currentPublicKey);
-      _encryptionService.setPartnerPublicKey(currentPublicKey);
 
       return true;
     }
@@ -506,7 +451,6 @@ class PartnerService {
   }
 }
 
-/// Partner information model
 class PartnerInfo {
   final String id;
   final String name;

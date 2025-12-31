@@ -1,13 +1,12 @@
-import * as admin from "firebase-admin";
+import {FieldValue} from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as speakeasy from "speakeasy";
-import {validateRequest} from "../utils/validation";
-import {hashBackupCode} from "../utils/hashing";
-import {generateBackupCodes} from "../utils/random";
-import {TOTP_CONFIG} from "../config/constants";
-
-const db = admin.firestore();
+import {validateRequest} from "../utils/validation.js";
+import {hashBackupCode} from "../utils/hashing.js";
+import {generateBackupCodes} from "../utils/random.js";
+import {TOTP_CONFIG} from "../config/constants.js";
+import {db} from "../firebase.js";
 
 export const regenerateBackupCodes = onCall(
   {maxInstances: 5},
@@ -25,7 +24,7 @@ export const regenerateBackupCodes = onCall(
       );
     }
 
-    logger.info("Regenerating backup codes", {userId, ip});
+    logger.info("Backup code regeneration initiated");
 
     try {
       const secretDoc = await db
@@ -51,22 +50,22 @@ export const regenerateBackupCodes = onCall(
 
       const backupCodes = generateBackupCodes();
       const hashedBackupCodes = backupCodes.map((code) =>
-        hashBackupCode(code, userId)
+        hashBackupCode(code)
       );
 
       await db.collection("users").doc(userId).update({
         backupCodes: hashedBackupCodes,
-        backupCodesRegeneratedAt: admin.firestore.FieldValue.serverTimestamp(),
+        backupCodesRegeneratedAt: FieldValue.serverTimestamp(),
       });
 
       await db.collection("security_logs").add({
         userId,
         event: "backup_codes_regenerated",
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: FieldValue.serverTimestamp(),
         ip: ip,
       });
 
-      logger.info("Backup codes regenerated successfully", {userId, ip});
+      logger.info("Backup codes regenerated");
 
       return {
         success: true,
@@ -76,12 +75,7 @@ export const regenerateBackupCodes = onCall(
       if (error instanceof HttpsError) {
         throw error;
       }
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error("Failed to regenerate backup codes", {
-        userId,
-        errorMessage,
-      });
+      logger.error("Backup code regeneration failed");
       throw new HttpsError("internal", "Failed to regenerate backup codes");
     }
   }

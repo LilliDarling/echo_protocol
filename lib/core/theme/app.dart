@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// App theme configuration for Echo Protocol
 class AppTheme {
-  // Light theme
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(
@@ -39,7 +37,6 @@ class AppTheme {
     ),
   );
 
-  // Dark theme
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(

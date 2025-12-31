@@ -1,18 +1,18 @@
-import * as admin from "firebase-admin";
+import {Firestore, Timestamp} from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import {HttpsError} from "firebase-functions/v2/https";
-import {RATE_LIMITS, ANOMALY_THRESHOLDS} from "../config/constants";
-import {alertSuspiciousActivity} from "./anomaly";
+import {RATE_LIMITS, ANOMALY_THRESHOLDS} from "../config/constants.js";
+import {alertSuspiciousActivity} from "./anomaly.js";
 
 /**
  * Check and enforce user-based rate limiting
- * @param {admin.firestore.Firestore} db - Firestore database instance
+ * @param {Firestore} db - Firestore database instance
  * @param {string} userId - User ID to check rate limit for
  * @param {"TOTP" | "BACKUP_CODE"} limitType - Type of rate limit to check
  * @return {Promise<void>}
  */
 export async function checkUserRateLimit(
-  db: admin.firestore.Firestore,
+  db: Firestore,
   userId: string,
   limitType: "TOTP" | "BACKUP_CODE"
 ): Promise<void> {
@@ -22,28 +22,24 @@ export async function checkUserRateLimit(
   try {
     await db.runTransaction(async (transaction) => {
       const attemptsDoc = await transaction.get(attemptsRef);
-      const now = admin.firestore.Timestamp.now();
+      const now = Timestamp.now();
       const windowStart = new Date(
         now.toMillis() - config.windowMinutes * 60 * 1000
       );
 
-      let attempts: admin.firestore.Timestamp[] = [];
+      let attempts: Timestamp[] = [];
       if (attemptsDoc.exists) {
         const data = attemptsDoc.data();
         const key = limitType.toLowerCase();
-        attempts = (data?.[key] || []) as admin.firestore.Timestamp[];
+        attempts = (data?.[key] || []) as Timestamp[];
         attempts = attempts.filter(
-          (timestamp: admin.firestore.Timestamp) =>
+          (timestamp: Timestamp) =>
             timestamp.toDate() > windowStart
         );
       }
 
       if (attempts.length >= config.maxAttempts) {
-        logger.warn("User rate limit exceeded", {
-          userId,
-          limitType,
-          attempts: attempts.length,
-        });
+        logger.warn("Rate limit exceeded");
         throw new HttpsError(
           "resource-exhausted",
           `Too many ${limitType.toLowerCase()} verification attempts. ` +
@@ -62,21 +58,20 @@ export async function checkUserRateLimit(
     if (error instanceof HttpsError) {
       throw error;
     }
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error("Rate limit check failed", {userId, errorMessage});
+    logger.error("Rate limit check failed");
     throw new HttpsError("internal", "Rate limit check failed");
   }
 }
 
 /**
  * Check and enforce IP-based rate limiting (prevents distributed attacks)
- * @param {admin.firestore.Firestore} db - Firestore database instance
+ * @param {Firestore} db - Firestore database instance
  * @param {string} ip - IP address to check rate limit for
  * @param {string} userId - User ID making the request
  * @return {Promise<void>}
  */
 export async function checkIpRateLimit(
-  db: admin.firestore.Firestore,
+  db: Firestore,
   ip: string,
   userId: string
 ): Promise<void> {
@@ -86,13 +81,13 @@ export async function checkIpRateLimit(
   try {
     await db.runTransaction(async (transaction) => {
       const ipDoc = await transaction.get(ipRef);
-      const now = admin.firestore.Timestamp.now();
+      const now = Timestamp.now();
       const windowStart = new Date(
         now.toMillis() - config.windowMinutes * 60 * 1000
       );
 
       type AttemptRecord = {
-        timestamp: admin.firestore.Timestamp;
+        timestamp: Timestamp;
         userId: string;
       };
       let attempts: AttemptRecord[] = [];
@@ -110,18 +105,14 @@ export async function checkIpRateLimit(
       }
 
       if (attempts.length >= config.maxAttemptsPerIp) {
-        logger.warn("IP rate limit exceeded", {
-          ip,
-          attempts: attempts.length,
-          uniqueUsers: uniqueUsers.size,
-        });
+        logger.warn("IP rate limit exceeded");
 
         if (uniqueUsers.size >= ANOMALY_THRESHOLDS.multipleAccountAttacks) {
           await alertSuspiciousActivity(
             db,
             ip,
             "distributed_attack",
-            `IP ${ip} attempted 2FA on ${uniqueUsers.size} different accounts`
+            "Multiple account attack detected"
           );
         }
 
@@ -145,17 +136,14 @@ export async function checkIpRateLimit(
       );
 
       if (attempts.length >= ANOMALY_THRESHOLDS.suspiciousIpAttempts) {
-        const msg = `IP ${ip} has made ${attempts.length} 2FA attempts ` +
-          `in ${config.windowMinutes} minutes`;
-        await alertSuspiciousActivity(db, ip, "high_attempt_rate", msg);
+        await alertSuspiciousActivity(db, ip, "high_attempt_rate", "Suspicious activity detected");
       }
     });
   } catch (error) {
     if (error instanceof HttpsError) {
       throw error;
     }
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error("IP rate limit check failed", {ip, errorMessage});
+    logger.error("Rate limit check failed");
     throw new HttpsError("internal", "Rate limit check failed");
   }
 }

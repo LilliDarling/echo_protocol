@@ -45,7 +45,6 @@ class _DeviceLinkingScreenState extends State<DeviceLinkingScreen> {
         _isGenerating = false;
       });
 
-      // Auto-cancel after expiration
       Future.delayed(linkData.timeRemaining, () {
         if (mounted && _linkData?.linkToken == linkData.linkToken) {
           setState(() {
@@ -127,7 +126,6 @@ class _DeviceLinkingScreenState extends State<DeviceLinkingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Link New Device Section
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -148,7 +146,6 @@ class _DeviceLinkingScreenState extends State<DeviceLinkingScreen> {
                     ),
                     const SizedBox(height: 16),
                     if (_linkData != null) ...[
-                      // Show QR Code
                       Center(
                         child: Container(
                           padding: const EdgeInsets.all(16),
@@ -182,7 +179,6 @@ class _DeviceLinkingScreenState extends State<DeviceLinkingScreen> {
                         child: const Text('Cancel'),
                       ),
                     ] else ...[
-                      // Show Generate Button
                       ElevatedButton.icon(
                         onPressed: _isGenerating ? null : _generateQRCode,
                         icon: _isGenerating
@@ -201,7 +197,6 @@ class _DeviceLinkingScreenState extends State<DeviceLinkingScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Linked Devices Section
             const Text(
               'Your Devices',
               style: TextStyle(

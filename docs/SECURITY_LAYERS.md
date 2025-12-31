@@ -1,6 +1,6 @@
 # Echo Protocol - Security Layers Explained
 
-## 🛡️ Your Complete Security Stack
+## Complete Security Stack
 
 ### Layer 1: Two-Factor Authentication (2FA)
 **Protects**: Account Access
@@ -29,31 +29,40 @@ Login Attempt:
 
 ---
 
-### Layer 2: End-to-End Encryption (E2EE)
-**Protects**: Message Content
+### Layer 2: X3DH + Double Ratchet Encryption
+**Protects**: Message Content with Forward & Future Secrecy
 
 ```
-Message Journey:
-Your Device (Plaintext)
-    ↓ [ENCRYPT with AES-256]
-    ↓
-Firebase (Gibberish)
-    ↓
-Partner's Device (Plaintext) ← [DECRYPT with AES-256]
+Session Establishment (X3DH):
+Your Device ──► Fetch Partner's Prekey Bundle
+    │
+    ├─► 4 Diffie-Hellman Operations
+    │
+    └─► Derive Root Key + Chain Key
+
+Ongoing Messages (Double Ratchet):
+Each Message ──► New Key Derived
+    │
+    ├─► DH Ratchet (new keys per exchange)
+    │
+    └─► Chain Ratchet (new key per message)
 ```
 
 **What This Stops**:
 - ✅ Network interception (man-in-the-middle)
-- ✅ Database hacks
-- ✅ Server administrator snooping
-- ✅ Government requests for data (nothing to give)
+- ✅ Database hacks (encrypted gibberish)
+- ✅ Past message decryption (forward secrecy)
+- ✅ Future message decryption after key recovery (future secrecy)
+- ✅ Message replay attacks
 
 **Attack Scenario Blocked**:
 ```
-❌ Hacker: "I hacked Firebase and got all the messages!"
-✓  Reality: Messages look like: "U2FsdGVkX1+vupppZksvRf5pq5g5XjFRIipRkw"
-❌ Hacker: "That's useless gibberish..."
-✓  You: "Exactly."
+❌ Hacker: "I got their encryption keys!"
+✓  System: "Those keys only work for that one message."
+❌ Hacker: "What about past messages?"
+✓  System: "Different keys, already deleted."
+❌ Hacker: "Future messages?"
+✓  System: "New keys generated on next exchange."
 ```
 
 ---
@@ -101,7 +110,7 @@ E2EE + TLS           read E2EE data
 
 ---
 
-## 🔐 Combined Defense Example
+## Combined Defense Example
 
 **Scenario**: Someone wants to read your messages to your partner
 
@@ -111,39 +120,43 @@ E2EE + TLS           read E2EE data
    - AND get your authenticator device
    - OR guess/phish your 2FA codes
 
-2. **Access the encrypted messages** (defeat E2EE layer 2)
+2. **Access the encrypted messages** (defeat Double Ratchet layer 2)
    - Somehow get into Firebase
    - Download encrypted gibberish
+   - Each message encrypted with different key
 
 3. **Get your private key** (defeat device security layer 3)
    - Physically compromise your device
    - Break iOS Keychain or Android KeyStore
+   - Even then, only current messages at risk (forward secrecy)
 
 4. **Intercept network traffic** (defeat TLS layer 4)
    - Break TLS encryption
-   - Still can't read E2EE encrypted content
+   - Still can't read Double Ratchet encrypted content
 
-**Result**: Near impossible without physical device access + knowing your password + having your authenticator
+**Result**: Near impossible without physical device access + knowing your password + having your authenticator. Even with key compromise, past messages remain protected.
 
 ---
 
-## 🎯 What Each Layer Protects Against
+## What Each Layer Protects Against
 
-| Threat | 2FA | E2EE | Device Keys | TLS |
-|--------|-----|------|-------------|-----|
+| Threat | 2FA | Double Ratchet | Device Keys | TLS |
+|--------|-----|----------------|-------------|-----|
 | Stolen Password | ✅ | - | - | - |
 | Database Breach | ✅ | ✅ | ✅ | - |
 | Network Sniffing | - | ✅ | - | ✅ |
 | Server Access | - | ✅ | ✅ | - |
 | Man-in-Middle | - | ✅ | - | ✅ |
 | Cloud Backup Leak | - | - | ✅ | - |
+| Key Compromise (Past) | - | ✅ | - | - |
+| Key Compromise (Future) | - | ✅ | - | - |
 | Physical Device | ⚠️ | ⚠️ | ⚠️ | - |
 
 ⚠️ = Vulnerable if device is unlocked and compromised
 
 ---
 
-## 🚨 The One Weakness: Compromised Device
+## The One Weakness: Compromised Device
 
 **If someone has physical access to your UNLOCKED device**:
 - They can open the app (if no app-lock)
@@ -159,11 +172,9 @@ E2EE + TLS           read E2EE data
 
 ---
 
-## 💡 Recommendation: Maximum Security Setup
+## Thoughts: Maximum Security Setup
 
-For your couple's app, I recommend:
-
-### Essential (Do These):
+### Essential:
 ✅ **Enable 2FA** - Blocks password-based attacks
 ✅ **Store backup codes safely** - Account recovery
 ✅ **Use strong device PIN** - Last line of defense
@@ -184,41 +195,41 @@ For your couple's app, I recommend:
 
 ---
 
-## 📊 Security Level Comparison
+## Security Level Comparison
 
 ```
 Basic (No 2FA):
 Password ──────────────────► Access
-                              └─► Encrypted Messages
+                              └─► Double Ratchet Encrypted Messages
 Risk: Medium
 
 With 2FA:
 Password + Phone ──────────► Access
-                              └─► Encrypted Messages
+                              └─► Double Ratchet Encrypted Messages
 Risk: Low
 
 With 2FA + Single Device:
 Password + Phone ──────────► Access
-                              └─► Encrypted Messages (device-only keys)
+                              └─► Double Ratchet (device-only keys)
+                                  └─► Per-message forward secrecy
 Risk: Very Low (but lose messages if device lost)
 
 With 2FA + Biometric App Lock:
 Password + Phone ──────────► Access
             └─► Biometric ──► Open App
-                              └─► Encrypted Messages
+                              └─► Double Ratchet Encrypted Messages
 Risk: Very Low
 ```
 
 ---
 
-## 🎁 Perfect for Your Gift
+## What This Does
 
-This app is more secure than:
-- Regular SMS (no encryption)
-- Most messaging apps (no E2EE)
-- iMessage (E2EE but tied to Apple)
-- Even WhatsApp (E2EE but owned by Meta)
+This app provides:
+- **Double Ratchet encryption** with per-message keys
+- **Forward secrecy** - past messages stay safe even if keys leak
+- **Future secrecy** - key compromise heals automatically
+- **X3DH key exchange** for secure session setup
+- **Zero-knowledge** server architecture
 
-It's a private sanctuary just for you two, with Signal-level security. 💕
-
-Your messages are as private as a whispered secret in an empty room.
+Each message gets its own key, and those keys are deleted after use. Even if someone got hold of one, they'd only get that single message.

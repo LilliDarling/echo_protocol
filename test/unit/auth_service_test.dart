@@ -4,17 +4,16 @@ import 'package:mockito/annotations.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:echo_protocol/services/auth.dart';
-import 'package:echo_protocol/services/encryption.dart';
+import 'package:echo_protocol/services/crypto/protocol_service.dart';
 import 'package:echo_protocol/services/secure_storage.dart';
 import 'package:echo_protocol/utils/validators.dart';
 
-// Generate mocks for these classes
 @GenerateMocks([
   FirebaseAuth,
   FirebaseFirestore,
   UserCredential,
   User,
-  EncryptionService,
+  ProtocolService,
   SecureStorageService,
 ], customMocks: [
   MockSpec<CollectionReference<Map<String, dynamic>>>(
@@ -31,7 +30,7 @@ void main() {
     late AuthService authService;
     late MockFirebaseAuth mockAuth;
     late MockFirebaseFirestore mockFirestore;
-    late MockEncryptionService mockEncryption;
+    late MockProtocolService mockProtocol;
     late MockSecureStorageService mockSecureStorage;
     late MockUserCredential mockUserCredential;
     late MockUser mockUser;
@@ -41,7 +40,7 @@ void main() {
     setUp(() {
       mockAuth = MockFirebaseAuth();
       mockFirestore = MockFirebaseFirestore();
-      mockEncryption = MockEncryptionService();
+      mockProtocol = MockProtocolService();
       mockSecureStorage = MockSecureStorageService();
       mockUserCredential = MockUserCredential();
       mockUser = MockUser();
@@ -51,7 +50,7 @@ void main() {
       authService = AuthService(
         auth: mockAuth,
         firestore: mockFirestore,
-        encryptionService: mockEncryption,
+        protocolService: mockProtocol,
         secureStorage: mockSecureStorage,
       );
     });
@@ -279,10 +278,7 @@ void main() {
       });
 
       test('SECURITY: Must enforce maximum email length (DoS prevention)', () {
-        // 255 character email (over RFC limit of 254)
-        // 'a' * 240 + '@example.com' = 240 + 12 = 252 chars (under limit)
-        // Need 255 chars to exceed limit
-        final tooLong = 'a' * 243 + '@example.com'; // 243 + 12 = 255 chars
+        final tooLong = 'a' * 243 + '@example.com';
 
         final result = Validators.validateEmail(tooLong);
         expect(result, isNotNull,
@@ -294,7 +290,6 @@ void main() {
       test('SECURITY: Must trim whitespace to prevent bypass', () {
         final withWhitespace = '  test@example.com  ';
 
-        // Should trim and validate
         final result = Validators.validateEmail(withWhitespace);
         expect(result, isNull,
           reason: 'Valid email with whitespace should be trimmed and accepted');
@@ -363,8 +358,8 @@ void main() {
       test('SECURITY: Private keys MUST be stored locally, NEVER in Firestore', () async {
         // Arrange
         const userId = 'user123';
-        const publicKey = 'public_key_base64';
-        const privateKey = 'private_key_base64';
+        const fingerprint = 'AAAA BBBB CCCC DDDD';
+        const mnemonic = 'test word one two three four five six seven eight nine ten eleven twelve';
 
         when(mockAuth.createUserWithEmailAndPassword(
           email: anyNamed('email'),
@@ -375,55 +370,45 @@ void main() {
         when(mockUser.uid).thenReturn(userId);
         when(mockUser.updateDisplayName(any)).thenAnswer((_) async {});
 
-        when(mockEncryption.generateKeyPair()).thenAnswer(
-          (_) async => {'publicKey': publicKey, 'privateKey': privateKey},
-        );
-        when(mockEncryption.generateFingerprint(any))
-            .thenReturn('AAAA BBBB CCCC DDDD EEEE FFFF 0000 1111');
+        when(mockProtocol.generateRecoveryPhrase())
+            .thenAnswer((_) async => mnemonic);
+        when(mockProtocol.setupKeys(any)).thenAnswer((_) async {});
+        when(mockProtocol.getFingerprint()).thenAnswer((_) async => fingerprint);
+        when(mockProtocol.getPublicKey()).thenAnswer((_) async => 'test-public-key');
+        when(mockProtocol.uploadPreKeys()).thenAnswer((_) async {});
 
-        when(mockSecureStorage.storePrivateKey(privateKey))
-            .thenAnswer((_) async {});
-        when(mockSecureStorage.storePublicKey(publicKey))
-            .thenAnswer((_) async {});
-        when(mockSecureStorage.storeCurrentKeyVersion(any))
-            .thenAnswer((_) async {});
         when(mockSecureStorage.storeUserId(userId))
+            .thenAnswer((_) async {});
+        when(mockSecureStorage.storePublicKey(any))
             .thenAnswer((_) async {});
 
         when(mockFirestore.collection('users')).thenReturn(mockCollection);
         when(mockCollection.doc(userId)).thenReturn(mockDocument);
 
-        // Capture what's sent to Firestore
         Map<String, dynamic>? firestoreData;
         when(mockDocument.set(any)).thenAnswer((invocation) {
           firestoreData = invocation.positionalArguments[0] as Map<String, dynamic>;
           return Future.value();
         });
 
-        // Act
         await authService.signUpWithEmail(
           email: 'test@example.com',
           password: 'ValidPass123!',
           displayName: 'Test User',
         );
 
-        // Assert - CRITICAL SECURITY CHECK
         expect(firestoreData, isNotNull);
         expect(firestoreData!.containsKey('privateKey'), false,
           reason: 'CRITICAL: Private key MUST NEVER be sent to Firestore');
         expect(firestoreData!.containsKey('publicKey'), true,
-          reason: 'Public key should be in Firestore');
-        expect(firestoreData!['publicKey'], equals(publicKey));
-
-        // Verify private key was stored locally
-        verify(mockSecureStorage.storePrivateKey(privateKey)).called(1);
+          reason: 'Identity fingerprint should be in Firestore as publicKey');
       });
 
-      test('SECURITY: Private key MUST be stored in secure storage on signup', () async {
+      test('SECURITY: Keys MUST be set up via ProtocolService on signup', () async {
         // Arrange
         const userId = 'user123';
-        const publicKey = 'public_key_base64';
-        const privateKey = 'private_key_base64';
+        const fingerprint = 'AAAA BBBB CCCC DDDD';
+        const mnemonic = 'test word one two three four five six seven eight nine ten eleven twelve';
 
         when(mockAuth.createUserWithEmailAndPassword(
           email: anyNamed('email'),
@@ -434,85 +419,37 @@ void main() {
         when(mockUser.uid).thenReturn(userId);
         when(mockUser.updateDisplayName(any)).thenAnswer((_) async {});
 
-        when(mockEncryption.generateKeyPair()).thenAnswer(
-          (_) async => {'publicKey': publicKey, 'privateKey': privateKey},
-        );
-        when(mockEncryption.generateFingerprint(any))
-            .thenReturn('AAAA BBBB CCCC DDDD EEEE FFFF 0000 1111');
+        when(mockProtocol.generateRecoveryPhrase())
+            .thenAnswer((_) async => mnemonic);
+        when(mockProtocol.initialize(recoveryPhrase: anyNamed('recoveryPhrase')))
+            .thenAnswer((_) async {});
+        when(mockProtocol.getFingerprint()).thenAnswer((_) async => fingerprint);
+        when(mockProtocol.getPublicKey()).thenAnswer((_) async => 'test-public-key');
+        when(mockProtocol.uploadPreKeys()).thenAnswer((_) async {});
 
-        when(mockSecureStorage.storePrivateKey(any))
+        when(mockSecureStorage.storeUserId(any))
             .thenAnswer((_) async {});
         when(mockSecureStorage.storePublicKey(any))
-            .thenAnswer((_) async {});
-        when(mockSecureStorage.storeCurrentKeyVersion(any))
-            .thenAnswer((_) async {});
-        when(mockSecureStorage.storeUserId(any))
             .thenAnswer((_) async {});
 
         when(mockFirestore.collection('users')).thenReturn(mockCollection);
         when(mockCollection.doc(userId)).thenReturn(mockDocument);
         when(mockDocument.set(any)).thenAnswer((_) async {});
 
-        // Act
         await authService.signUpWithEmail(
           email: 'test@example.com',
           password: 'ValidPass123!',
           displayName: 'Test User',
         );
 
-        // Assert - Verify secure storage was called with exact key
-        verify(mockSecureStorage.storePrivateKey(privateKey)).called(1);
-        verify(mockSecureStorage.storePublicKey(publicKey)).called(1);
+        verify(mockProtocol.generateRecoveryPhrase()).called(1);
+        verify(mockProtocol.initialize(recoveryPhrase: mnemonic)).called(1);
+        verify(mockProtocol.uploadPreKeys()).called(1);
         verify(mockSecureStorage.storeUserId(userId)).called(1);
       });
 
-      test('SECURITY: Encryption keys MUST be generated for every new user', () async {
-        // Arrange
+      test('SECURITY: Sign in MUST load keys from storage via ProtocolService', () async {
         const userId = 'user123';
-
-        when(mockAuth.createUserWithEmailAndPassword(
-          email: anyNamed('email'),
-          password: anyNamed('password'),
-        )).thenAnswer((_) async => mockUserCredential);
-
-        when(mockUserCredential.user).thenReturn(mockUser);
-        when(mockUser.uid).thenReturn(userId);
-        when(mockUser.updateDisplayName(any)).thenAnswer((_) async {});
-
-        when(mockEncryption.generateKeyPair()).thenAnswer(
-          (_) async => {'publicKey': 'pub', 'privateKey': 'priv'},
-        );
-        when(mockEncryption.generateFingerprint(any))
-            .thenReturn('AAAA BBBB CCCC DDDD EEEE FFFF 0000 1111');
-
-        when(mockSecureStorage.storePrivateKey(any))
-            .thenAnswer((_) async {});
-        when(mockSecureStorage.storeCurrentKeyVersion(any))
-            .thenAnswer((_) async {});
-        when(mockSecureStorage.storePublicKey(any))
-            .thenAnswer((_) async {});
-        when(mockSecureStorage.storeUserId(any))
-            .thenAnswer((_) async {});
-
-        when(mockFirestore.collection('users')).thenReturn(mockCollection);
-        when(mockCollection.doc(userId)).thenReturn(mockDocument);
-        when(mockDocument.set(any)).thenAnswer((_) async {});
-
-        // Act
-        await authService.signUpWithEmail(
-          email: 'test@example.com',
-          password: 'ValidPass123!',
-          displayName: 'Test User',
-        );
-
-        // Assert - MUST generate keys
-        verify(mockEncryption.generateKeyPair()).called(1);
-      });
-
-      test('SECURITY: Sign in MUST load keys from secure storage, not Firestore', () async {
-        // Arrange
-        const userId = 'user123';
-        const privateKey = 'stored_private_key';
 
         when(mockAuth.signInWithEmailAndPassword(
           email: anyNamed('email'),
@@ -522,8 +459,10 @@ void main() {
         when(mockUserCredential.user).thenReturn(mockUser);
         when(mockUser.uid).thenReturn(userId);
 
-        when(mockSecureStorage.getPrivateKey())
-            .thenAnswer((_) async => privateKey);
+        when(mockSecureStorage.getUserId())
+            .thenAnswer((_) async => userId);
+        when(mockProtocol.initializeFromStorage())
+            .thenAnswer((_) async {});
         when(mockSecureStorage.storeUserId(userId))
             .thenAnswer((_) async {});
 
@@ -531,36 +470,29 @@ void main() {
         when(mockCollection.doc(userId)).thenReturn(mockDocument);
         when(mockDocument.update(any)).thenAnswer((_) async {});
 
-        // Act
         await authService.signInWithEmail(
           email: 'test@example.com',
           password: 'ValidPass123!',
         );
 
-        // Assert - Keys MUST come from secure storage
-        verify(mockSecureStorage.getPrivateKey()).called(1);
-        verify(mockEncryption.setPrivateKey(privateKey)).called(1);
+        verify(mockProtocol.initializeFromStorage()).called(1);
 
-        // Verify we did NOT fetch from Firestore
         verifyNever(mockDocument.get());
       });
 
-      test('SECURITY: Sign out MUST clear encryption keys from memory', () async {
-        // Arrange
+      test('SECURITY: Sign out preserves keys for re-login', () async {
         when(mockAuth.currentUser).thenReturn(mockUser);
         when(mockUser.uid).thenReturn('test-user-id');
-        when(mockEncryption.clearKeys()).thenReturn(null);
         when(mockAuth.signOut()).thenAnswer((_) async {});
+        when(mockSecureStorage.clear2FASessionVerified())
+            .thenAnswer((_) async {});
 
-        // Act
         await authService.signOut();
 
-        // Assert - Keys MUST be cleared
-        verify(mockEncryption.clearKeys()).called(1);
+        verifyNever(mockProtocol.dispose());
       });
 
       test('SECURITY: Failed signup MUST NOT leave orphaned keys', () async {
-        // Arrange
         when(mockAuth.createUserWithEmailAndPassword(
           email: anyNamed('email'),
           password: anyNamed('password'),
@@ -568,7 +500,6 @@ void main() {
           code: 'email-already-in-use',
         ));
 
-        // Act & Assert
         expect(
           () async => await authService.signUpWithEmail(
             email: 'existing@example.com',
@@ -578,9 +509,8 @@ void main() {
           throwsA(isA<String>()),
         );
 
-        // Verify keys were NOT generated
-        verifyNever(mockEncryption.generateKeyPair());
-        verifyNever(mockSecureStorage.storePrivateKey(any));
+        verifyNever(mockProtocol.setupKeys(any));
+        verifyNever(mockSecureStorage.storeUserId(any));
       });
     });
 

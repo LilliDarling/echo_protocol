@@ -175,7 +175,7 @@ class DeviceLinkingService {
             }
           }
         } catch (e) {
-          LoggerService.warning('Failed to restore archived keys during device linking');
+          LoggerService.warning('Key restoration failed');
         }
       }
 
@@ -193,7 +193,7 @@ class DeviceLinkingService {
 
       return true;
     } catch (e) {
-      LoggerService.error('Device linking failed');
+      LoggerService.error('Device link failed');
       return false;
     }
   }
@@ -284,7 +284,7 @@ class DeviceLinkingService {
         return linuxInfo.name;
       }
     } catch (e) {
-      LoggerService.warning('Failed to get device name');
+      LoggerService.warning('Device info unavailable');
     }
 
     return 'Unknown Device';

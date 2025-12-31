@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth.dart';
 
-/// Screen for entering recovery phrase to restore account access.
 class RecoveryEntryScreen extends StatefulWidget {
   final void Function(BuildContext context) onRecovered;
   final void Function(BuildContext context)? onCancel;
@@ -67,15 +66,12 @@ class _RecoveryEntryScreenState extends State<RecoveryEntryScreen> {
   }
 
   void _onWordChanged(int index, String value) {
-    // Handle paste of full phrase
     if (value.contains(' ')) {
       final words = value.trim().split(RegExp(r'\s+'));
       if (words.length >= 2) {
-        // Distribute words starting from current index
         for (int i = 0; i < words.length && (index + i) < 12; i++) {
           _controllers[index + i].text = words[i];
         }
-        // Move focus to next empty field or last field
         final nextEmpty = _controllers.indexWhere((c) => c.text.isEmpty);
         if (nextEmpty != -1) {
           _focusNodes[nextEmpty].requestFocus();
@@ -85,8 +81,6 @@ class _RecoveryEntryScreenState extends State<RecoveryEntryScreen> {
         return;
       }
     }
-
-    // Auto-advance to next field on space
     if (value.endsWith(' ') && index < 11) {
       _controllers[index].text = value.trim();
       _focusNodes[index + 1].requestFocus();

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Widget displaying a date separator between messages
 class DateSeparator extends StatelessWidget {
   final DateTime date;
 

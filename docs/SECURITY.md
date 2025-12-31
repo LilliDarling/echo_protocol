@@ -9,25 +9,85 @@ Echo Protocol implements **end-to-end encryption (E2EE)** to ensure that all mes
 ### Multi-Layer Security
 
 1. **Transport Layer**: HTTPS/TLS encryption for all data in transit
-2. **Application Layer**: End-to-end encryption for message content
+2. **Application Layer**: X3DH + Double Ratchet for message content
 3. **Storage Layer**: Platform-specific secure storage for private keys
+4. **Media Layer**: Per-file encryption with unique keys
 
 ### Key Management
 
 #### Key Generation
-- Each user generates an **Elliptic Curve (secp256k1) key pair** on device during registration
-- **Security level**: 256-bit (equivalent to RSA-3072, same curve used by Bitcoin and Signal)
+- Each user generates an **X25519 identity key pair** on device during registration
+- **Security level**: 256-bit (Curve25519)
 - Private key **NEVER leaves the device** and is stored in platform secure storage:
   - iOS: Keychain with `first_unlock` accessibility
   - Android: KeyStore with encrypted shared preferences
   - Windows: DPAPI-protected storage
 
-#### Key Exchange (ECDH - Elliptic Curve Diffie-Hellman)
-- Public keys are stored in Firestore at `/users/{userId}/publicKey`
-- When partners connect, they exchange public keys
-- A shared symmetric key is derived using ECDH key agreement
-- **Key Derivation**: HKDF-SHA256 (Signal Protocol standard) transforms the ECDH shared secret into a 256-bit AES key
-- **Per-Conversation Salt**: Unique salt derived from both public keys ensures each conversation has a different encryption key
+#### X3DH Key Exchange (Extended Triple Diffie-Hellman)
+
+The X3DH protocol establishes the initial shared secret between partners:
+
+```
+Identity Keys:     Long-term keys for user identity
+Signed Prekeys:    Medium-term keys (rotated every 30 days)
+One-Time Prekeys:  Single-use keys for forward secrecy
+Ephemeral Keys:    Generated fresh for each session
+```
+
+**X3DH Process:**
+1. Alice fetches Bob's **prekey bundle** (identity key + signed prekey + one-time prekey)
+2. Alice verifies Bob's signed prekey signature
+3. Alice generates an ephemeral key pair
+4. Four DH operations compute the shared secret:
+   - DH1: Alice's identity key ↔ Bob's signed prekey
+   - DH2: Alice's ephemeral key ↔ Bob's identity key
+   - DH3: Alice's ephemeral key ↔ Bob's signed prekey
+   - DH4: Alice's ephemeral key ↔ Bob's one-time prekey (if available)
+5. HKDF-SHA256 derives root key and initial chain key
+6. One-time prekey is consumed and deleted (cannot be reused)
+
+**Security Properties:**
+- **Forward Secrecy**: Compromised identity key cannot decrypt past sessions
+- **Deniability**: No cryptographic proof of who sent messages
+- **Replay Protection**: One-time prekeys prevent session replay
+
+#### Double Ratchet Protocol
+
+After X3DH establishes the initial session, the Double Ratchet provides ongoing encryption:
+
+```
+Root Key ────► DH Ratchet ────► New Root Key
+    │                              │
+    └─► Chain Key ───► Message Keys (one per message)
+```
+
+**How It Works:**
+
+1. **DH Ratchet (Asymmetric)**: Each party generates new X25519 key pairs
+   - When receiving a message with new ratchet key, perform DH ratchet step
+   - Computes new shared secret and derives new root/chain keys
+   - Old private keys are securely deleted
+
+2. **Chain Ratchet (Symmetric)**: Each chain key derives the next
+   - Each message consumes the chain key and produces a new one
+   - Message keys are derived from chain keys via HKDF
+   - Old chain keys are deleted after use
+
+3. **Message Keys**: Unique key per message
+   - Derived from chain key using HKDF-SHA256
+   - Used once for AES-256-GCM encryption
+   - Immediately deleted after encryption/decryption
+
+**Out-of-Order Message Handling:**
+- Skipped message keys are stored temporarily (max 1000 per chain)
+- Keys expire after 24 hours
+- Allows decryption of delayed messages
+
+**Security Guarantees:**
+- **Forward Secrecy**: Compromise of current keys cannot decrypt past messages
+- **Future Secrecy**: Compromise of current keys is healed by next ratchet step
+- **Per-Message Keys**: Each message uses a unique encryption key
+- **Key Deletion**: Used keys are securely cleared from memory
 
 #### Public Key Fingerprint Verification
 - Each public key has a unique **fingerprint** (SHA-256 hash displayed as 32 hex characters)
@@ -39,24 +99,29 @@ Echo Protocol implements **end-to-end encryption (E2EE)** to ensure that all mes
 ### Message Encryption
 
 #### Algorithm: AES-256-GCM (Galois/Counter Mode)
-- **Authenticated encryption** using 256-bit keys
+- **Authenticated encryption** using 256-bit message keys
 - Provides both **confidentiality** (encryption) and **authenticity** (tamper detection)
-- Each message uses a unique random 16-byte Initialization Vector (IV)
+- Each message uses a unique key derived from the Double Ratchet chain
+- **12-byte nonce** derived deterministically from message key via HKDF
 - **Authentication tag** automatically generated and verified (prevents tampering)
-- IV is prepended to ciphertext for decryption
+- **Associated data** binds message to sender, recipient, and session context
 
 #### Encryption Flow
 ```
 1. Sender types message (plaintext)
-2. Generate random 16-byte IV using secure random generator
-3. Encrypt plaintext with AES-256-GCM using shared secret + IV
-4. GCM automatically generates authentication tag (prevents tampering)
-5. Combine IV:EncryptedText (with embedded auth tag) in base64
-6. Store in Firestore as 'content' field
-7. Recipient retrieves encrypted content
-8. Extract IV and decrypt using shared secret
-9. GCM automatically verifies authentication tag (rejects if tampered)
-10. Display plaintext
+2. Double Ratchet advances chain and derives unique message key
+3. Nonce derived from message key via HKDF (12 bytes)
+4. Construct associated data (sender ID, recipient ID, ratchet key, message index)
+5. Encrypt plaintext with AES-256-GCM using message key + nonce + AAD
+6. GCM generates authentication tag (prevents tampering)
+7. Package: [nonce | ciphertext | auth tag | ratchet public key | message index]
+8. Store encrypted message in Firestore
+9. Recipient retrieves encrypted message
+10. Double Ratchet locates or derives correct message key
+11. Verify AAD matches expected values
+12. Decrypt and verify authentication tag
+13. Securely delete message key from memory
+14. Display plaintext
 ```
 
 ### What's Encrypted vs. Unencrypted
@@ -77,30 +142,53 @@ Echo Protocol implements **end-to-end encryption (E2EE)** to ensure that all mes
 - ❌ User names and avatars
 - ❌ File names (but not content)
 
-### File Encryption
+### Media Encryption
 
-Images, videos, and voice messages are encrypted before upload to Firebase Storage:
-1. Read file as bytes
-2. Encrypt entire file with AES-256-GCM (authenticated encryption)
-3. Prepend IV to encrypted bytes (with embedded authentication tag)
-4. Upload to Firebase Storage
-5. Store encrypted file URL in Firestore
-6. On retrieval, download, extract IV, verify authentication tag, decrypt, display
+Images, videos, and GIFs are encrypted independently with unique per-file keys:
+
+#### Media Key Management
+- Each media file gets a **unique 256-bit key** (not derived from message ratchet)
+- Media key is generated using secure random
+- Media key is encrypted within the message and sent to recipient
+- Allows media to be decrypted independently of message order
+
+#### Encryption Process
+```
+1. Read media file as bytes
+2. Generate unique 32-byte media key (secure random)
+3. Generate unique media ID (SHA-256 based)
+4. Construct AAD: "EchoMedia:{mediaId}"
+5. Generate 12-byte random nonce
+6. Encrypt with AES-256-GCM using media key + nonce + AAD
+7. Package: [nonce | ciphertext | auth tag]
+8. Upload encrypted bytes to Firebase Storage
+9. Include media key in encrypted message (protected by Double Ratchet)
+10. On retrieval: download, decrypt with media key, cache locally
+```
+
+#### Security Properties
+- **Independent Keys**: Media compromise doesn't affect message encryption
+- **Per-File Isolation**: Each file has unique key and ID
+- **Authenticated Encryption**: Tampering detection via GCM
+- **Secure Caching**: Decrypted media cached in app-private storage
 
 ### Security Guarantees
 
+✅ **Forward Secrecy**: Compromise of current keys cannot decrypt past messages
+✅ **Future Secrecy**: Key compromise is healed by next DH ratchet step
+✅ **Per-Message Keys**: Each message uses a unique encryption key
 ✅ **Authenticated Encryption**: GCM mode prevents tampering and forgery
-✅ **Perfect Forward Secrecy**: Each message has unique IV
-✅ **Replay Attack Protection**: Per-conversation sequence numbers and nonce tracking prevent message replay
+✅ **Replay Attack Protection**: Per-conversation sequence numbers and nonce tracking
 ✅ **Rate Limiting**: Soft blocking with exponential backoff prevents spam and abuse
 ✅ **Zero-Knowledge**: Server cannot read messages
 ✅ **Device-Only Private Keys**: Private keys never transmitted
 ✅ **Platform Security**: Leverages iOS Keychain / Android KeyStore
-✅ **Industry-Standard Encryption**: AES-256-GCM + ECDH (secp256k1) + HKDF-SHA256
-✅ **Signal Protocol Inspired**: Uses same key derivation approach as Signal
-✅ **Per-Conversation Isolation**: Unique salt per conversation prevents cross-conversation key reuse
+✅ **Industry-Standard Encryption**: X25519 + AES-256-GCM + HKDF-SHA256
+✅ **X3DH Key Agreement**: Secure initial key exchange with one-time prekeys
+✅ **Double Ratchet**: Continuous key rotation for ongoing conversations
 ✅ **Fingerprint Verification**: Out-of-band verification prevents MITM attacks
-✅ **Key Rotation**: Users can generate new encryption keys when needed
+✅ **Key Rotation**: Users can generate new identity keys when needed
+✅ **Secure Key Deletion**: Used keys are cleared from memory immediately
 
 ### Threat Model
 
@@ -112,32 +200,55 @@ Images, videos, and voice messages are encrypted before upload to Firebase Stora
 - ✅ Message tampering (GCM authentication tags detect modifications)
 - ✅ Replay attacks (sequence numbers + nonce tracking with 1-hour window)
 - ✅ Message flooding/spam (rate limiting: 30 msg/min, 500/hour with soft blocking)
+- ✅ Man-in-the-middle during key exchange
 
 #### Not Protected Against:
 - ❌ Compromised device (malware can read decrypted messages in memory)
 - ❌ Partner's device access (they can decrypt messages sent to them)
-- ❌ Metadata analysis (who/when communication occurs is visible)
-- ✅ ~~Man-in-the-middle during key exchange~~ - **MITIGATED** by public key fingerprint verification (implemented)
+- ❌ Metadata analysis (who/when communication occurs is visible) - currently being updated
 
 ## Implementation Notes
 
 ### User Registration Flow
-```dart
+```
 1. User signs up
-2. Generate EC (secp256k1) key pair using secure random
-3. Store private key in secure storage (device only)
-4. Upload public key to Firestore
-5. Never backup or sync private key
+2. Generate X25519 identity key pair using secure random
+3. Generate initial signed prekey (30-day validity)
+4. Generate batch of one-time prekeys (100 keys)
+5. Store private keys in secure storage (device only)
+6. Upload public identity key and prekey bundle to Firestore
+7. Never backup or sync private keys
 ```
 
 ### Partner Connection Flow
-```dart
-1. Users authenticate
-2. Exchange public keys via Firestore
-3. Perform ECDH key agreement to generate shared point
-4. Derive symmetric AES-256 key using HKDF-SHA256
-5. Initialize encryption service with derived key
-6. All messages now encrypted/decrypted automatically
+```
+1. Users authenticate and link via invite code
+2. Initiator fetches responder's prekey bundle
+3. Verify signed prekey signature
+4. Perform X3DH key agreement (4 DH operations)
+5. Consume and delete one-time prekey
+6. Initialize Double Ratchet session with derived keys
+7. Generate initial ratchet key pair
+8. All messages now use Double Ratchet encryption
+```
+
+### Message Send/Receive Flow
+```
+Sending:
+1. Advance sending chain ratchet
+2. Derive unique message key from chain
+3. Encrypt message with AES-256-GCM
+4. Include current ratchet public key
+5. Store encrypted message in Firestore
+6. Securely clear message key
+
+Receiving:
+1. Check if new ratchet key received
+2. If new key: perform DH ratchet step
+3. Derive message key for message index
+4. Decrypt and verify authentication
+5. Update receiving chain state
+6. Securely clear message key
 ```
 
 ### Key Rotation
@@ -430,10 +541,12 @@ Consider: Partner-assisted recovery (future feature)
 
 This encryption implementation follows:
 - ✅ **AES-256-GCM** (FIPS 197) - NIST approved authenticated encryption
-- ✅ **ECDH with secp256k1** - Elliptic curve key agreement (same as Bitcoin, Signal)
+- ✅ **X25519** (RFC 7748) - Elliptic curve Diffie-Hellman
+- ✅ **Ed25519** (RFC 8032) - Digital signatures for prekey signing
 - ✅ **HKDF-SHA256** (RFC 5869) - Key derivation function
 - ✅ **SHA-256** (FIPS 180-4) - Cryptographic hashing
-- ✅ **Signal Protocol Principles** - Industry-leading E2EE messaging standard
+- ✅ **X3DH** - Extended Triple Diffie-Hellman key agreement
+- ✅ **Double Ratchet** - Continuous key rotation with forward/future secrecy
 
 ## Development Best Practices
 
@@ -559,11 +672,16 @@ If your device is compromised:
 - [x] Two-factor authentication (2FA)
 - [x] Device linking via QR code
 - [x] Device access audit log (in security log collection)
+- [x] X3DH key exchange (Extended Triple Diffie-Hellman)
+- [x] Double Ratchet protocol (forward and future secrecy)
+- [x] Per-message key derivation
+- [x] Media encryption with independent keys
+- [x] Out-of-order message handling
 - [ ] Add message self-destruct timer
 - [ ] Screenshot detection and warnings
 - [ ] Biometric authentication for app access
 - [ ] Remote key revocation
-- [ ] Cross-device sequence synchronization
+- [ ] Cross-device session synchronization
 
 ---
 

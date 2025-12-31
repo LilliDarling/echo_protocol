@@ -1,10 +1,10 @@
 # Echo Protocol
 
-A private, secure communication app designed for couples to stay connected, share moments, and cherish their relationship - no matter the distance.
+A private, encrypted messaging app for couples to stay connected - no matter the distance.
 
 ## Overview
 
-Echo Protocol is a Flutter-based mobile application that provides a dedicated, intimate space for partners to communicate and connect. More than just a messaging app, it's a relationship companion that helps couples share their thoughts, feelings, and memories in creative ways while keeping track of the experiences they want to share together.
+Echo Protocol is a Flutter-based mobile app that gives partners a dedicated space to communicate. It handles end-to-end encryption properly (X3DH + Double Ratchet), so messages stay private even if the server is compromised. Beyond messaging, it includes shared planning features for gift ideas and dates you want to try together.
 
 ## Features
 
@@ -24,19 +24,21 @@ Echo Protocol is a Flutter-based mobile application that provides a dedicated, i
 - **Shared Experiences**: Track activities you've done together and things you want to do in the future *(planned)*
 
 ### Security & Privacy
-- **End-to-End Encryption**: Military-grade AES-256-GCM encryption for all messages and files
-- **Authentication Tag Verification**: Explicit validation of GCM authentication tags prevents tampering
-- **Enhanced Key Encoding**: Binary key format with versioning and comprehensive validation
+- **X3DH Key Exchange**: Extended Triple Diffie-Hellman for secure session establishment
+- **Double Ratchet Protocol**: Per-message key derivation with forward and future secrecy
+- **End-to-End Encryption**: AES-256-GCM encryption for all messages and media
+- **Per-Message Keys**: Each message uses a unique encryption key
+- **Forward Secrecy**: Past messages remain secure even if current keys are compromised
+- **Future Secrecy**: Compromised keys are healed by subsequent ratchet steps
+- **Media Encryption**: Independent per-file keys for images, videos, and GIFs
 - **Public Key Fingerprint Verification**: Verify conversation partners via QR codes or security codes
-- **Key Rotation with Backward Compatibility**: Rotate encryption keys without losing access to old messages
-- **Replay Attack Protection**: Per-conversation sequence numbers and nonce tracking prevent message replay
-- **Rate Limiting**: Soft blocking with exponential backoff prevents spam and abuse (30 msg/min, 500/hour)
+- **Replay Attack Protection**: Per-conversation sequence numbers and nonce tracking
+- **Rate Limiting**: Soft blocking with exponential backoff (30 msg/min, 500/hour)
 - **Two-Factor Authentication**: TOTP-based 2FA with backup codes
 - **Recovery Phrases**: BIP39 12-word mnemonic phrases for account recovery
 - **Device Management**: Link multiple devices with encrypted private key transfer
 - **Secure Storage**: Platform-specific secure storage (iOS Keychain, Android EncryptedSharedPreferences)
 - **Zero-Knowledge Architecture**: Server cannot read your encrypted messages
-- **Screenshot Protection**: Anti-screenshot mechanisms for sensitive screens
 
 See [SECURITY.md](docs/SECURITY.md) for complete security architecture details.
 
@@ -57,9 +59,10 @@ See [SECURITY.md](docs/SECURITY.md) for complete security architecture details.
   - Firebase Cloud Messaging (Push notifications)
 
 ### Cryptography
-- **Encryption**: AES-256-GCM
-- **Key Exchange**: ECDH with secp256k1 curve
-- **Key Derivation**: HKDF-SHA256, PBKDF2
+- **Key Exchange**: X3DH (Extended Triple Diffie-Hellman)
+- **Message Encryption**: Double Ratchet with AES-256-GCM
+- **Curves**: X25519 (ECDH), Ed25519 (signatures)
+- **Key Derivation**: HKDF-SHA256
 - **Recovery**: BIP39 mnemonic phrases
 
 ## Project Structure
@@ -178,24 +181,25 @@ This project is currently in active development.
 - ✅ User authentication (email/password, Google Sign-In)
 - ✅ Two-factor authentication (TOTP + backup codes)
 - ✅ BIP39 recovery phrase generation and verification
-- ✅ End-to-end encryption (AES-256-GCM, ECDH, HKDF)
-- ✅ GCM authentication tag validation
-- ✅ Binary key encoding with format versioning
+- ✅ X3DH key exchange (Extended Triple Diffie-Hellman)
+- ✅ Double Ratchet protocol with forward and future secrecy
+- ✅ Per-message key derivation
+- ✅ End-to-end encryption (AES-256-GCM)
+- ✅ Media encryption with independent per-file keys
+- ✅ Out-of-order message handling
 - ✅ Public key fingerprint verification
-- ✅ Key rotation with backward compatibility
+- ✅ Signed prekey generation and validation
+- ✅ One-time prekey management
 - ✅ Replay attack protection (sequence numbers + nonce tracking)
 - ✅ Rate limiting (global + per-conversation with soft blocking)
 - ✅ Device linking and management
-- ✅ Secure key storage with versioning
-- ✅ Message encryption key version tracking
+- ✅ Secure key storage
 - ✅ Messaging interface with conversation view
-- ✅ Media sharing (images, videos) with encryption
-- ✅ GIF integration via Giphy
+- ✅ Media sharing (images, videos, GIFs) with encryption
 - ✅ Link previews for shared URLs
 - ✅ Typing indicators
 - ✅ Read receipts and delivery status
 - ✅ Offline message queue
-- ✅ Screenshot protection
 - ✅ Partner linking via invite codes
 
 ### In Progress
@@ -231,11 +235,15 @@ The following server-side functions handle security-critical operations:
 ### Cryptographic Parameters
 | Parameter | Value |
 |-----------|-------|
-| Encryption | AES-256-GCM |
-| Key Exchange | ECDH secp256k1 |
-| TOTP Secret | 256 bits |
+| Key Exchange | X3DH with X25519 |
+| Message Encryption | Double Ratchet + AES-256-GCM |
+| Signatures | Ed25519 |
+| Key Derivation | HKDF-SHA256 |
+| Signed Prekey Validity | 30 days |
+| Skipped Key Limit | 1000 per chain |
+| Skipped Key Expiry | 24 hours |
 | Recovery Phrase | 128 bits (12 words) |
-| PBKDF2 Iterations | 100,000 (2FA), 2,048 (seed) |
+| TOTP Secret | 256 bits |
 
 ## Privacy & Security
 

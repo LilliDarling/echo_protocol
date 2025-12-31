@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Session model for user authentication sessions
 class SessionModel {
   final String id;
   final String userId;
@@ -56,12 +55,10 @@ class SessionModel {
     );
   }
 
-  /// Check if the session is expired
   bool get isExpired {
     return DateTime.now().isAfter(expiresAt);
   }
 
-  /// Check if the session is still valid
   bool get isValid {
     return !isExpired;
   }
