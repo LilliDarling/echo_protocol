@@ -6,6 +6,7 @@ import {createHash, randomBytes} from "crypto";
 import * as ed from "@noble/ed25519";
 import {sha512} from "@noble/hashes/sha2.js";
 import {db} from "../firebase.js";
+import {checkUserRateLimit, checkIpRateLimit} from "../services/rateLimit.js";
 
 ed.hashes.sha512 = sha512;
 ed.hashes.sha512Async = (msg: Uint8Array) => Promise.resolve(sha512(msg));
@@ -30,6 +31,11 @@ export const acceptPartnerInvite = onCall(
     const correlationId = generateCorrelationId();
 
     const userId = request.auth?.uid as string;
+    const ip = request.rawRequest?.ip || "unknown";
+
+    await checkUserRateLimit(db, userId, "PARTNER_INVITE");
+    await checkIpRateLimit(db, ip, userId);
+
     const {inviteCode, myPublicKey, myKeyVersion} = request.data;
 
     if (!inviteCode || typeof inviteCode !== "string") {
