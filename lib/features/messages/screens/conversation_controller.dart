@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../../../models/echo.dart';
 import '../../../services/partner.dart';
 import '../../../services/crypto/protocol_service.dart';
@@ -134,6 +135,7 @@ class ConversationController extends ChangeNotifier {
       );
 
       _mediaEncryptionService = MediaEncryptionService();
+      await _mediaEncryptionService!.clearCache();
 
       _isServicesInitialized = true;
       notifyListeners();
@@ -523,13 +525,29 @@ class ConversationController extends ChangeNotifier {
         notifyListeners();
       }
 
+      await _deleteMediaFromStorage(message.metadata);
+
       await _messagesRef.doc(message.id).update({
         'isDeleted': true,
         'deletedAt': FieldValue.serverTimestamp(),
         'content': '',
+        'metadata': {},
       });
     } catch (e) {
       rethrow;
+    }
+  }
+
+  Future<void> _deleteMediaFromStorage(EchoMetadata metadata) async {
+    final storage = FirebaseStorage.instance;
+    final urls = [metadata.fileUrl, metadata.thumbnailUrl]
+        .whereType<String>()
+        .where((url) => url.isNotEmpty);
+
+    for (final url in urls) {
+      try {
+        await storage.refFromURL(url).delete();
+      } catch (_) {}
     }
   }
 

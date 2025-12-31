@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -29,7 +28,7 @@ class MediaMessage extends StatefulWidget {
 }
 
 class _MediaMessageState extends State<MediaMessage> {
-  String? _decryptedThumbnailPath;
+  Uint8List? _decryptedThumbnailBytes;
   bool _isDecrypting = false;
   bool _hasError = false;
   Uint8List? _mediaKey;
@@ -70,15 +69,14 @@ class _MediaMessageState extends State<MediaMessage> {
 
       setState(() => _isDecrypting = true);
       try {
-        final decryptedPath = await widget.encryptionService!.downloadAndDecrypt(
+        final decryptedBytes = await widget.encryptionService!.downloadAndDecryptToMemory(
           encryptedUrl: thumbnailUrl,
           mediaId: thumbMediaId,
           mediaKey: _thumbKey!,
-          isVideo: false,
         );
         if (mounted) {
           setState(() {
-            _decryptedThumbnailPath = decryptedPath;
+            _decryptedThumbnailBytes = decryptedBytes;
             _isDecrypting = false;
           });
         }
@@ -132,9 +130,9 @@ class _MediaMessageState extends State<MediaMessage> {
     if (_isDecrypting) return MediaPlaceholders.loading();
     if (_hasError) return MediaPlaceholders.error();
 
-    if (widget.message.metadata.isEncrypted && _decryptedThumbnailPath != null) {
-      return Image.file(
-        File(_decryptedThumbnailPath!),
+    if (widget.message.metadata.isEncrypted && _decryptedThumbnailBytes != null) {
+      return Image.memory(
+        _decryptedThumbnailBytes!,
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => MediaPlaceholders.error(),
       );
@@ -161,7 +159,7 @@ class _MediaMessageState extends State<MediaMessage> {
         builder: (context) => FullScreenMediaView(
           url: fileUrl,
           thumbnailUrl: widget.message.metadata.thumbnailUrl,
-          decryptedThumbnailPath: _decryptedThumbnailPath,
+          decryptedThumbnailBytes: _decryptedThumbnailBytes,
           isVideo: widget.message.type == EchoType.video,
           isEncrypted: widget.message.metadata.isEncrypted,
           encryptionService: widget.encryptionService,

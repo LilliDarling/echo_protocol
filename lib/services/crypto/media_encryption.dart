@@ -71,6 +71,24 @@ class MediaEncryptionService {
     return cachedPath;
   }
 
+  Future<Uint8List> downloadAndDecryptToMemory({
+    required String encryptedUrl,
+    required String mediaId,
+    required Uint8List mediaKey,
+  }) async {
+    final response = await http.get(Uri.parse(encryptedUrl));
+    if (response.statusCode != 200) {
+      throw Exception('Media download failed');
+    }
+
+    final encryptedBytes = Uint8List.fromList(response.bodyBytes);
+    return decryptMedia(
+      encryptedBytes: encryptedBytes,
+      mediaId: mediaId,
+      mediaKey: mediaKey,
+    );
+  }
+
   String _generateMediaId(int index) {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final data = '$timestamp:$index';
