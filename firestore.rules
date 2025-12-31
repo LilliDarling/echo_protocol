@@ -347,12 +347,8 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && isValidLinkToken()
         && request.resource.data.userId == request.auth.uid
-        && request.resource.data.keys().hasAll(['userId', 'sessionKey', 'encryptedPrivateKey', 'publicKey', 'keyVersion', 'iv', 'createdAt', 'expiresAt', 'used'])
+        && request.resource.data.keys().hasAll(['userId', 'encryptedPrivateKey', 'publicKey', 'keyVersion', 'iv', 'createdAt', 'expiresAt', 'used'])
         && request.resource.data.used == false
-        // Validate session key is present and reasonable length (43-44 chars base64)
-        && request.resource.data.sessionKey is string
-        && request.resource.data.sessionKey.size() >= 40
-        && request.resource.data.sessionKey.size() <= 50
         // Validate encrypted private key is present and reasonable length
         && request.resource.data.encryptedPrivateKey is string
         && request.resource.data.encryptedPrivateKey.size() > 100

@@ -65,7 +65,6 @@ class DeviceLinkingService {
     final expiresAt = DateTime.now().add(const Duration(minutes: 2));
     await _db.collection('deviceLinking').doc(linkToken).set({
       'userId': userId,
-      'sessionKey': sessionKey,
       'encryptedPrivateKey': encryptedPrivateKey.base64,
       'publicKey': publicKey,
       'keyVersion': keyVersion,
@@ -82,6 +81,7 @@ class DeviceLinkingService {
       'type': 'echo_protocol_device_link',
       'version': 1,
       'token': linkToken,
+      'sessionKey': sessionKey,
       'userId': userId,
       'expires': expiresAt.millisecondsSinceEpoch,
     });
@@ -106,6 +106,7 @@ class DeviceLinkingService {
       }
 
       final linkToken = data['token'] as String;
+      final sessionKey = data['sessionKey'] as String;
       final userId = data['userId'] as String;
       final expiresTimestamp = data['expires'] as int;
 
@@ -130,7 +131,6 @@ class DeviceLinkingService {
         throw Exception('Link has expired');
       }
 
-      final sessionKey = linkData['sessionKey'] as String;
       final encryptedPrivateKey = linkData['encryptedPrivateKey'] as String;
       final publicKey = linkData['publicKey'] as String;
       final keyVersion = linkData['keyVersion'] as int;
