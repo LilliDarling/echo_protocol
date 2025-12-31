@@ -5,85 +5,48 @@ import 'package:cryptography/cryptography.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart' as crypto_pkg;
 import 'package:http/http.dart' as http;
-import '../../models/crypto/ratchet_session.dart';
 import '../../utils/security.dart';
-import 'session_manager.dart';
 
 class MediaEncryptionService {
-  static const String _mediaKdfInfo = 'EchoProtocol-MediaKey-v1';
-  static const String _mediaChainInfo = 'EchoProtocol-MediaChain-v1';
   static const String _cacheSubdir = 'decrypted_media';
 
-  final SessionManager _sessionManager;
   final AesGcm _aesGcm = AesGcm.with256bits();
 
-  MediaEncryptionService({SessionManager? sessionManager})
-      : _sessionManager = sessionManager ?? SessionManager();
+  MediaEncryptionService();
 
-  Future<({Uint8List encrypted, String mediaId})> encryptMedia({
+  Future<({Uint8List encrypted, String mediaId, Uint8List mediaKey})> encryptMedia({
     required Uint8List plainBytes,
     required String recipientId,
     required String senderId,
   }) async {
-    final session = await _sessionManager.getSession(recipientId, senderId);
-    if (session == null) {
-      throw Exception('Media encryption failed');
-    }
-
-    _initializeMediaChainIfNeeded(session);
-
-    final mediaId = _generateMediaId(session.mediaKeyIndex);
-    final mediaKey = _deriveMediaKey(session);
-
-    session.mediaKeys[mediaId] = Uint8List.fromList(mediaKey);
-
-    _advanceMediaChain(session);
-    await _sessionManager.saveSession(session);
+    // Generate a random media key for each piece of media
+    final mediaKey = SecurityUtils.generateSecureRandomBytes(32);
+    final mediaId = _generateMediaId(DateTime.now().millisecondsSinceEpoch);
 
     final encrypted = await _aesEncrypt(mediaKey, plainBytes, mediaId);
-    SecurityUtils.secureClear(mediaKey);
 
-    return (encrypted: encrypted, mediaId: mediaId);
+    // Return the key so it can be included in the encrypted message
+    return (encrypted: encrypted, mediaId: mediaId, mediaKey: Uint8List.fromList(mediaKey));
   }
 
   Future<Uint8List> decryptMedia({
     required Uint8List encryptedBytes,
     required String mediaId,
-    required String senderId,
-    required String myUserId,
+    required Uint8List mediaKey,
   }) async {
-    final session = await _sessionManager.getSession(senderId, myUserId);
-    if (session == null) {
-      throw Exception('Media decryption failed');
-    }
-
-    final mediaKey = session.mediaKeys[mediaId];
-    if (mediaKey == null) {
-      throw Exception('Media decryption failed');
-    }
-
     return _aesDecrypt(mediaKey, encryptedBytes, mediaId);
   }
 
   Future<void> deleteMedia({
     required String mediaId,
-    required String recipientId,
-    required String senderId,
   }) async {
-    final session = await _sessionManager.getSession(recipientId, senderId);
-    if (session == null) return;
-
-    session.deleteMediaKey(mediaId);
-    await _sessionManager.saveSession(session);
-
     await _deleteCachedMedia(mediaId);
   }
 
   Future<String> downloadAndDecrypt({
     required String encryptedUrl,
     required String mediaId,
-    required String senderId,
-    required String myUserId,
+    required Uint8List mediaKey,
     required bool isVideo,
   }) async {
     final cachedPath = await _getCachedFilePath(mediaId, isVideo);
@@ -100,8 +63,7 @@ class MediaEncryptionService {
     final decryptedBytes = await decryptMedia(
       encryptedBytes: encryptedBytes,
       mediaId: mediaId,
-      senderId: senderId,
-      myUserId: myUserId,
+      mediaKey: mediaKey,
     );
 
     final file = File(cachedPath);
@@ -109,40 +71,6 @@ class MediaEncryptionService {
     await file.writeAsBytes(decryptedBytes);
 
     return cachedPath;
-  }
-
-  void _initializeMediaChainIfNeeded(RatchetSession session) {
-    if (session.mediaChainKey != null) return;
-
-    session.mediaChainKey = SecurityUtils.hkdfSha256(
-      session.rootKey,
-      Uint8List.fromList(utf8.encode('media-init')),
-      Uint8List.fromList(utf8.encode(_mediaChainInfo)),
-      32,
-    );
-    session.mediaKeyIndex = 0;
-  }
-
-  Uint8List _deriveMediaKey(RatchetSession session) {
-    return SecurityUtils.hkdfSha256(
-      session.mediaChainKey!,
-      Uint8List.fromList([session.mediaKeyIndex & 0xFF]),
-      Uint8List.fromList(utf8.encode(_mediaKdfInfo)),
-      32,
-    );
-  }
-
-  void _advanceMediaChain(RatchetSession session) {
-    final newChainKey = SecurityUtils.hkdfSha256(
-      session.mediaChainKey!,
-      Uint8List.fromList([0xFF]),
-      Uint8List.fromList(utf8.encode('$_mediaChainInfo-advance')),
-      32,
-    );
-
-    SecurityUtils.secureClear(session.mediaChainKey!);
-    session.mediaChainKey = newChainKey;
-    session.mediaKeyIndex++;
   }
 
   String _generateMediaId(int index) {

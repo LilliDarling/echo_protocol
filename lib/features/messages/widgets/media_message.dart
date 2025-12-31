@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../models/echo.dart';
@@ -11,6 +13,7 @@ class MediaMessage extends StatefulWidget {
   final bool isMe;
   final MediaEncryptionService? encryptionService;
   final String? myUserId;
+  final String? decryptedContent;
 
   const MediaMessage({
     super.key,
@@ -18,6 +21,7 @@ class MediaMessage extends StatefulWidget {
     required this.isMe,
     this.encryptionService,
     this.myUserId,
+    this.decryptedContent,
   });
 
   @override
@@ -28,11 +32,29 @@ class _MediaMessageState extends State<MediaMessage> {
   String? _decryptedThumbnailPath;
   bool _isDecrypting = false;
   bool _hasError = false;
+  Uint8List? _mediaKey;
+  Uint8List? _thumbKey;
 
   @override
   void initState() {
     super.initState();
+    _parseKeys();
     _loadMedia();
+  }
+
+  void _parseKeys() {
+    if (widget.decryptedContent == null) return;
+    try {
+      final data = jsonDecode(widget.decryptedContent!) as Map<String, dynamic>;
+      if (data['mediaKey'] != null) {
+        _mediaKey = base64Decode(data['mediaKey'] as String);
+      }
+      if (data['thumbKey'] != null) {
+        _thumbKey = base64Decode(data['thumbKey'] as String);
+      }
+    } catch (_) {
+      // Not a JSON content (might be plain text like "[Image]")
+    }
   }
 
   Future<void> _loadMedia() async {
@@ -40,16 +62,19 @@ class _MediaMessageState extends State<MediaMessage> {
     if (thumbnailUrl == null || thumbnailUrl.isEmpty) return;
 
     if (widget.message.metadata.isEncrypted &&
-        widget.encryptionService != null &&
-        widget.myUserId != null) {
+        widget.encryptionService != null) {
+      final thumbMediaId = widget.message.metadata.thumbMediaId;
+      if (thumbMediaId == null || _thumbKey == null) {
+        setState(() => _hasError = true);
+        return;
+      }
+
       setState(() => _isDecrypting = true);
       try {
-        final mediaId = MediaEncryptionService.generateFileId(thumbnailUrl);
         final decryptedPath = await widget.encryptionService!.downloadAndDecrypt(
           encryptedUrl: thumbnailUrl,
-          mediaId: '${mediaId}_thumb',
-          senderId: widget.message.senderId,
-          myUserId: widget.myUserId!,
+          mediaId: thumbMediaId,
+          mediaKey: _thumbKey!,
           isVideo: false,
         );
         if (mounted) {
@@ -141,8 +166,8 @@ class _MediaMessageState extends State<MediaMessage> {
           isVideo: widget.message.type == EchoType.video,
           isEncrypted: widget.message.metadata.isEncrypted,
           encryptionService: widget.encryptionService,
-          senderId: widget.message.senderId,
-          myUserId: widget.myUserId,
+          mediaId: widget.message.metadata.mediaId,
+          mediaKey: _mediaKey,
         ),
       ),
     );

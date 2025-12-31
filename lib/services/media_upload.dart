@@ -41,6 +41,8 @@ class MediaUploadService {
     Uint8List uploadThumbnailBytes;
     String? mediaId;
     String? thumbMediaId;
+    String? mediaKey;
+    String? thumbMediaKey;
 
     if (isEncryptionEnabled) {
       final result = await _encryptionService!.encryptMedia(
@@ -50,6 +52,7 @@ class MediaUploadService {
       );
       uploadBytes = result.encrypted;
       mediaId = result.mediaId;
+      mediaKey = base64Encode(result.mediaKey);
 
       final thumbResult = await _encryptionService.encryptMedia(
         plainBytes: thumbnailBytes,
@@ -58,6 +61,7 @@ class MediaUploadService {
       );
       uploadThumbnailBytes = thumbResult.encrypted;
       thumbMediaId = thumbResult.mediaId;
+      thumbMediaKey = base64Encode(thumbResult.mediaKey);
     } else {
       uploadBytes = Uint8List.fromList(fileBytes);
       uploadThumbnailBytes = thumbnailBytes;
@@ -84,6 +88,8 @@ class MediaUploadService {
       'isEncrypted': isEncryptionEnabled ? 'true' : 'false',
       if (mediaId != null) 'mediaId': mediaId,
       if (thumbMediaId != null) 'thumbMediaId': thumbMediaId,
+      if (mediaKey != null) 'mediaKey': mediaKey,
+      if (thumbMediaKey != null) 'thumbMediaKey': thumbMediaKey,
     };
   }
 
@@ -103,6 +109,8 @@ class MediaUploadService {
     Uint8List uploadBytes;
     String? mediaId;
     String? thumbMediaId;
+    String? mediaKey;
+    String? thumbMediaKey;
 
     if (isEncryptionEnabled) {
       final result = await _encryptionService!.encryptMedia(
@@ -112,6 +120,7 @@ class MediaUploadService {
       );
       uploadBytes = result.encrypted;
       mediaId = result.mediaId;
+      mediaKey = base64Encode(result.mediaKey);
     } else {
       uploadBytes = Uint8List.fromList(fileBytes);
     }
@@ -137,6 +146,7 @@ class MediaUploadService {
         );
         uploadThumbnailBytes = thumbResult.encrypted;
         thumbMediaId = thumbResult.mediaId;
+        thumbMediaKey = base64Encode(thumbResult.mediaKey);
       } else {
         uploadThumbnailBytes = Uint8List.fromList(thumbnailBytes);
       }
@@ -165,6 +175,8 @@ class MediaUploadService {
       'isEncrypted': isEncryptionEnabled ? 'true' : 'false',
       if (mediaId != null) 'mediaId': mediaId,
       if (thumbMediaId != null) 'thumbMediaId': thumbMediaId,
+      if (mediaKey != null) 'mediaKey': mediaKey,
+      if (thumbMediaKey != null) 'thumbMediaKey': thumbMediaKey,
     };
   }
 

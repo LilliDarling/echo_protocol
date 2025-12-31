@@ -197,6 +197,8 @@ class EchoMetadata {
   final String? fileName;
   final String? fileUrl;
   final String? thumbnailUrl;
+  final String? mediaId;
+  final String? thumbMediaId;
   final LinkPreview? linkPreview;
   final bool isEncrypted;
 
@@ -205,6 +207,8 @@ class EchoMetadata {
     this.fileName,
     this.fileUrl,
     this.thumbnailUrl,
+    this.mediaId,
+    this.thumbMediaId,
     this.linkPreview,
     this.isEncrypted = false,
   });
@@ -215,6 +219,8 @@ class EchoMetadata {
       fileName: json['fileName'] as String?,
       fileUrl: json['fileUrl'] as String?,
       thumbnailUrl: json['thumbnailUrl'] as String?,
+      mediaId: json['mediaId'] as String?,
+      thumbMediaId: json['thumbMediaId'] as String?,
       linkPreview: json['linkPreview'] != null
           ? LinkPreview.fromJson(json['linkPreview'] as Map<String, dynamic>)
           : null,
@@ -228,6 +234,8 @@ class EchoMetadata {
       if (fileName != null) 'fileName': fileName,
       if (fileUrl != null) 'fileUrl': fileUrl,
       if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
+      if (mediaId != null) 'mediaId': mediaId,
+      if (thumbMediaId != null) 'thumbMediaId': thumbMediaId,
       if (linkPreview != null) 'linkPreview': linkPreview!.toJson(),
       'isEncrypted': isEncrypted,
     };
@@ -238,6 +246,8 @@ class EchoMetadata {
     String? fileName,
     String? fileUrl,
     String? thumbnailUrl,
+    String? mediaId,
+    String? thumbMediaId,
     LinkPreview? linkPreview,
     bool? isEncrypted,
   }) {
@@ -246,6 +256,8 @@ class EchoMetadata {
       fileName: fileName ?? this.fileName,
       fileUrl: fileUrl ?? this.fileUrl,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      mediaId: mediaId ?? this.mediaId,
+      thumbMediaId: thumbMediaId ?? this.thumbMediaId,
       linkPreview: linkPreview ?? this.linkPreview,
       isEncrypted: isEncrypted ?? this.isEncrypted,
     );

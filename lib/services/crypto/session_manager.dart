@@ -329,8 +329,6 @@ class SessionManager {
       ourSignedPrekey: signedPrekey,
     );
 
-    session.theirRatchetPublicKey = preKeyMessage.innerMessage.senderRatchetKey;
-
     final plaintext = await _ratchet.decrypt(
       session: session,
       message: preKeyMessage.innerMessage,
@@ -342,7 +340,7 @@ class SessionManager {
     return (session: session, plaintext: plaintext);
   }
 
-  Future<EncryptedMessage> encrypt({
+  Future<Uint8List> encrypt({
     required String recipientId,
     required String ourUserId,
     required Uint8List plaintext,
@@ -362,12 +360,12 @@ class SessionManager {
           ourIdentityKey: ourIdentityKey,
           initialPlaintext: plaintext,
         );
-        return EncryptedMessage.fromBytes(result.message.toBytes());
+        return result.message.toBytes();
       }
 
       final message = await _ratchet.encrypt(session: session, plaintext: plaintext);
       await saveSession(session);
-      return message;
+      return message.toBytes();
     } finally {
       lock.release();
     }

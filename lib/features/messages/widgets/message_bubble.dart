@@ -160,6 +160,8 @@ class MessageBubble extends StatelessWidget {
     switch (message.type) {
       case EchoType.image:
       case EchoType.video:
+        // Check if content is JSON with keys (encrypted media)
+        final isJsonContent = decryptedContent.startsWith('{') && decryptedContent.contains('mediaKey');
         return Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -168,8 +170,10 @@ class MessageBubble extends StatelessWidget {
               isMe: isMe,
               encryptionService: mediaEncryptionService,
               myUserId: myUserId,
+              decryptedContent: decryptedContent,
             ),
-            if (decryptedContent.isNotEmpty && decryptedContent != '[Media]')
+            // Don't show JSON content as caption
+            if (decryptedContent.isNotEmpty && !isJsonContent && decryptedContent != '[Media]' && decryptedContent != '[Image]' && decryptedContent != '[Video]')
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
                 child: Text(
@@ -182,6 +186,31 @@ class MessageBubble extends StatelessWidget {
         );
 
       case EchoType.gif:
+        // Encrypted GIFs use MediaMessage, unencrypted use direct URL
+        if (message.metadata.isEncrypted) {
+          final isJsonContent = decryptedContent.startsWith('{') && decryptedContent.contains('mediaKey');
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              MediaMessage(
+                message: message,
+                isMe: isMe,
+                encryptionService: mediaEncryptionService,
+                myUserId: myUserId,
+                decryptedContent: decryptedContent,
+              ),
+              if (decryptedContent.isNotEmpty && !isJsonContent && decryptedContent != '[GIF]')
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                  child: Text(
+                    decryptedContent,
+                    style: TextStyle(color: textColor),
+                  ),
+                ),
+              _buildFooter(context),
+            ],
+          );
+        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [

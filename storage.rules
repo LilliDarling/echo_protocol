@@ -46,6 +46,12 @@ service firebase.storage {
                    && request.resource.size < 50 * 1024 * 1024;  // 50MB max
     }
 
+    match /media/gifs/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId)
+                   && request.resource.size < 20 * 1024 * 1024;  // 20MB max for GIFs
+    }
+
     // Deny all other access
     match /{allPaths=**} {
       allow read, write: if false;

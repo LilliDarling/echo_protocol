@@ -10,7 +10,7 @@ class ProtocolService {
   static final ProtocolService _instance = ProtocolService._internal();
   factory ProtocolService() => _instance;
   ProtocolService._internal() {
-    _mediaService = MediaEncryptionService(sessionManager: _sessionManager);
+    _mediaService = MediaEncryptionService();
   }
 
   final SessionManager _sessionManager = SessionManager();
@@ -98,7 +98,7 @@ class ProtocolService {
       ourIdentityKey: _identityKey!,
     );
 
-    return messageBytes.toBase64();
+    return base64Encode(messageBytes);
   }
 
   Future<String> decryptMessage({
@@ -180,7 +180,7 @@ class ProtocolService {
     await _sessionManager.cleanupAllSessions();
   }
 
-  Future<({Uint8List encrypted, String mediaId})> encryptMedia({
+  Future<({Uint8List encrypted, String mediaId, Uint8List mediaKey})> encryptMedia({
     required Uint8List plainBytes,
     required String recipientId,
     required String senderId,
@@ -196,43 +196,35 @@ class ProtocolService {
   Future<Uint8List> decryptMedia({
     required Uint8List encryptedBytes,
     required String mediaId,
-    required String senderId,
-    required String myUserId,
+    required Uint8List mediaKey,
   }) async {
     _ensureInitialized();
     return _mediaService.decryptMedia(
       encryptedBytes: encryptedBytes,
       mediaId: mediaId,
-      senderId: senderId,
-      myUserId: myUserId,
+      mediaKey: mediaKey,
     );
   }
 
   Future<void> deleteMedia({
     required String mediaId,
-    required String recipientId,
-    required String senderId,
   }) async {
     return _mediaService.deleteMedia(
       mediaId: mediaId,
-      recipientId: recipientId,
-      senderId: senderId,
     );
   }
 
   Future<String> downloadAndDecryptMedia({
     required String encryptedUrl,
     required String mediaId,
-    required String senderId,
-    required String myUserId,
+    required Uint8List mediaKey,
     required bool isVideo,
   }) async {
     _ensureInitialized();
     return _mediaService.downloadAndDecrypt(
       encryptedUrl: encryptedUrl,
       mediaId: mediaId,
-      senderId: senderId,
-      myUserId: myUserId,
+      mediaKey: mediaKey,
       isVideo: isVideo,
     );
   }
