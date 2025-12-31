@@ -6,7 +6,7 @@ import 'package:crypto/crypto.dart';
 class RecoveryPhraseService {
   static const int _mnemonicStrength = 128;
   static const String _salt = 'echo-protocol-v1';
-  static const int _pbkdf2Iterations = 2048;
+  static const int _pbkdf2Iterations = 210000;
 
   String generateMnemonic() {
     return bip39.generateMnemonic(strength: _mnemonicStrength);
