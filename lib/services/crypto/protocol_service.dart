@@ -130,7 +130,6 @@ class ProtocolService {
       senderId: senderId,
     );
 
-    // Get sender key version from storage
     final senderKeyVersion = await _storage.getCurrentKeyVersion() ?? 1;
 
     return {

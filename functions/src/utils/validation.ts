@@ -12,10 +12,7 @@ export function validateRequest(request: CallableRequest): void {
 
   const userAgent = request.rawRequest.headers["user-agent"];
   if (!userAgent || userAgent.length < 10) {
-    logger.warn("Suspicious request without proper user agent", {
-      userId: request.auth.uid,
-      userAgent,
-    });
+    logger.warn("Suspicious request detected");
   }
 
   const {ip} = request.rawRequest;

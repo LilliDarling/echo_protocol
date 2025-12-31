@@ -7,7 +7,6 @@ import * as ed from "@noble/ed25519";
 import {sha512} from "@noble/hashes/sha2.js";
 import {db} from "../firebase.js";
 
-// Enable both sync and async methods for @noble/ed25519 v3
 ed.hashes.sha512 = sha512;
 ed.hashes.sha512Async = (msg: Uint8Array) => Promise.resolve(sha512(msg));
 
@@ -75,9 +74,7 @@ export const acceptPartnerInvite = onCall(
       );
     }
 
-    logger.info("Partner invite acceptance attempt", {
-      correlationId,
-    });
+    logger.info("Partner invite attempt", {correlationId});
 
     try {
       const inviteRef = db.collection("partnerInvites").doc(normalizedCode);
@@ -93,43 +90,43 @@ export const acceptPartnerInvite = onCall(
       }
 
       if (inviteData.signatureVersion !== 4) {
-        logger.warn("Invalid signature version", {correlationId});
+        logger.warn("Invite validation failed", {correlationId});
         throw new HttpsError("failed-precondition", "Invalid invite");
       }
 
       if (!inviteData.ed25519PublicKey ||
           typeof inviteData.ed25519PublicKey !== "string") {
-        logger.warn("Missing Ed25519 public key", {correlationId});
+        logger.warn("Invite validation failed", {correlationId});
         throw new HttpsError("failed-precondition", "Invalid invite");
       }
 
       if (!inviteData.signature ||
           typeof inviteData.signature !== "string") {
-        logger.warn("Missing signature", {correlationId});
+        logger.warn("Invite validation failed", {correlationId});
         throw new HttpsError("failed-precondition", "Invalid invite");
       }
 
       if (!inviteData.publicKey ||
           typeof inviteData.publicKey !== "string" ||
           inviteData.publicKey.length < 50) {
-        logger.warn("Invalid public key", {correlationId});
+        logger.warn("Invite validation failed", {correlationId});
         throw new HttpsError("failed-precondition", "Invalid invite");
       }
 
       if (!inviteData.userName || typeof inviteData.userName !== "string") {
-        logger.warn("Missing userName", {correlationId});
+        logger.warn("Invite validation failed", {correlationId});
         throw new HttpsError("failed-precondition", "Invalid invite");
       }
 
       if (!inviteData.publicKeyFingerprint ||
           typeof inviteData.publicKeyFingerprint !== "string") {
-        logger.warn("Missing fingerprint", {correlationId});
+        logger.warn("Invite validation failed", {correlationId});
         throw new HttpsError("failed-precondition", "Invalid invite");
       }
 
       if (typeof inviteData.publicKeyVersion !== "number" &&
           typeof inviteData.publicKeyVersion !== "string") {
-        logger.warn("Missing keyVersion", {correlationId});
+        logger.warn("Invite validation failed", {correlationId});
         throw new HttpsError("failed-precondition", "Invalid invite");
       }
 
@@ -141,12 +138,12 @@ export const acceptPartnerInvite = onCall(
         );
 
         if (publicKeyBytes.length !== 32) {
-          logger.warn("Invalid Ed25519 public key length", {correlationId});
+          logger.warn("Invite validation failed", {correlationId});
           throw new HttpsError("failed-precondition", "Invalid invite");
         }
 
         if (signatureBytes.length !== 64) {
-          logger.warn("Invalid Ed25519 signature length", {correlationId});
+          logger.warn("Invite validation failed", {correlationId});
           throw new HttpsError("failed-precondition", "Invalid invite");
         }
 
@@ -155,7 +152,7 @@ export const acceptPartnerInvite = onCall(
           .digest("hex");
 
         if (inviteData.publicKeyHash !== computedHash) {
-          logger.warn("Public key hash mismatch", {correlationId});
+          logger.warn("Invite validation failed", {correlationId});
           throw new HttpsError("failed-precondition", "Invalid invite");
         }
 
@@ -167,37 +164,15 @@ export const acceptPartnerInvite = onCall(
           `${expiresAtMs}`;
         const payloadBytes = Buffer.from(payload, "utf-8");
 
-        // Detailed debug logging
-        logger.info("Verification inputs", {
-          correlationId,
-          payload,
-          payloadHex: payloadBytes.toString("hex"),
-          signatureHex: signatureBytes.toString("hex"),
-          pubKeyHex: publicKeyBytes.toString("hex"),
-          signatureLen: signatureBytes.length,
-          pubKeyLen: publicKeyBytes.length,
-        });
-
         try {
-          // Convert standard Node Buffers to Uint8Arrays for Noble
           const sig = new Uint8Array(signatureBytes);
           const msg = new Uint8Array(payloadBytes);
           const pub = new Uint8Array(publicKeyBytes);
 
-          // Use verifyAsync for @noble/ed25519 v3
           const isValid = await ed.verifyAsync(sig, msg, pub);
 
-          logger.info("Verification result", {
-            correlationId,
-            isValid,
-            isValidType: typeof isValid,
-          });
-
           if (!isValid) {
-            logger.warn(
-              "Ed25519 signature verification failed",
-              {correlationId}
-            );
+            logger.warn("Invite validation failed", {correlationId});
             throw new HttpsError(
               "failed-precondition",
               "Invalid invite signature"
@@ -207,23 +182,16 @@ export const acceptPartnerInvite = onCall(
           if (err instanceof HttpsError) {
             throw err;
           }
-          logger.error(
-            "Noble Ed25519 verification error",
-            {error: String(err), correlationId}
-          );
+          logger.error("Signature processing error", {correlationId});
           throw new HttpsError("internal", "Signature processing failed");
         }
 
-        logger.info("Ed25519 signature verified", {correlationId});
-
-        // CRITICAL: Verify Ed25519 key binding
-        // The ed25519PublicKey MUST match the user's registered identity key
         const inviteCreatorDoc = await db.collection("users")
           .doc(inviteData.userId)
           .get();
 
         if (!inviteCreatorDoc.exists) {
-          logger.warn("Invite creator not found", {correlationId});
+          logger.warn("Invite validation failed", {correlationId});
           throw new HttpsError("failed-precondition", "Invalid invite");
         }
 
@@ -232,21 +200,19 @@ export const acceptPartnerInvite = onCall(
 
         if (!registeredIdentityKey ||
             typeof registeredIdentityKey.ed25519 !== "string") {
-          logger.warn("No registered identity key", {correlationId});
+          logger.warn("Invite validation failed", {correlationId});
           throw new HttpsError("failed-precondition", "Invalid invite");
         }
 
         if (inviteData.ed25519PublicKey !== registeredIdentityKey.ed25519) {
-          logger.warn("Ed25519 key binding failed", {correlationId});
+          logger.warn("Invite validation failed", {correlationId});
           throw new HttpsError("failed-precondition", "Invalid invite");
         }
-
-        logger.info("Ed25519 key binding verified", {correlationId});
       } catch (error) {
         if (error instanceof HttpsError) {
           throw error;
         }
-        logger.error("Signature verification error", {correlationId});
+        logger.error("Invite validation error", {correlationId});
         throw new HttpsError("failed-precondition", "Invalid invite");
       }
 
@@ -276,7 +242,6 @@ export const acceptPartnerInvite = onCall(
       }
       const partnerName = inviteData.userName;
 
-      // ATOMIC TRANSACTION: All state checks and updates happen atomically
       await db.runTransaction(async (transaction) => {
         const txInviteDoc = await transaction.get(inviteRef);
         const txCurrentUserDoc = await transaction.get(
@@ -326,8 +291,6 @@ export const acceptPartnerInvite = onCall(
           usedBy: userId,
         });
 
-        // Hash partner IDs for secure cross-user reads
-        // partnerIdHash allows partner to read this user's document
         const userPartnerIdHash = createHash("sha256")
           .update(partnerId)
           .digest("hex");
@@ -373,7 +336,7 @@ export const acceptPartnerInvite = onCall(
         details: {partnerId},
       });
 
-      logger.info("Partner linking successful", {correlationId});
+      logger.info("Partner linked", {correlationId});
 
       return {
         success: true,
@@ -387,7 +350,7 @@ export const acceptPartnerInvite = onCall(
       if (error instanceof HttpsError) {
         throw error;
       }
-      logger.error("Partner invite acceptance error", {correlationId});
+      logger.error("Partner invite error", {correlationId});
       throw new HttpsError("internal", "Failed to accept invite");
     }
   }

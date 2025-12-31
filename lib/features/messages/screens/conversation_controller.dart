@@ -66,7 +66,6 @@ class ConversationController extends ChangeNotifier {
     );
   }
 
-  // Getters
   List<EchoModel> get messages => _messages;
   bool get isLoading => _isLoading;
   bool get isSending => _isSending;
@@ -85,7 +84,6 @@ class ConversationController extends ChangeNotifier {
   CollectionReference<Map<String, dynamic>> get _messagesRef =>
       _db.collection('conversations').doc(conversationId).collection('messages');
 
-  /// Get the next sequence number for this conversation
   Future<int> _getNextSequenceNumber() async {
     final sortedIds = [currentUserId, partner.id]..sort();
     final conversationKey = '${sortedIds[0]}_${sortedIds[1]}';
@@ -128,7 +126,6 @@ class ConversationController extends ChangeNotifier {
       _subscribeToOfflineQueue();
       _subscribeToTypingIndicator();
 
-      // Initialize protocol service from stored identity
       await _protocolService.initializeFromStorage();
 
       _encryptionHelper = MessageEncryptionHelper(
@@ -409,12 +406,10 @@ class ConversationController extends ChangeNotifier {
         conversationId: conversationId,
       );
 
-      // Add to local list immediately for optimistic UI
       _contentCache.put(messageId, text);
       _messages = [..._messages, message];
       notifyListeners();
 
-      // Check if offline - queue for later
       if (!_offlineQueue.isOnline) {
         await _offlineQueue.enqueue(
           messageId: messageId,
@@ -432,7 +427,6 @@ class ConversationController extends ChangeNotifier {
         return;
       }
 
-      // Send via Cloud Function (handles rate limiting, replay protection, and Firestore write)
       final result = await _functions.httpsCallable('sendMessage').call({
         'messageId': messageId,
         'conversationId': conversationId,
@@ -464,7 +458,6 @@ class ConversationController extends ChangeNotifier {
         throw Exception(error ?? 'Failed to send message');
       }
 
-      // Update local message status to sent
       final index = _messages.indexWhere((m) => m.id == messageId);
       if (index != -1) {
         _messages[index] = _messages[index].copyWith(status: EchoStatus.sent);

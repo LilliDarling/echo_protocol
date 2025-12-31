@@ -254,12 +254,8 @@ class MediaUploadService {
   }
 
   Future<void> deleteFile(String fileUrl) async {
-    try {
-      final ref = _storage.refFromURL(fileUrl);
-      await ref.delete();
-    } catch (e) {
-      // Silently fail - file might already be deleted
-    }
+    final ref = _storage.refFromURL(fileUrl);
+    await ref.delete().catchError((_) {});
   }
 
   static Future<int> getFileSize(XFile file) async {
@@ -268,7 +264,7 @@ class MediaUploadService {
   }
 
   static bool isFileSizeValid(int bytes) {
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const maxSize = 50 * 1024 * 1024;
     return bytes <= maxSize;
   }
 

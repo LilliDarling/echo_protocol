@@ -33,7 +33,6 @@ export const getPreKeyBundle = onCall<GetPreKeyBundleRequest>(
     const userRef = db.collection("users").doc(recipientId);
 
     return await db.runTransaction(async (transaction) => {
-      // === ALL READS FIRST ===
       const userDoc = await transaction.get(userRef);
 
       if (!userDoc.exists) {
@@ -53,12 +52,10 @@ export const getPreKeyBundle = onCall<GetPreKeyBundleRequest>(
       const otpQuery = otpCollection.orderBy("id").limit(1);
       const otpSnapshot = await transaction.get(otpQuery);
 
-      // Read prekey count before any writes
       const metadataCol = userRef.collection("metadata");
       const countRef = metadataCol.doc("prekeyCount");
       const countDoc = await transaction.get(countRef);
 
-      // === NOW PROCESS AND WRITE ===
       let oneTimePrekey: {id: number; publicKey: string} | undefined;
 
       if (!otpSnapshot.empty) {
@@ -69,10 +66,8 @@ export const getPreKeyBundle = onCall<GetPreKeyBundleRequest>(
           publicKey: otpData.publicKey,
         };
 
-        // Delete the claimed OTP
         transaction.delete(otpDoc.ref);
 
-        // Update the count
         const countData = countDoc.data();
         const currentCount = countDoc.exists ? countData?.count || 0 : 0;
         const newCount = Math.max(0, currentCount - 1);

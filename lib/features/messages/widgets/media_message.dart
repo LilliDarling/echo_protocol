@@ -53,7 +53,6 @@ class _MediaMessageState extends State<MediaMessage> {
         _thumbKey = base64Decode(data['thumbKey'] as String);
       }
     } catch (_) {
-      // Not a JSON content (might be plain text like "[Image]")
     }
   }
 

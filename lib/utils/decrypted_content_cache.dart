@@ -190,7 +190,7 @@ class DecryptedContentCacheService {
         true,
         AEADParameters(
           KeyParameter(key),
-          128, // 128-bit auth tag
+          128,
           iv,
           Uint8List(0),
         ),

@@ -39,11 +39,7 @@ export async function checkUserRateLimit(
       }
 
       if (attempts.length >= config.maxAttempts) {
-        logger.warn("User rate limit exceeded", {
-          userId,
-          limitType,
-          attempts: attempts.length,
-        });
+        logger.warn("Rate limit exceeded");
         throw new HttpsError(
           "resource-exhausted",
           `Too many ${limitType.toLowerCase()} verification attempts. ` +
@@ -62,8 +58,7 @@ export async function checkUserRateLimit(
     if (error instanceof HttpsError) {
       throw error;
     }
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error("Rate limit check failed", {userId, errorMessage});
+    logger.error("Rate limit check failed");
     throw new HttpsError("internal", "Rate limit check failed");
   }
 }
@@ -110,18 +105,14 @@ export async function checkIpRateLimit(
       }
 
       if (attempts.length >= config.maxAttemptsPerIp) {
-        logger.warn("IP rate limit exceeded", {
-          ip,
-          attempts: attempts.length,
-          uniqueUsers: uniqueUsers.size,
-        });
+        logger.warn("IP rate limit exceeded");
 
         if (uniqueUsers.size >= ANOMALY_THRESHOLDS.multipleAccountAttacks) {
           await alertSuspiciousActivity(
             db,
             ip,
             "distributed_attack",
-            `IP ${ip} attempted 2FA on ${uniqueUsers.size} different accounts`
+            "Multiple account attack detected"
           );
         }
 
@@ -145,17 +136,14 @@ export async function checkIpRateLimit(
       );
 
       if (attempts.length >= ANOMALY_THRESHOLDS.suspiciousIpAttempts) {
-        const msg = `IP ${ip} has made ${attempts.length} 2FA attempts ` +
-          `in ${config.windowMinutes} minutes`;
-        await alertSuspiciousActivity(db, ip, "high_attempt_rate", msg);
+        await alertSuspiciousActivity(db, ip, "high_attempt_rate", "Suspicious activity detected");
       }
     });
   } catch (error) {
     if (error instanceof HttpsError) {
       throw error;
     }
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error("IP rate limit check failed", {ip, errorMessage});
+    logger.error("Rate limit check failed");
     throw new HttpsError("internal", "Rate limit check failed");
   }
 }

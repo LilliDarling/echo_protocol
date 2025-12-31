@@ -154,7 +154,6 @@ class _MessageInputState extends State<MessageInput> {
           isEncrypted: isEncrypted,
         );
 
-        // Include encryption keys in the message content (will be encrypted)
         final messageContent = isEncrypted
             ? jsonEncode({
                 'type': 'image',
@@ -237,7 +236,6 @@ class _MessageInputState extends State<MessageInput> {
           isEncrypted: isEncrypted,
         );
 
-        // Include encryption keys in the message content (will be encrypted)
         final messageContent = isEncrypted
             ? jsonEncode({
                 'type': 'video',
@@ -276,12 +274,10 @@ class _MessageInputState extends State<MessageInput> {
       if (gifResult != null && mounted) {
         final userId = FirebaseAuth.instance.currentUser?.uid;
 
-        // If encryption is enabled, download and encrypt the GIF
         if (_uploadService.isEncryptionEnabled && widget.mediaEncryptionService != null && userId != null) {
           setState(() => _isUploading = true);
 
           try {
-            // Download GIF and preview
             final gifResponse = await http.get(Uri.parse(gifResult.url));
             final previewResponse = await http.get(Uri.parse(gifResult.previewUrl));
 
@@ -292,7 +288,6 @@ class _MessageInputState extends State<MessageInput> {
             final gifBytes = Uint8List.fromList(gifResponse.bodyBytes);
             final previewBytes = Uint8List.fromList(previewResponse.bodyBytes);
 
-            // Encrypt both
             final gifEncrypted = await widget.mediaEncryptionService!.encryptMedia(
               plainBytes: gifBytes,
               recipientId: widget.partnerId,
@@ -305,12 +300,10 @@ class _MessageInputState extends State<MessageInput> {
               senderId: userId,
             );
 
-            // Generate filename
             final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
             final hash = sha256.convert(utf8.encode('$userId:$timestamp:${gifBytes.length}'));
             final hashedFilename = hash.toString();
 
-            // Upload encrypted files
             final storage = FirebaseStorage.instance;
 
             final gifRef = storage.ref().child('media/gifs/$userId/$hashedFilename');
@@ -353,7 +346,6 @@ class _MessageInputState extends State<MessageInput> {
             }
           }
         } else {
-          // Send GIF without encryption (direct GIPHY URL)
           final metadata = EchoMetadata(
             fileUrl: gifResult.url,
             thumbnailUrl: gifResult.previewUrl,

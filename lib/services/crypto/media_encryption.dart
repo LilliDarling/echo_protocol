@@ -19,13 +19,11 @@ class MediaEncryptionService {
     required String recipientId,
     required String senderId,
   }) async {
-    // Generate a random media key for each piece of media
     final mediaKey = SecurityUtils.generateSecureRandomBytes(32);
     final mediaId = _generateMediaId(DateTime.now().millisecondsSinceEpoch);
 
     final encrypted = await _aesEncrypt(mediaKey, plainBytes, mediaId);
 
-    // Return the key so it can be included in the encrypted message
     return (encrypted: encrypted, mediaId: mediaId, mediaKey: Uint8List.fromList(mediaKey));
   }
 

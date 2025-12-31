@@ -1408,6 +1408,14 @@ class MockProtocolService extends _i1.Mock implements _i10.ProtocolService {
           as _i7.Future<String?>);
 
   @override
+  _i7.Future<String?> getPublicKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#getPublicKey, []),
+            returnValue: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
   _i7.Future<({_i9.Uint8List publicKey, _i9.Uint8List signature})> sign(
     _i9.Uint8List? data,
   ) =>
@@ -1450,7 +1458,10 @@ class MockProtocolService extends _i1.Mock implements _i10.ProtocolService {
           as _i7.Future<void>);
 
   @override
-  _i7.Future<({_i9.Uint8List encrypted, String mediaId})> encryptMedia({
+  _i7.Future<
+    ({_i9.Uint8List encrypted, String mediaId, _i9.Uint8List mediaKey})
+  >
+  encryptMedia({
     required _i9.Uint8List? plainBytes,
     required String? recipientId,
     required String? senderId,
@@ -1462,7 +1473,13 @@ class MockProtocolService extends _i1.Mock implements _i10.ProtocolService {
               #senderId: senderId,
             }),
             returnValue:
-                _i7.Future<({_i9.Uint8List encrypted, String mediaId})>.value((
+                _i7.Future<
+                  ({
+                    _i9.Uint8List encrypted,
+                    String mediaId,
+                    _i9.Uint8List mediaKey,
+                  })
+                >.value((
                   encrypted: _i9.Uint8List(0),
                   mediaId: _i8.dummyValue<String>(
                     this,
@@ -1472,40 +1489,33 @@ class MockProtocolService extends _i1.Mock implements _i10.ProtocolService {
                       #senderId: senderId,
                     }),
                   ),
+                  mediaKey: _i9.Uint8List(0),
                 )),
           )
-          as _i7.Future<({_i9.Uint8List encrypted, String mediaId})>);
+          as _i7.Future<
+            ({_i9.Uint8List encrypted, String mediaId, _i9.Uint8List mediaKey})
+          >);
 
   @override
   _i7.Future<_i9.Uint8List> decryptMedia({
     required _i9.Uint8List? encryptedBytes,
     required String? mediaId,
-    required String? senderId,
-    required String? myUserId,
+    required _i9.Uint8List? mediaKey,
   }) =>
       (super.noSuchMethod(
             Invocation.method(#decryptMedia, [], {
               #encryptedBytes: encryptedBytes,
               #mediaId: mediaId,
-              #senderId: senderId,
-              #myUserId: myUserId,
+              #mediaKey: mediaKey,
             }),
             returnValue: _i7.Future<_i9.Uint8List>.value(_i9.Uint8List(0)),
           )
           as _i7.Future<_i9.Uint8List>);
 
   @override
-  _i7.Future<void> deleteMedia({
-    required String? mediaId,
-    required String? recipientId,
-    required String? senderId,
-  }) =>
+  _i7.Future<void> deleteMedia({required String? mediaId}) =>
       (super.noSuchMethod(
-            Invocation.method(#deleteMedia, [], {
-              #mediaId: mediaId,
-              #recipientId: recipientId,
-              #senderId: senderId,
-            }),
+            Invocation.method(#deleteMedia, [], {#mediaId: mediaId}),
             returnValue: _i7.Future<void>.value(),
             returnValueForMissingStub: _i7.Future<void>.value(),
           )
@@ -1515,16 +1525,14 @@ class MockProtocolService extends _i1.Mock implements _i10.ProtocolService {
   _i7.Future<String> downloadAndDecryptMedia({
     required String? encryptedUrl,
     required String? mediaId,
-    required String? senderId,
-    required String? myUserId,
+    required _i9.Uint8List? mediaKey,
     required bool? isVideo,
   }) =>
       (super.noSuchMethod(
             Invocation.method(#downloadAndDecryptMedia, [], {
               #encryptedUrl: encryptedUrl,
               #mediaId: mediaId,
-              #senderId: senderId,
-              #myUserId: myUserId,
+              #mediaKey: mediaKey,
               #isVideo: isVideo,
             }),
             returnValue: _i7.Future<String>.value(
@@ -1533,8 +1541,7 @@ class MockProtocolService extends _i1.Mock implements _i10.ProtocolService {
                 Invocation.method(#downloadAndDecryptMedia, [], {
                   #encryptedUrl: encryptedUrl,
                   #mediaId: mediaId,
-                  #senderId: senderId,
-                  #myUserId: myUserId,
+                  #mediaKey: mediaKey,
                   #isVideo: isVideo,
                 }),
               ),
@@ -1940,7 +1947,6 @@ class MockTransaction extends _i1.Mock implements _i6.Transaction {
 /// A class which mocks [CollectionReference].
 ///
 /// See the documentation for Mockito's code generation for more information.
-// ignore: must_be_immutable
 class MockCollectionReference extends _i1.Mock
     implements _i6.CollectionReference<Map<String, dynamic>> {
   MockCollectionReference() {
@@ -2367,7 +2373,6 @@ class MockCollectionReference extends _i1.Mock
 /// A class which mocks [DocumentReference].
 ///
 /// See the documentation for Mockito's code generation for more information.
-// ignore: must_be_immutable
 class MockDocumentReference extends _i1.Mock
     implements _i6.DocumentReference<Map<String, dynamic>> {
   MockDocumentReference() {
@@ -2662,7 +2667,6 @@ class MockQueryDocumentSnapshot extends _i1.Mock
 /// A class which mocks [Query].
 ///
 /// See the documentation for Mockito's code generation for more information.
-// ignore: must_be_immutable
 class MockQuery extends _i1.Mock implements _i6.Query<Map<String, dynamic>> {
   MockQuery() {
     _i1.throwOnMissingStub(this);

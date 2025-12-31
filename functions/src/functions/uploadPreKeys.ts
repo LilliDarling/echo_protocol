@@ -44,7 +44,6 @@ export const uploadPreKeys = onCall<UploadPreKeysRequest>(
     let uploadedCount = 0;
 
     await db.runTransaction(async (transaction) => {
-      // READS FIRST: Firestore requires all reads before any writes
       const metadataCol = userRef.collection("metadata");
       const countRef = metadataCol.doc("prekeyCount");
       let countDoc = null;
@@ -52,7 +51,6 @@ export const uploadPreKeys = onCall<UploadPreKeysRequest>(
         countDoc = await transaction.get(countRef);
       }
 
-      // VALIDATION AND PREPARE DATA
       const updateData: Record<string, unknown> = {};
 
       if (identityKey) {
@@ -82,7 +80,6 @@ export const uploadPreKeys = onCall<UploadPreKeysRequest>(
         updateData.signedPrekey = signedPrekey;
       }
 
-      // WRITES: All writes happen after reads
       if (Object.keys(updateData).length > 0) {
         transaction.set(userRef, updateData, {merge: true});
       }

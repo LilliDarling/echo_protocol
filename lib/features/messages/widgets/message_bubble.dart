@@ -160,7 +160,6 @@ class MessageBubble extends StatelessWidget {
     switch (message.type) {
       case EchoType.image:
       case EchoType.video:
-        // Check if content is JSON with keys (encrypted media)
         final isJsonContent = decryptedContent.startsWith('{') && decryptedContent.contains('mediaKey');
         return Column(
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -172,7 +171,6 @@ class MessageBubble extends StatelessWidget {
               myUserId: myUserId,
               decryptedContent: decryptedContent,
             ),
-            // Don't show JSON content as caption
             if (decryptedContent.isNotEmpty && !isJsonContent && decryptedContent != '[Media]' && decryptedContent != '[Image]' && decryptedContent != '[Video]')
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
@@ -186,7 +184,6 @@ class MessageBubble extends StatelessWidget {
         );
 
       case EchoType.gif:
-        // Encrypted GIFs use MediaMessage, unencrypted use direct URL
         if (message.metadata.isEncrypted) {
           final isJsonContent = decryptedContent.startsWith('{') && decryptedContent.contains('mediaKey');
           return Column(

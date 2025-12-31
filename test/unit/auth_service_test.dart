@@ -374,8 +374,12 @@ void main() {
             .thenAnswer((_) async => mnemonic);
         when(mockProtocol.setupKeys(any)).thenAnswer((_) async {});
         when(mockProtocol.getFingerprint()).thenAnswer((_) async => fingerprint);
+        when(mockProtocol.getPublicKey()).thenAnswer((_) async => 'test-public-key');
+        when(mockProtocol.uploadPreKeys()).thenAnswer((_) async {});
 
         when(mockSecureStorage.storeUserId(userId))
+            .thenAnswer((_) async {});
+        when(mockSecureStorage.storePublicKey(any))
             .thenAnswer((_) async {});
 
         when(mockFirestore.collection('users')).thenReturn(mockCollection);
@@ -420,9 +424,12 @@ void main() {
         when(mockProtocol.initialize(recoveryPhrase: anyNamed('recoveryPhrase')))
             .thenAnswer((_) async {});
         when(mockProtocol.getFingerprint()).thenAnswer((_) async => fingerprint);
+        when(mockProtocol.getPublicKey()).thenAnswer((_) async => 'test-public-key');
         when(mockProtocol.uploadPreKeys()).thenAnswer((_) async {});
 
         when(mockSecureStorage.storeUserId(any))
+            .thenAnswer((_) async {});
+        when(mockSecureStorage.storePublicKey(any))
             .thenAnswer((_) async {});
 
         when(mockFirestore.collection('users')).thenReturn(mockCollection);

@@ -407,7 +407,6 @@ class PartnerService {
       try {
         await _protocolService.initializeFromStorage();
       } catch (e) {
-        // Keys not available - user may need to recover with phrase
         return;
       }
     }

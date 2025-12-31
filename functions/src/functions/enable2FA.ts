@@ -16,7 +16,7 @@ export const enable2FA = onCall(
     const userId = request.auth?.uid as string;
     const ip = request.rawRequest.ip || "unknown";
 
-    logger.info("Enabling 2FA", {userId, ip});
+    logger.info("2FA setup initiated");
 
     try {
       const secret = speakeasy.generateSecret({
@@ -52,7 +52,7 @@ export const enable2FA = onCall(
         ip: ip,
       });
 
-      logger.info("2FA enabled successfully", {userId, ip});
+      logger.info("2FA setup complete");
 
       return {
         success: true,
@@ -61,9 +61,7 @@ export const enable2FA = onCall(
         backupCodes: backupCodes,
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error("Failed to enable 2FA", {userId, errorMessage});
+      logger.error("2FA setup failed");
       throw new HttpsError("internal", "Failed to enable 2FA");
     }
   }

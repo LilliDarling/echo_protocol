@@ -60,20 +60,12 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
     const clockSkew = REPLAY_PROTECTION.clockSkewToleranceMinutes * 60 * 1000;
 
     if (now - messageTime > maxAge) {
-      logger.warn("Message timestamp too old", {
-        senderId,
-        messageId,
-        age: now - messageTime,
-      });
+      logger.warn("Message validation failed");
       return {valid: false, error: "Message timestamp expired"};
     }
 
     if (messageTime - now > clockSkew) {
-      logger.warn("Message timestamp in future", {
-        senderId,
-        messageId,
-        drift: messageTime - now,
-      });
+      logger.warn("Message validation failed");
       return {valid: false, error: "Message timestamp in future"};
     }
 
@@ -134,7 +126,6 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
         const convAttemptsInHour = convAttempts.length;
 
         let retryAfterMs = 0;
-        let limitReason = "";
 
         if (userAttemptsInMinute >= rateLimitConfig.maxPerMinute) {
                 type TS = Timestamp;
@@ -147,7 +138,6 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
                     oldestInMinute.toMillis() + 60000 - nowTimestamp.toMillis()
                   );
                 }
-                limitReason = "global minute limit";
         }
 
         if (userAttemptsInHour >= rateLimitConfig.maxPerHour) {
@@ -160,7 +150,6 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
                     oldestInHour.toMillis() + 3600000 - nowTimestamp.toMillis()
                   );
                 }
-                limitReason = "global hour limit";
         }
 
         if (convAttemptsInMinute >= rateLimitConfig.conversationMaxPerMinute) {
@@ -174,7 +163,6 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
                     oldestInMinute.toMillis() + 60000 - nowTimestamp.toMillis()
                   );
                 }
-                limitReason = "conversation minute limit";
         }
 
         if (convAttemptsInHour >= rateLimitConfig.conversationMaxPerHour) {
@@ -187,19 +175,10 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
                     oldestInHour.toMillis() + 3600000 - nowTimestamp.toMillis()
                   );
                 }
-                limitReason = "conversation hour limit";
         }
 
         if (retryAfterMs > 0) {
-          logger.warn("Message rate limit exceeded", {
-            userId: senderId,
-            conversationId,
-            limitReason,
-            userAttemptsInMinute,
-            userAttemptsInHour,
-            convAttemptsInMinute,
-            convAttemptsInHour,
-          });
+          logger.warn("Rate limit exceeded");
 
           return {
             valid: false,
@@ -215,34 +194,19 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
         }
 
         if (nonceDoc.exists) {
-          logger.warn("Duplicate nonce detected (replay attack)", {
-            senderId,
-            messageId,
-            conversationId,
-          });
+          logger.warn("Replay detected");
           return {valid: false, error: "Duplicate message ID"};
         }
 
         const lastSequence = (sequenceDoc.data()?.lastSequence as number) || 0;
         if (sequenceNumber <= lastSequence) {
-          logger.warn("Invalid sequence number (replay/reorder attack)", {
-            senderId,
-            messageId,
-            sequenceNumber,
-            lastSequence,
-          });
+          logger.warn("Sequence validation failed");
           return {valid: false, error: "Invalid sequence number"};
         }
 
         const maxGap = 1000;
         if (sequenceNumber > lastSequence + maxGap) {
-          logger.warn("Sequence number gap too large", {
-            senderId,
-            messageId,
-            sequenceNumber,
-            lastSequence,
-            gap: sequenceNumber - lastSequence,
-          });
+          logger.warn("Sequence validation failed");
           return {valid: false, error: "Invalid sequence number"};
         }
 
@@ -336,9 +300,7 @@ export const validateMessageSend = onCall<ValidateMessageRequest>(
       if (error instanceof HttpsError) {
         throw error;
       }
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error("Message validation failed", {senderId, errorMessage});
+      logger.error("Message validation failed");
       throw new HttpsError("internal", "Validation failed");
     }
   }

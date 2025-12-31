@@ -50,7 +50,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (mounted) {
         if (result.needsRecovery) {
-          // Keys not found - need recovery phrase
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => RecoveryEntryScreen(

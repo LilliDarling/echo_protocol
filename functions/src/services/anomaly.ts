@@ -25,9 +25,8 @@ export async function alertSuspiciousActivity(
       resolved: false,
     });
 
-    logger.warn("Security alert triggered", {ip, alertType, description});
+    logger.warn("Security alert triggered");
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error("Failed to create security alert", {errorMessage});
+    logger.error("Security alert creation failed");
   }
 }

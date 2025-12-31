@@ -109,12 +109,12 @@ export const sendMessage = onCall<SendMessageRequest>(
     const clockSkew = REPLAY_PROTECTION.clockSkewToleranceMinutes * 60 * 1000;
 
     if (now - messageTime > maxAge) {
-      logger.warn("Message timestamp too old", {senderId, messageId});
+      logger.warn("Message validation failed");
       return {success: false, error: "Message timestamp expired"};
     }
 
     if (messageTime - now > clockSkew) {
-      logger.warn("Message timestamp in future", {senderId, messageId});
+      logger.warn("Message validation failed");
       return {success: false, error: "Message timestamp in future"};
     }
 
@@ -164,7 +164,7 @@ export const sendMessage = onCall<SendMessageRequest>(
                 ]);
 
         if (existingMsg.exists) {
-          logger.warn("Message already exists", {senderId, messageId});
+          logger.warn("Duplicate message");
           return {success: false, error: "Message already exists"};
         }
 
@@ -200,7 +200,6 @@ export const sendMessage = onCall<SendMessageRequest>(
         const convAttemptsInHour = convAttempts.length;
 
         let retryAfterMs = 0;
-        let limitReason = "";
 
         if (userAttemptsInMinute >= rateLimitConfig.maxPerMinute) {
                 type TS = Timestamp;
@@ -213,7 +212,6 @@ export const sendMessage = onCall<SendMessageRequest>(
                     oldest.toMillis() + 60000 - nowTimestamp.toMillis()
                   );
                 }
-                limitReason = "global minute limit";
         }
 
         if (userAttemptsInHour >= rateLimitConfig.maxPerHour) {
@@ -226,7 +224,6 @@ export const sendMessage = onCall<SendMessageRequest>(
                     oldest.toMillis() + 3600000 - nowTimestamp.toMillis()
                   );
                 }
-                limitReason = "global hour limit";
         }
 
         if (convAttemptsInMinute >= rateLimitConfig.conversationMaxPerMinute) {
@@ -240,7 +237,6 @@ export const sendMessage = onCall<SendMessageRequest>(
                     oldest.toMillis() + 60000 - nowTimestamp.toMillis()
                   );
                 }
-                limitReason = "conversation minute limit";
         }
 
         if (convAttemptsInHour >= rateLimitConfig.conversationMaxPerHour) {
@@ -253,15 +249,10 @@ export const sendMessage = onCall<SendMessageRequest>(
                     oldest.toMillis() + 3600000 - nowTimestamp.toMillis()
                   );
                 }
-                limitReason = "conversation hour limit";
         }
 
         if (retryAfterMs > 0) {
-          logger.warn("Message rate limit exceeded", {
-            userId: senderId,
-            conversationId,
-            limitReason,
-          });
+          logger.warn("Rate limit exceeded");
 
           return {
             success: false,
@@ -273,27 +264,19 @@ export const sendMessage = onCall<SendMessageRequest>(
         }
 
         if (nonceDoc.exists) {
-          logger.warn("Duplicate nonce detected (replay attack)", {
-            senderId,
-            messageId,
-          });
+          logger.warn("Replay detected");
           return {success: false, error: "Duplicate message ID"};
         }
 
         const lastSequence = (sequenceDoc.data()?.lastSequence as number) || 0;
         if (sequenceNumber <= lastSequence) {
-          logger.warn("Invalid sequence number", {
-            senderId,
-            messageId,
-            sequenceNumber,
-            lastSequence,
-          });
+          logger.warn("Sequence validation failed");
           return {success: false, error: "Invalid sequence number"};
         }
 
         const maxGap = 1000;
         if (sequenceNumber > lastSequence + maxGap) {
-          logger.warn("Sequence gap too large", {senderId, sequenceNumber});
+          logger.warn("Sequence validation failed");
           return {success: false, error: "Invalid sequence number"};
         }
 
@@ -397,9 +380,7 @@ export const sendMessage = onCall<SendMessageRequest>(
       if (error instanceof HttpsError) {
         throw error;
       }
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error("Message send failed", {senderId, errorMessage});
+      logger.error("Message send failed");
       throw new HttpsError("internal", "Failed to send message");
     }
   }

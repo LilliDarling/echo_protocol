@@ -24,7 +24,7 @@ export const regenerateBackupCodes = onCall(
       );
     }
 
-    logger.info("Regenerating backup codes", {userId, ip});
+    logger.info("Backup code regeneration initiated");
 
     try {
       const secretDoc = await db
@@ -65,7 +65,7 @@ export const regenerateBackupCodes = onCall(
         ip: ip,
       });
 
-      logger.info("Backup codes regenerated successfully", {userId, ip});
+      logger.info("Backup codes regenerated");
 
       return {
         success: true,
@@ -75,12 +75,7 @@ export const regenerateBackupCodes = onCall(
       if (error instanceof HttpsError) {
         throw error;
       }
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error("Failed to regenerate backup codes", {
-        userId,
-        errorMessage,
-      });
+      logger.error("Backup code regeneration failed");
       throw new HttpsError("internal", "Failed to regenerate backup codes");
     }
   }

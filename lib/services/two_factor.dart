@@ -30,7 +30,7 @@ class TwoFactorService {
       final backupCodes = List<String>.from(data['backupCodes'] as List);
       await _secureStorage.storeBackupCodes(backupCodes);
 
-      LoggerService.auth('2FA enabled via Cloud Function', userId: userId);
+      LoggerService.auth('2FA setup complete');
 
       return TwoFactorSetup(
         secret: data['secret'] as String,
@@ -38,7 +38,7 @@ class TwoFactorService {
         backupCodes: backupCodes,
       );
     } on FirebaseFunctionsException catch (e) {
-      LoggerService.error('Failed to enable 2FA: ${e.code}');
+      LoggerService.error('2FA setup failed');
       throw _handleFunctionsException(e);
     } catch (e) {
       throw Exception('Failed to enable 2FA: $e');
@@ -56,7 +56,7 @@ class TwoFactorService {
       final verified = data['verified'] as bool? ?? false;
 
       if (verified) {
-        LoggerService.auth('2FA TOTP verified', userId: userId);
+        LoggerService.auth('2FA verified');
       }
 
       return verified;
@@ -76,14 +76,13 @@ class TwoFactorService {
       final result = await callable.call({'code': code});
       final data = result.data as Map<String, dynamic>;
       final verified = data['verified'] as bool? ?? false;
-      final remaining = data['remainingBackupCodes'] as int? ?? 0;
 
       if (verified) {
         final localCodes = await _secureStorage.getBackupCodes() ?? [];
         localCodes.remove(code);
         localCodes.removeWhere((c) => c.replaceAll('-', '') == code.replaceAll('-', ''));
         await _secureStorage.storeBackupCodes(localCodes);
-        LoggerService.auth('2FA backup code verified ($remaining remaining)', userId: userId);
+        LoggerService.auth('Backup code verified');
       }
 
       return verified;
@@ -102,7 +101,7 @@ class TwoFactorService {
       final callable = _functions.httpsCallable('disable2FA');
       await callable.call({'code': totpCode});
       await _secureStorage.clearTwoFactor();
-      LoggerService.auth('2FA disabled', userId: userId);
+      LoggerService.auth('2FA disabled');
     } on FirebaseFunctionsException catch (e) {
       throw _handleFunctionsException(e);
     }
@@ -116,7 +115,7 @@ class TwoFactorService {
       final backupCodes = List<String>.from(data['backupCodes'] as List);
 
       await _secureStorage.storeBackupCodes(backupCodes);
-      LoggerService.auth('Backup codes regenerated', userId: userId);
+      LoggerService.auth('Backup codes regenerated');
 
       return backupCodes;
     } on FirebaseFunctionsException catch (e) {

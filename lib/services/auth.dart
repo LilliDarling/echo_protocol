@@ -63,22 +63,17 @@ class AuthService {
       final sanitizedName = displayName.trim();
       await credential.user?.updateDisplayName(sanitizedName);
 
-      // Store userId first for any fallback operations
       await _secureStorage.storeUserId(credential.user!.uid);
 
-      // Generate keys locally first (without uploading)
       final mnemonic = await _protocolService.generateRecoveryPhrase();
       await _protocolService.initialize(recoveryPhrase: mnemonic);
       final fingerprint = await _protocolService.getFingerprint();
       final publicKey = await _protocolService.getPublicKey();
 
-      // Store public key for partner linking
       if (publicKey != null) {
         await _secureStorage.storePublicKey(publicKey);
       }
 
-      // Create user document BEFORE uploading prekeys
-      // This ensures Firestore rules are satisfied for any fallback writes
       await _createUserDocument(
         userId: credential.user!.uid,
         email: email,
@@ -88,16 +83,15 @@ class AuthService {
         fingerprint: fingerprint ?? '',
       );
 
-      // Now upload prekeys (safe to do after user doc exists)
       await _protocolService.uploadPreKeys();
 
-      LoggerService.auth('Sign up successful', userId: credential.user!.uid);
+      LoggerService.auth('Sign up complete');
       return SignUpResult(
         credential: credential,
         recoveryPhrase: mnemonic,
       );
     } on FirebaseAuthException catch (e) {
-      LoggerService.error('Sign up failed: ${e.code}');
+      LoggerService.error('Sign up failed');
       throw _handleAuthException(e);
     }
   }
@@ -117,10 +111,10 @@ class AuthService {
         await _updateLastActive(credential.user!.uid);
       }
 
-      LoggerService.auth('Sign in successful', userId: credential.user!.uid);
+      LoggerService.auth('Sign in complete');
       return SignInResult(credential: credential, needsRecovery: needsRecovery);
     } on FirebaseAuthException catch (e) {
-      LoggerService.error('Sign in failed: ${e.code}');
+      LoggerService.error('Sign in failed');
       throw _handleAuthException(e);
     }
   }
@@ -150,21 +144,17 @@ class AuthService {
       final isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
 
       if (isNewUser) {
-        // Store userId first for any fallback operations
         await _secureStorage.storeUserId(userCredential.user!.uid);
 
-        // Generate keys locally first (without uploading)
         final mnemonic = await _protocolService.generateRecoveryPhrase();
         await _protocolService.initialize(recoveryPhrase: mnemonic);
         final fingerprint = await _protocolService.getFingerprint();
         final publicKey = await _protocolService.getPublicKey();
 
-        // Store public key for partner linking
         if (publicKey != null) {
           await _secureStorage.storePublicKey(publicKey);
         }
 
-        // Create user document BEFORE uploading prekeys
         await _createUserDocument(
           userId: userCredential.user!.uid,
           email: userCredential.user!.email!,
@@ -174,10 +164,9 @@ class AuthService {
           fingerprint: fingerprint ?? '',
         );
 
-        // Now upload prekeys (safe to do after user doc exists)
         await _protocolService.uploadPreKeys();
 
-        LoggerService.auth('Google sign-up successful', userId: userCredential.user!.uid);
+        LoggerService.auth('Google sign-up complete');
         return SignUpResult(
           credential: userCredential,
           recoveryPhrase: mnemonic,
@@ -188,11 +177,11 @@ class AuthService {
           await _updateLastActive(userCredential.user!.uid);
         }
 
-        LoggerService.auth('Google sign-in successful', userId: userCredential.user!.uid);
+        LoggerService.auth('Google sign-in complete');
         return SignInResult(credential: userCredential, needsRecovery: needsRecovery);
       }
     } on FirebaseAuthException catch (e) {
-      LoggerService.error('Google sign-in failed: ${e.code}');
+      LoggerService.error('Google sign-in failed');
       throw _handleAuthException(e);
     } catch (e) {
       LoggerService.error('Google sign-in failed');
@@ -201,25 +190,15 @@ class AuthService {
   }
 
   Future<void> signOut() async {
-    try {
-      final userId = currentUserId;
-
-      if (!kIsWeb) {
-        try {
-          await GoogleSignIn.instance.signOut();
-        } catch (e) {
-          // Continue with Firebase sign out
-        }
-      }
-
-      await _auth.signOut();
-
-      LoggerService.auth('Sign out successful', userId: userId);
-      await _secureStorage.clear2FASessionVerified();
-    } catch (e) {
-      LoggerService.error('Sign out failed');
-      throw Exception('Failed to sign out');
+    if (!kIsWeb) {
+      try {
+        await GoogleSignIn.instance.signOut();
+      } catch (_) {}
     }
+
+    await _auth.signOut();
+    LoggerService.auth('Sign out complete');
+    await _secureStorage.clear2FASessionVerified();
   }
 
   Future<void> resetPassword(String email) async {
@@ -335,7 +314,7 @@ class AuthService {
 
     await _secureStorage.storeUserId(user.uid);
     await _updateLastActive(user.uid);
-    LoggerService.auth('Recovery successful', userId: user.uid);
+    LoggerService.auth('Recovery complete');
   }
 
   Future<void> _createUserDocument({
@@ -347,7 +326,7 @@ class AuthService {
     required String fingerprint,
   }) async {
     final now = DateTime.now();
-    const initialVersion = 1;  // Key version starts at 1, increments on rotation
+    const initialVersion = 1;
 
     final userModel = UserModel(
       id: userId,

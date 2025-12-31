@@ -22,7 +22,7 @@ export const disable2FA = onCall(
       );
     }
 
-    logger.info("Disabling 2FA", {userId, ip});
+    logger.info("2FA disable initiated");
 
     try {
       const secretDoc = await db
@@ -66,7 +66,7 @@ export const disable2FA = onCall(
         ip: ip,
       });
 
-      logger.info("2FA disabled successfully", {userId, ip});
+      logger.info("2FA disabled");
 
       return {
         success: true,
@@ -75,9 +75,7 @@ export const disable2FA = onCall(
       if (error instanceof HttpsError) {
         throw error;
       }
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error("Failed to disable 2FA", {userId, errorMessage});
+      logger.error("2FA disable failed");
       throw new HttpsError("internal", "Failed to disable 2FA");
     }
   }
