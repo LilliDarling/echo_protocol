@@ -184,11 +184,21 @@ class IdentityPublicKey {
     'keyId': keyId,
   };
 
-  factory IdentityPublicKey.fromJson(Map<String, dynamic> json) => IdentityPublicKey(
-    ed25519PublicKey: base64Decode(json['ed25519'] as String),
-    x25519PublicKey: base64Decode(json['x25519'] as String),
-    keyId: json['keyId'] as String,
-  );
+  factory IdentityPublicKey.fromJson(Map<String, dynamic> json) {
+    final ed25519 = json['ed25519'];
+    final x25519 = json['x25519'];
+    final keyId = json['keyId'];
+
+    if (ed25519 == null || x25519 == null || keyId == null) {
+      throw Exception('Invalid identity key data - missing required fields');
+    }
+
+    return IdentityPublicKey(
+      ed25519PublicKey: base64Decode(ed25519 as String),
+      x25519PublicKey: base64Decode(x25519 as String),
+      keyId: keyId as String,
+    );
+  }
 
   Uint8List toBytes() {
     final keyIdBytes = utf8.encode(keyId);

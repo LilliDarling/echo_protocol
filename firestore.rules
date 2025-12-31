@@ -48,8 +48,9 @@ service cloud.firestore {
       // Users can read their own document
       // Partners can also read each other's documents (for name, avatar, identity keys)
       // Uses partnerIdHash for security - partnerId itself is encrypted
+      // Note: toHexString() returns uppercase, stored hash is lowercase, so use .lower()
       allow read: if isOwner(userId)
-        || (isAuthenticated() && resource.data.partnerIdHash == hashing.sha256(request.auth.uid.toUtf8()));
+        || (isAuthenticated() && resource.data.partnerIdHash == hashing.sha256(request.auth.uid.toUtf8()).toHexString().lower());
 
       // Users can create their own document during signup
       // Note: identityKey and signedPrekey are set later via Cloud Functions

@@ -415,7 +415,7 @@ class SessionManager {
         'recipientId': recipientId,
       });
 
-      final data = result.data as Map<String, dynamic>;
+      final data = Map<String, dynamic>.from(result.data as Map);
       return PreKeyBundle.fromJson(data);
     } catch (e) {
       throw Exception(

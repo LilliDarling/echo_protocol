@@ -114,10 +114,10 @@ class SignedPrekeyPublic {
   };
 
   factory SignedPrekeyPublic.fromJson(Map<String, dynamic> json) => SignedPrekeyPublic(
-    id: json['id'] as int,
+    id: (json['id'] as num).toInt(),
     publicKey: base64Decode(json['publicKey'] as String),
     signature: base64Decode(json['signature'] as String),
-    expiresAt: DateTime.fromMillisecondsSinceEpoch(json['expiresAt'] as int),
+    expiresAt: DateTime.fromMillisecondsSinceEpoch((json['expiresAt'] as num).toInt()),
   );
 
   Uint8List toBytes() {
@@ -224,7 +224,7 @@ class OneTimePrekeyPublic {
   };
 
   factory OneTimePrekeyPublic.fromJson(Map<String, dynamic> json) => OneTimePrekeyPublic(
-    id: json['id'] as int,
+    id: (json['id'] as num).toInt(),
     publicKey: base64Decode(json['publicKey'] as String),
   );
 
@@ -270,12 +270,18 @@ class PreKeyBundle {
     'registrationId': registrationId,
   };
 
-  factory PreKeyBundle.fromJson(Map<String, dynamic> json) => PreKeyBundle(
-    identityKey: IdentityPublicKey.fromJson(json['identityKey'] as Map<String, dynamic>),
-    signedPrekey: SignedPrekeyPublic.fromJson(json['signedPrekey'] as Map<String, dynamic>),
-    oneTimePrekey: json['oneTimePrekey'] != null
-        ? OneTimePrekeyPublic.fromJson(json['oneTimePrekey'] as Map<String, dynamic>)
-        : null,
-    registrationId: json['registrationId'] as int,
-  );
+  factory PreKeyBundle.fromJson(Map<String, dynamic> json) {
+    final identityKeyData = Map<String, dynamic>.from(json['identityKey'] as Map);
+    final signedPrekeyData = Map<String, dynamic>.from(json['signedPrekey'] as Map);
+    final oneTimePrekeyRaw = json['oneTimePrekey'];
+
+    return PreKeyBundle(
+      identityKey: IdentityPublicKey.fromJson(identityKeyData),
+      signedPrekey: SignedPrekeyPublic.fromJson(signedPrekeyData),
+      oneTimePrekey: oneTimePrekeyRaw != null
+          ? OneTimePrekeyPublic.fromJson(Map<String, dynamic>.from(oneTimePrekeyRaw as Map))
+          : null,
+      registrationId: (json['registrationId'] as num).toInt(),
+    );
+  }
 }

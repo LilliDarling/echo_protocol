@@ -209,12 +209,23 @@ class RatchetSession {
       throw SessionVersionException(version, currentVersion);
     }
 
+    final sessionId = json['sessionId'];
+    final ourUserId = json['ourUserId'];
+    final theirUserId = json['theirUserId'];
+    final theirIdentityKey = json['theirIdentityKey'];
+    final rootKey = json['rootKey'];
+
+    if (sessionId == null || ourUserId == null || theirUserId == null ||
+        theirIdentityKey == null || rootKey == null) {
+      throw Exception('Corrupted session data - missing required fields');
+    }
+
     return RatchetSession(
-      sessionId: json['sessionId'] as String,
-      ourUserId: json['ourUserId'] as String,
-      theirUserId: json['theirUserId'] as String,
-      theirIdentityKey: IdentityPublicKey.fromJson(json['theirIdentityKey'] as Map<String, dynamic>),
-      rootKey: base64Decode(json['rootKey'] as String),
+      sessionId: sessionId as String,
+      ourUserId: ourUserId as String,
+      theirUserId: theirUserId as String,
+      theirIdentityKey: IdentityPublicKey.fromJson(Map<String, dynamic>.from(theirIdentityKey as Map)),
+      rootKey: base64Decode(rootKey as String),
       ourRatchetPrivateKey: json['ourRatchetPrivateKey'] != null
           ? base64Decode(json['ourRatchetPrivateKey'] as String) : null,
       ourRatchetPublicKey: json['ourRatchetPublicKey'] != null

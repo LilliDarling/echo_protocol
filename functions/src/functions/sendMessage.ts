@@ -48,6 +48,8 @@ export const sendMessage = onCall<SendMessageRequest>(
       timestamp,
       senderKeyVersion,
       recipientKeyVersion,
+      type,
+      metadata,
       mediaType,
       mediaUrl,
       thumbnailUrl,
@@ -357,8 +359,14 @@ export const sendMessage = onCall<SendMessageRequest>(
           timestamp: Timestamp.fromMillis(messageTime),
           senderKeyVersion,
           recipientKeyVersion,
+          sequenceNumber,
+          type: type || "text",
+          metadata: metadata || {},
           status: "sent",
           createdAt: FieldValue.serverTimestamp(),
+          isEdited: false,
+          isDeleted: false,
+          encryptionVersion: 2,
         };
 
         if (mediaType) messageData.mediaType = mediaType;

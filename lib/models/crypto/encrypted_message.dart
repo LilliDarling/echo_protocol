@@ -87,11 +87,11 @@ class EncryptedMessage {
   };
 
   factory EncryptedMessage.fromJson(Map<String, dynamic> json) => EncryptedMessage(
-    type: MessageType.fromValue(json['type'] as int),
-    version: json['version'] as int,
+    type: MessageType.fromValue((json['type'] as num).toInt()),
+    version: (json['version'] as num).toInt(),
     senderRatchetKey: base64Decode(json['senderRatchetKey'] as String),
-    previousChainLength: json['previousChainLength'] as int,
-    messageIndex: json['messageIndex'] as int,
+    previousChainLength: (json['previousChainLength'] as num).toInt(),
+    messageIndex: (json['messageIndex'] as num).toInt(),
     ciphertext: base64Decode(json['ciphertext'] as String),
   );
 }
@@ -180,20 +180,23 @@ class PreKeyMessage {
   };
 
   factory PreKeyMessage.fromJson(Map<String, dynamic> json) {
-    final version = json['version'] as int;
+    final version = (json['version'] as num).toInt();
 
     if (version != currentVersion) {
       throw ArgumentError('Unsupported PreKeyMessage version: $version');
     }
+
+    final oneTimePrekeyIdRaw = json['oneTimePrekeyId'];
+    final innerMessageRaw = json['innerMessage'];
 
     return PreKeyMessage(
       version: version,
       senderIdentityKeyEd25519: base64Decode(json['senderIdentityKeyEd25519'] as String),
       senderIdentityKeyX25519: base64Decode(json['senderIdentityKeyX25519'] as String),
       ephemeralKey: base64Decode(json['ephemeralKey'] as String),
-      signedPrekeyId: json['signedPrekeyId'] as int,
-      oneTimePrekeyId: json['oneTimePrekeyId'] as int?,
-      innerMessage: EncryptedMessage.fromJson(json['innerMessage'] as Map<String, dynamic>),
+      signedPrekeyId: (json['signedPrekeyId'] as num).toInt(),
+      oneTimePrekeyId: oneTimePrekeyIdRaw != null ? (oneTimePrekeyIdRaw as num).toInt() : null,
+      innerMessage: EncryptedMessage.fromJson(Map<String, dynamic>.from(innerMessageRaw as Map)),
     );
   }
 

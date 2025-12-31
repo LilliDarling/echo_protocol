@@ -20,6 +20,8 @@ class MessageEncryptionHelper {
     required String plaintext,
     required String partnerId,
     required String senderId,
+    int senderKeyVersion = 1,
+    int recipientKeyVersion = 1,
   }) async {
     if (_rateLimiter != null) {
       final delay = await _rateLimiter.checkRateLimit(
@@ -52,6 +54,8 @@ class MessageEncryptionHelper {
       'content': result['content'],
       'encryptionVersion': result['encryptionVersion'],
       'sequenceNumber': sequenceNumber,
+      'senderKeyVersion': result['senderKeyVersion'] ?? senderKeyVersion,
+      'recipientKeyVersion': result['recipientKeyVersion'] ?? recipientKeyVersion,
     };
   }
 

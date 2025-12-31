@@ -7,8 +7,9 @@ import * as ed from "@noble/ed25519";
 import {sha512} from "@noble/hashes/sha2.js";
 import {db} from "../firebase.js";
 
-// Enable sync methods for @noble/ed25519 v3
+// Enable both sync and async methods for @noble/ed25519 v3
 ed.hashes.sha512 = sha512;
+ed.hashes.sha512Async = (msg: Uint8Array) => Promise.resolve(sha512(msg));
 
 /**
  * Generate a short correlation ID for logging.
@@ -166,24 +167,31 @@ export const acceptPartnerInvite = onCall(
           `${expiresAtMs}`;
         const payloadBytes = Buffer.from(payload, "utf-8");
 
-        // Debug logging
-        logger.info("Signature debug", {
+        // Detailed debug logging
+        logger.info("Verification inputs", {
           correlationId,
           payload,
+          payloadHex: payloadBytes.toString("hex"),
+          signatureHex: signatureBytes.toString("hex"),
+          pubKeyHex: publicKeyBytes.toString("hex"),
           signatureLen: signatureBytes.length,
           pubKeyLen: publicKeyBytes.length,
-          signatureHex: signatureBytes.toString("hex").substring(0, 32),
-          pubKeyHex: publicKeyBytes.toString("hex"),
         });
 
         try {
           // Convert standard Node Buffers to Uint8Arrays for Noble
-          // Using sync verify with sha512Sync configured above
-          const isValid = ed.verify(
-            new Uint8Array(signatureBytes),
-            new Uint8Array(payloadBytes),
-            new Uint8Array(publicKeyBytes)
-          );
+          const sig = new Uint8Array(signatureBytes);
+          const msg = new Uint8Array(payloadBytes);
+          const pub = new Uint8Array(publicKeyBytes);
+
+          // Use verifyAsync for @noble/ed25519 v3
+          const isValid = await ed.verifyAsync(sig, msg, pub);
+
+          logger.info("Verification result", {
+            correlationId,
+            isValid,
+            isValidType: typeof isValid,
+          });
 
           if (!isValid) {
             logger.warn(
@@ -201,7 +209,7 @@ export const acceptPartnerInvite = onCall(
           }
           logger.error(
             "Noble Ed25519 verification error",
-            {error: err, correlationId}
+            {error: String(err), correlationId}
           );
           throw new HttpsError("internal", "Signature processing failed");
         }
@@ -318,8 +326,18 @@ export const acceptPartnerInvite = onCall(
           usedBy: userId,
         });
 
+        // Hash partner IDs for secure cross-user reads
+        // partnerIdHash allows partner to read this user's document
+        const userPartnerIdHash = createHash("sha256")
+          .update(partnerId)
+          .digest("hex");
+        const partnerPartnerIdHash = createHash("sha256")
+          .update(userId)
+          .digest("hex");
+
         transaction.update(db.collection("users").doc(userId), {
           partnerId: partnerId,
+          partnerIdHash: userPartnerIdHash,
           partnerPublicKey: partnerPublicKey,
           partnerKeyVersion: partnerKeyVersion,
           partnerLinkedAt: FieldValue.serverTimestamp(),
@@ -327,6 +345,7 @@ export const acceptPartnerInvite = onCall(
 
         transaction.update(db.collection("users").doc(partnerId), {
           partnerId: userId,
+          partnerIdHash: partnerPartnerIdHash,
           partnerPublicKey: myPublicKey,
           partnerKeyVersion: keyVersion,
           partnerLinkedAt: FieldValue.serverTimestamp(),

@@ -347,7 +347,7 @@ class AuthService {
     required String fingerprint,
   }) async {
     final now = DateTime.now();
-    final initialVersion = now.millisecondsSinceEpoch ~/ 1000;
+    const initialVersion = 1;  // Key version starts at 1, increments on rotation
 
     final userModel = UserModel(
       id: userId,

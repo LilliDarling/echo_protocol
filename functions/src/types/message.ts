@@ -7,6 +7,8 @@ export interface SendMessageRequest {
   timestamp: number;
   senderKeyVersion: number;
   recipientKeyVersion: number;
+  type?: string;
+  metadata?: Record<string, unknown>;
   mediaType?: string;
   mediaUrl?: string;
   thumbnailUrl?: string;

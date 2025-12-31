@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../models/echo.dart';
 import '../../../services/partner.dart';
@@ -9,7 +10,6 @@ import '../../../services/crypto/media_encryption.dart';
 import '../../../services/secure_storage.dart';
 import '../../../services/message_encryption_helper.dart';
 import '../../../services/message_rate_limiter.dart';
-import '../../../services/replay_protection.dart';
 import '../../../utils/decrypted_content_cache.dart';
 import '../../../services/read_receipt.dart';
 import '../../../services/offline_queue.dart';
@@ -21,12 +21,12 @@ class ConversationController extends ChangeNotifier {
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   late final ProtocolService _protocolService;
   late final SecureStorageService _secureStorage;
   late final MessageEncryptionHelper _encryptionHelper;
   late final MessageRateLimiter _rateLimiter;
-  late final ReplayProtectionService _replayProtection;
   MediaEncryptionService? _mediaEncryptionService;
   late final DecryptedContentCacheService _contentCache;
   late final ReadReceiptService _readReceiptService;
@@ -85,6 +85,30 @@ class ConversationController extends ChangeNotifier {
   CollectionReference<Map<String, dynamic>> get _messagesRef =>
       _db.collection('conversations').doc(conversationId).collection('messages');
 
+  /// Get the next sequence number for this conversation
+  Future<int> _getNextSequenceNumber() async {
+    final sortedIds = [currentUserId, partner.id]..sort();
+    final conversationKey = '${sortedIds[0]}_${sortedIds[1]}';
+    final docRef = _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('message_sequences')
+        .doc(conversationKey);
+
+    return await _db.runTransaction<int>((transaction) async {
+      final doc = await transaction.get(docRef);
+      final lastSeq = (doc.data()?['lastSequence'] as num?)?.toInt() ?? 0;
+      final nextSeq = lastSeq + 1;
+
+      transaction.set(docRef, {
+        'lastSequence': nextSeq,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      return nextSeq;
+    });
+  }
+
   Future<void> initialize() async {
     await _initializeServices();
     await _loadInitialMessages();
@@ -96,7 +120,6 @@ class ConversationController extends ChangeNotifier {
       _protocolService = ProtocolService();
       _secureStorage = SecureStorageService();
       _rateLimiter = MessageRateLimiter();
-      _replayProtection = ReplayProtectionService(userId: currentUserId);
 
       _contentCache = DecryptedContentCacheService(secureStorage: _secureStorage);
       await _contentCache.loadFromDisk();
@@ -110,7 +133,6 @@ class ConversationController extends ChangeNotifier {
 
       _encryptionHelper = MessageEncryptionHelper(
         protocolService: _protocolService,
-        replayProtection: _replayProtection,
         rateLimiter: _rateLimiter,
       );
 
@@ -365,42 +387,12 @@ class ConversationController extends ChangeNotifier {
         plaintext: text,
         partnerId: partner.id,
         senderId: currentUserId,
+        recipientKeyVersion: partner.keyVersion,
       );
 
       final messageId = _messagesRef.doc().id;
       final timestamp = DateTime.now();
-      final sequenceNumber = encryptionResult['sequenceNumber'] as int;
-
-      String? validationToken;
-      bool useOfflineQueue = false;
-
-      try {
-        final validationResult = await _replayProtection.validateMessageServerSide(
-          messageId: messageId,
-          conversationId: conversationId,
-          recipientId: partner.id,
-          sequenceNumber: sequenceNumber,
-          timestamp: timestamp,
-        );
-
-        if (!validationResult.valid) {
-          if (validationResult.isRateLimited) {
-            final retrySeconds = validationResult.retryAfter.inSeconds;
-            throw Exception(
-              'Message rate limit exceeded. Please wait ${retrySeconds > 60 ? '${(retrySeconds / 60).ceil()} minutes' : '$retrySeconds seconds'}.',
-            );
-          }
-          throw Exception(validationResult.error ?? 'Message validation failed');
-        }
-
-        validationToken = validationResult.token;
-      } catch (e) {
-        if (!_offlineQueue.isOnline || e.toString().contains('network')) {
-          useOfflineQueue = true;
-        } else {
-          rethrow;
-        }
-      }
+      final sequenceNumber = await _getNextSequenceNumber();
 
       final message = EchoModel(
         id: messageId,
@@ -409,20 +401,21 @@ class ConversationController extends ChangeNotifier {
         content: encryptionResult['content'] as String,
         timestamp: timestamp,
         type: type,
-        status: useOfflineQueue ? EchoStatus.pending : EchoStatus.sent,
+        status: EchoStatus.pending,
         metadata: metadata ?? EchoMetadata.empty(),
         senderKeyVersion: encryptionResult['senderKeyVersion'] as int,
         recipientKeyVersion: encryptionResult['recipientKeyVersion'] as int,
         sequenceNumber: sequenceNumber,
-        validationToken: validationToken,
         conversationId: conversationId,
       );
 
+      // Add to local list immediately for optimistic UI
       _contentCache.put(messageId, text);
       _messages = [..._messages, message];
       notifyListeners();
 
-      if (useOfflineQueue) {
+      // Check if offline - queue for later
+      if (!_offlineQueue.isOnline) {
         await _offlineQueue.enqueue(
           messageId: messageId,
           conversationId: conversationId,
@@ -435,16 +428,47 @@ class ConversationController extends ChangeNotifier {
           senderKeyVersion: encryptionResult['senderKeyVersion'] as int,
           recipientKeyVersion: encryptionResult['recipientKeyVersion'] as int,
           sequenceNumber: sequenceNumber,
-          validationToken: validationToken,
         );
-      } else {
-        await _messagesRef.doc(messageId).set(message.toJson());
+        return;
+      }
 
-        await _db.collection('conversations').doc(conversationId).update({
-          'lastMessage': encryptionResult['content'] as String,
-          'lastMessageAt': FieldValue.serverTimestamp(),
-          'unreadCount.${partner.id}': FieldValue.increment(1),
-        });
+      // Send via Cloud Function (handles rate limiting, replay protection, and Firestore write)
+      final result = await _functions.httpsCallable('sendMessage').call({
+        'messageId': messageId,
+        'conversationId': conversationId,
+        'recipientId': partner.id,
+        'content': encryptionResult['content'] as String,
+        'sequenceNumber': sequenceNumber,
+        'timestamp': timestamp.millisecondsSinceEpoch,
+        'senderKeyVersion': encryptionResult['senderKeyVersion'] as int,
+        'recipientKeyVersion': encryptionResult['recipientKeyVersion'] as int,
+        'type': type.value,
+        'metadata': (metadata ?? EchoMetadata.empty()).toJson(),
+        if (type == EchoType.image || type == EchoType.video)
+          'mediaType': type.name,
+        if (metadata?.fileUrl != null) 'mediaUrl': metadata!.fileUrl,
+        if (metadata?.thumbnailUrl != null) 'thumbnailUrl': metadata!.thumbnailUrl,
+      });
+
+      final data = Map<String, dynamic>.from(result.data as Map);
+
+      if (data['success'] != true) {
+        final error = data['error'] as String?;
+        if (data['retryAfterMs'] != null) {
+          final retryMs = (data['retryAfterMs'] as num).toInt();
+          final retrySeconds = (retryMs / 1000).ceil();
+          throw Exception(
+            'Message rate limit exceeded. Please wait ${retrySeconds > 60 ? '${(retrySeconds / 60).ceil()} minutes' : '$retrySeconds seconds'}.',
+          );
+        }
+        throw Exception(error ?? 'Failed to send message');
+      }
+
+      // Update local message status to sent
+      final index = _messages.indexWhere((m) => m.id == messageId);
+      if (index != -1) {
+        _messages[index] = _messages[index].copyWith(status: EchoStatus.sent);
+        notifyListeners();
       }
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
@@ -466,6 +490,7 @@ class ConversationController extends ChangeNotifier {
         plaintext: newText,
         partnerId: partner.id,
         senderId: currentUserId,
+        recipientKeyVersion: partner.keyVersion,
       );
 
       _contentCache.put(message.id, newText);

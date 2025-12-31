@@ -382,6 +382,7 @@ class PartnerService {
     final batch = _db.batch();
     batch.update(_db.collection('users').doc(user.uid), {
       'partnerId': FieldValue.delete(),
+      'partnerIdHash': FieldValue.delete(),
       'partnerPublicKey': FieldValue.delete(),
       'partnerKeyVersion': FieldValue.delete(),
       'partnerLinkedAt': FieldValue.delete(),
@@ -389,6 +390,7 @@ class PartnerService {
 
     batch.update(_db.collection('users').doc(partnerId), {
       'partnerId': FieldValue.delete(),
+      'partnerIdHash': FieldValue.delete(),
       'partnerPublicKey': FieldValue.delete(),
       'partnerKeyVersion': FieldValue.delete(),
       'partnerLinkedAt': FieldValue.delete(),

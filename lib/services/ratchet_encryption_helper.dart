@@ -16,6 +16,7 @@ class RatchetEncryptionHelper {
     required String plaintext,
     required String partnerId,
     required String senderId,
+    int recipientKeyVersion = 1,
   }) async {
     if (_rateLimiter != null) {
       final delay = await _rateLimiter.checkRateLimit(
@@ -33,11 +34,16 @@ class RatchetEncryptionHelper {
       );
     }
 
-    return _protocolService.encryptForSending(
+    final result = await _protocolService.encryptForSending(
       plaintext: plaintext,
       recipientId: partnerId,
       senderId: senderId,
     );
+
+    return {
+      ...result,
+      'recipientKeyVersion': recipientKeyVersion,
+    };
   }
 
   Future<String> decryptMessage({

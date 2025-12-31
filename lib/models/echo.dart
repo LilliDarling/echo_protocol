@@ -44,16 +44,22 @@ class EchoModel {
   factory EchoModel.fromJson(String id, Map<String, dynamic> json) {
     return EchoModel(
       id: id,
-      senderId: json['senderId'] as String,
-      recipientId: json['recipientId'] as String,
-      content: json['content'] as String,
+      senderId: json['senderId'] as String? ?? '',
+      recipientId: json['recipientId'] as String? ?? '',
+      content: json['content'] as String? ?? '',
       timestamp: (json['timestamp'] as Timestamp).toDate(),
-      type: EchoType.fromString(json['type'] as String),
-      status: EchoStatus.fromString(json['status'] as String),
-      metadata: EchoMetadata.fromJson(json['metadata'] as Map<String, dynamic>),
-      senderKeyVersion: json['senderKeyVersion'] as int? ?? 0,
-      recipientKeyVersion: json['recipientKeyVersion'] as int? ?? 0,
-      sequenceNumber: json['sequenceNumber'] as int? ?? 0,
+      type: json['type'] != null
+          ? EchoType.fromString(json['type'] as String)
+          : EchoType.text,
+      status: json['status'] != null
+          ? EchoStatus.fromString(json['status'] as String)
+          : EchoStatus.sent,
+      metadata: json['metadata'] != null
+          ? EchoMetadata.fromJson(Map<String, dynamic>.from(json['metadata'] as Map))
+          : EchoMetadata.empty(),
+      senderKeyVersion: (json['senderKeyVersion'] as num?)?.toInt() ?? 0,
+      recipientKeyVersion: (json['recipientKeyVersion'] as num?)?.toInt() ?? 0,
+      sequenceNumber: (json['sequenceNumber'] as num?)?.toInt() ?? 0,
       validationToken: json['validationToken'] as String?,
       conversationId: json['conversationId'] as String?,
       isEdited: json['isEdited'] as bool? ?? false,
@@ -64,7 +70,7 @@ class EchoModel {
       deletedAt: json['deletedAt'] != null
           ? (json['deletedAt'] as Timestamp).toDate()
           : null,
-      encryptionVersion: json['encryptionVersion'] as int? ?? 2,
+      encryptionVersion: (json['encryptionVersion'] as num?)?.toInt() ?? 2,
     );
   }
 
