@@ -1507,6 +1507,49 @@ class MockSecureStorageService extends _i1.Mock
           as _i5.Future<bool>);
 
   @override
+  _i5.Future<void> storeTrustedFingerprint(String? fingerprint) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeTrustedFingerprint, [fingerprint]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<String?> getTrustedFingerprint() =>
+      (super.noSuchMethod(
+            Invocation.method(#getTrustedFingerprint, []),
+            returnValue: _i5.Future<String?>.value(),
+          )
+          as _i5.Future<String?>);
+
+  @override
+  _i5.Future<bool> isFingerprintAcknowledged() =>
+      (super.noSuchMethod(
+            Invocation.method(#isFingerprintAcknowledged, []),
+            returnValue: _i5.Future<bool>.value(false),
+          )
+          as _i5.Future<bool>);
+
+  @override
+  _i5.Future<void> clearFingerprintAcknowledgment() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearFingerprintAcknowledgment, []),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> clearTrustedFingerprint() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearTrustedFingerprint, []),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
   _i5.Future<void> storeTwoFactorSecret(String? secret) =>
       (super.noSuchMethod(
             Invocation.method(#storeTwoFactorSecret, [secret]),

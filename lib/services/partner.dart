@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'secure_storage.dart';
 import 'crypto/protocol_service.dart';
 import '../utils/security.dart';
+import '../models/key_change_event.dart';
 
 class PartnerService {
   final FirebaseFirestore _db;
@@ -419,35 +420,126 @@ class PartnerService {
     }
   }
 
-  Future<bool> checkAndUpdatePartnerKey() async {
-    final user = _auth.currentUser;
-    if (user == null) return false;
+  String computeFingerprint(String publicKey) {
+    final bytes = utf8.encode(publicKey);
+    final hash = sha256.convert(bytes);
+    final hex = hash.toString().toUpperCase();
+    final chunks = <String>[];
+    for (var i = 0; i < hex.length && chunks.length < 8; i += 4) {
+      chunks.add(hex.substring(i, i + 4));
+    }
+    return chunks.join(' ');
+  }
 
-    final userDoc = await _db.collection('users').doc(user.uid).get();
-    final partnerId = userDoc.data()?['partnerId'] as String?;
-    final storedKeyVersion = userDoc.data()?['partnerKeyVersion'] as int?;
+  Future<KeyChangeResult> checkPartnerKeyChange(String currentPublicKey) async {
+    final currentFingerprint = computeFingerprint(currentPublicKey);
+    final trustedFingerprint = await _secureStorage.getTrustedFingerprint();
 
-    if (partnerId == null) return false;
-
-    final partnerDoc = await _db.collection('users').doc(partnerId).get();
-    final currentKeyVersion = partnerDoc.data()?['publicKeyVersion'] as int?;
-    final currentPublicKey = partnerDoc.data()?['publicKey'] as String?;
-
-    if (currentKeyVersion != null &&
-        storedKeyVersion != null &&
-        currentKeyVersion > storedKeyVersion &&
-        currentPublicKey != null) {
-      await _db.collection('users').doc(user.uid).update({
-        'partnerPublicKey': currentPublicKey,
-        'partnerKeyVersion': currentKeyVersion,
-      });
-
-      await _secureStorage.storePartnerPublicKey(currentPublicKey);
-
-      return true;
+    if (trustedFingerprint == null) {
+      return KeyChangeResult(
+        status: KeyChangeStatus.firstKey,
+        currentFingerprint: currentFingerprint,
+      );
     }
 
-    return false;
+    if (trustedFingerprint != currentFingerprint) {
+      return KeyChangeResult(
+        status: KeyChangeStatus.changed,
+        previousFingerprint: trustedFingerprint,
+        currentFingerprint: currentFingerprint,
+      );
+    }
+
+    return KeyChangeResult(
+      status: KeyChangeStatus.noChange,
+      previousFingerprint: trustedFingerprint,
+      currentFingerprint: currentFingerprint,
+    );
+  }
+
+  Future<KeyChangeEvent?> logKeyChangeEvent({
+    required String previousFingerprint,
+    required String newFingerprint,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+
+    final random = Random.secure();
+    final visibleId = List.generate(8, (_) => random.nextInt(16).toRadixString(16)).join().toUpperCase();
+
+    final event = KeyChangeEvent(
+      id: '',
+      visibleId: visibleId,
+      detectedAt: DateTime.now(),
+      previousFingerprint: previousFingerprint,
+      newFingerprint: newFingerprint,
+    );
+
+    final docRef = await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('key_change_events')
+        .add(event.toFirestore());
+
+    return KeyChangeEvent(
+      id: docRef.id,
+      visibleId: visibleId,
+      detectedAt: event.detectedAt,
+      previousFingerprint: previousFingerprint,
+      newFingerprint: newFingerprint,
+    );
+  }
+
+  Future<void> acknowledgeKeyChange(String eventId) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('key_change_events')
+        .doc(eventId)
+        .update({
+      'acknowledged': true,
+      'acknowledgedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> trustCurrentKey(String publicKey) async {
+    final fingerprint = computeFingerprint(publicKey);
+    await _secureStorage.storeTrustedFingerprint(fingerprint);
+  }
+
+  Future<List<KeyChangeEvent>> getKeyChangeHistory() async {
+    final user = _auth.currentUser;
+    if (user == null) return [];
+
+    final snapshot = await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('key_change_events')
+        .orderBy('detectedAt', descending: true)
+        .limit(50)
+        .get();
+
+    return snapshot.docs.map((doc) => KeyChangeEvent.fromFirestore(doc)).toList();
+  }
+
+  Future<KeyChangeEvent?> getUnacknowledgedKeyChange() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+
+    final snapshot = await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('key_change_events')
+        .where('acknowledged', isEqualTo: false)
+        .orderBy('detectedAt', descending: true)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) return null;
+    return KeyChangeEvent.fromFirestore(snapshot.docs.first);
   }
 }
 

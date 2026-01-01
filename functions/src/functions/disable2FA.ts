@@ -3,6 +3,7 @@ import * as logger from "firebase-functions/logger";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as speakeasy from "speakeasy";
 import {validateRequest} from "../utils/validation.js";
+import {checkUserRateLimit, checkIpRateLimit} from "../services/rateLimit.js";
 import {TOTP_CONFIG} from "../config/constants.js";
 import {db} from "../firebase.js";
 
@@ -23,6 +24,9 @@ export const disable2FA = onCall(
     }
 
     logger.info("2FA disable initiated");
+
+    await checkIpRateLimit(db, ip, userId);
+    await checkUserRateLimit(db, userId, "TOTP");
 
     try {
       const secretDoc = await db

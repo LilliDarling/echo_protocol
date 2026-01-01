@@ -230,6 +230,32 @@ class SecureStorageService {
     return partnerKey != null;
   }
 
+  static const String _trustedFingerprintKey = 'trusted_partner_fingerprint';
+  static const String _fingerprintAcknowledgedKey = 'fingerprint_acknowledged';
+
+  Future<void> storeTrustedFingerprint(String fingerprint) async {
+    await _secureWrite(_trustedFingerprintKey, fingerprint);
+    await _secureWrite(_fingerprintAcknowledgedKey, 'true');
+  }
+
+  Future<String?> getTrustedFingerprint() async {
+    return await _secureRead(_trustedFingerprintKey);
+  }
+
+  Future<bool> isFingerprintAcknowledged() async {
+    final value = await _secureRead(_fingerprintAcknowledgedKey);
+    return value == 'true';
+  }
+
+  Future<void> clearFingerprintAcknowledgment() async {
+    await _secureDelete(_fingerprintAcknowledgedKey);
+  }
+
+  Future<void> clearTrustedFingerprint() async {
+    await _secureDelete(_trustedFingerprintKey);
+    await _secureDelete(_fingerprintAcknowledgedKey);
+  }
+
   Future<void> storeTwoFactorSecret(String secret) async {
     await _secureWrite('totp_secret', secret);
   }
