@@ -184,6 +184,25 @@ class PartnerService {
     await batch.commit();
   }
 
+  Future<({String signature, String ed25519PublicKey})> _generateAcceptSignature({
+    required String inviteCode,
+    required String userId,
+    required int timestamp,
+  }) async {
+    if (!_protocolService.isInitialized) {
+      throw Exception('Encryption keys not available');
+    }
+
+    final payload = '$inviteCode:$userId:$timestamp';
+    final payloadBytes = Uint8List.fromList(utf8.encode(payload));
+    final result = await _protocolService.sign(payloadBytes);
+
+    return (
+      signature: base64Encode(result.signature),
+      ed25519PublicKey: base64Encode(result.publicKey),
+    );
+  }
+
   Future<PartnerInfo> acceptInvite(String inviteCode) async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -236,6 +255,13 @@ class PartnerService {
       }
     }
 
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final signatureResult = await _generateAcceptSignature(
+      inviteCode: normalizedCode,
+      userId: user.uid,
+      timestamp: timestamp,
+    );
+
     final functions = FirebaseFunctions.instance;
     final callable = functions.httpsCallable('acceptPartnerInvite');
 
@@ -244,6 +270,9 @@ class PartnerService {
         'inviteCode': normalizedCode,
         'myPublicKey': myPublicKey,
         'myKeyVersion': myKeyVersion,
+        'timestamp': timestamp,
+        'signature': signatureResult.signature,
+        'ed25519PublicKey': signatureResult.ed25519PublicKey,
       });
 
       final data = result.data;

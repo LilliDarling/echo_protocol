@@ -36,7 +36,14 @@ export const acceptPartnerInvite = onCall(
     await checkUserRateLimit(db, userId, "PARTNER_INVITE");
     await checkIpRateLimit(db, ip, userId);
 
-    const {inviteCode, myPublicKey, myKeyVersion} = request.data;
+    const {
+      inviteCode,
+      myPublicKey,
+      myKeyVersion,
+      timestamp,
+      signature,
+      ed25519PublicKey,
+    } = request.data;
 
     if (!inviteCode || typeof inviteCode !== "string") {
       throw new HttpsError(
@@ -59,6 +66,35 @@ export const acceptPartnerInvite = onCall(
       throw new HttpsError(
         "invalid-argument",
         "Public key is required"
+      );
+    }
+
+    if (!signature || typeof signature !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Signature is required"
+      );
+    }
+
+    if (!ed25519PublicKey || typeof ed25519PublicKey !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Ed25519 public key is required"
+      );
+    }
+
+    if (typeof timestamp !== "number") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Timestamp is required"
+      );
+    }
+
+    const timestampAge = Date.now() - timestamp;
+    if (timestampAge < 0 || timestampAge > 5 * 60 * 1000) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Request expired"
       );
     }
 
@@ -228,6 +264,55 @@ export const acceptPartnerInvite = onCall(
           "failed-precondition",
           "This invite has expired"
         );
+      }
+
+      const acceptorDoc = await db.collection("users").doc(userId).get();
+      if (!acceptorDoc.exists) {
+        throw new HttpsError("not-found", "User not found");
+      }
+
+      const acceptorData = acceptorDoc.data();
+      const acceptorIdentityKey = acceptorData?.identityKey;
+
+      if (!acceptorIdentityKey ||
+          typeof acceptorIdentityKey.ed25519 !== "string") {
+        logger.warn("Acceptor validation failed", {correlationId});
+        throw new HttpsError("failed-precondition", "Identity key not found");
+      }
+
+      if (ed25519PublicKey !== acceptorIdentityKey.ed25519) {
+        logger.warn("Acceptor validation failed", {correlationId});
+        throw new HttpsError("failed-precondition", "Identity key mismatch");
+      }
+
+      try {
+        const signatureBytes = Buffer.from(signature, "base64");
+        const publicKeyBytes = Buffer.from(ed25519PublicKey, "base64");
+
+        if (publicKeyBytes.length !== 32 || signatureBytes.length !== 64) {
+          logger.warn("Acceptor validation failed", {correlationId});
+          throw new HttpsError("failed-precondition", "Invalid signature");
+        }
+
+        const payload = `${normalizedCode}:${userId}:${timestamp}`;
+        const payloadBytes = Buffer.from(payload, "utf-8");
+
+        const sig = new Uint8Array(signatureBytes);
+        const msg = new Uint8Array(payloadBytes);
+        const pub = new Uint8Array(publicKeyBytes);
+
+        const isValid = await ed.verifyAsync(sig, msg, pub);
+
+        if (!isValid) {
+          logger.warn("Acceptor validation failed", {correlationId});
+          throw new HttpsError("failed-precondition", "Invalid signature");
+        }
+      } catch (err) {
+        if (err instanceof HttpsError) {
+          throw err;
+        }
+        logger.error("Acceptor signature error", {correlationId});
+        throw new HttpsError("internal", "Signature verification failed");
       }
 
       const partnerId = inviteData.userId;
