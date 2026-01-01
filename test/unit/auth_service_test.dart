@@ -484,8 +484,6 @@ void main() {
         when(mockAuth.currentUser).thenReturn(mockUser);
         when(mockUser.uid).thenReturn('test-user-id');
         when(mockAuth.signOut()).thenAnswer((_) async {});
-        when(mockSecureStorage.clear2FASessionVerified())
-            .thenAnswer((_) async {});
 
         await authService.signOut();
 

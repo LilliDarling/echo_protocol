@@ -138,7 +138,9 @@ export async function checkIpRateLimit(
       );
 
       if (attempts.length >= ANOMALY_THRESHOLDS.suspiciousIpAttempts) {
-        await alertSuspiciousActivity(db, ip, "high_attempt_rate", "Suspicious activity detected");
+        await alertSuspiciousActivity(
+          db, ip, "high_attempt_rate", "Suspicious activity detected"
+        );
       }
     });
   } catch (error) {

@@ -4,7 +4,7 @@ import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as speakeasy from "speakeasy";
 import {validateRequest} from "../utils/validation.js";
 import {checkUserRateLimit, checkIpRateLimit} from "../services/rateLimit.js";
-import {db} from "../firebase.js";
+import {db, auth} from "../firebase.js";
 
 export const verify2FATOTP = onCall(
   {maxInstances: 5},
@@ -118,12 +118,26 @@ export const verify2FATOTP = onCall(
         userAgent: request.rawRequest.headers["user-agent"],
       });
 
+      let twoFactorVerifiedAt: number | null = null;
+      try {
+        twoFactorVerifiedAt = Date.now();
+        const user = await auth.getUser(userId);
+        const existingClaims = user.customClaims || {};
+        await auth.setCustomUserClaims(userId, {
+          ...existingClaims,
+          twoFactorVerifiedAt,
+        });
+      } catch (claimsError) {
+        logger.warn("Failed to set 2FA custom claims", {error: claimsError});
+      }
+
       logger.info("2FA verification successful");
 
       return {
         success: true,
         verified: true,
         activated: isPending,
+        twoFactorVerifiedAt,
       };
     } catch (error) {
       if (error instanceof HttpsError) {

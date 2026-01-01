@@ -198,7 +198,6 @@ class AuthService {
 
     await _auth.signOut();
     LoggerService.auth('Sign out complete');
-    await _secureStorage.clear2FASessionVerified();
   }
 
   Future<void> resetPassword(String email) async {

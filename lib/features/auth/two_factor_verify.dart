@@ -49,7 +49,7 @@ class _TwoFactorVerifyScreenState extends State<TwoFactorVerifyScreen> {
       final isValid = await _twoFactorService.verifyTOTP(_totpCode, userId: widget.userId);
 
       if (isValid) {
-        await _secureStorage.set2FASessionVerified(true);
+        await _secureStorage.refresh2FASession();
 
         if (!mounted) return;
 
@@ -91,7 +91,7 @@ class _TwoFactorVerifyScreenState extends State<TwoFactorVerifyScreen> {
       final isValid = await _twoFactorService.verifyBackupCode(code, widget.userId);
 
       if (isValid) {
-        await _secureStorage.set2FASessionVerified(true);
+        await _secureStorage.refresh2FASession();
 
         if (!mounted) return;
 
