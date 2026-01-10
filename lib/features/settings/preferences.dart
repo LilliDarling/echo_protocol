@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/theme_provider.dart';
+import '../../models/user.dart';
 
 class PreferencesScreen extends StatelessWidget {
   const PreferencesScreen({super.key});
@@ -38,6 +39,7 @@ class PreferencesScreen extends StatelessWidget {
                   ),
                 ),
               ),
+              _buildNotificationPreviewSelector(context, themeProvider),
 
               const Divider(height: 32),
 
@@ -131,6 +133,84 @@ class PreferencesScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildNotificationPreviewSelector(BuildContext context, ThemeProvider themeProvider) {
+    final preview = themeProvider.preferences.notificationPreview;
+
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          Icons.visibility,
+          color: Colors.orange.shade700,
+        ),
+      ),
+      title: const Text('Notification Preview'),
+      subtitle: Text(_formatNotificationPreview(preview)),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => _showNotificationPreviewDialog(context, themeProvider, preview),
+    );
+  }
+
+  String _formatNotificationPreview(NotificationPreview preview) {
+    switch (preview) {
+      case NotificationPreview.full:
+        return 'Show sender name';
+      case NotificationPreview.senderOnly:
+        return 'Show sender name';
+      case NotificationPreview.hidden:
+        return 'Hide all content';
+    }
+  }
+
+  void _showNotificationPreviewDialog(
+    BuildContext context,
+    ThemeProvider themeProvider,
+    NotificationPreview currentValue,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Notification Preview'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildPreviewOption(context, themeProvider, NotificationPreview.senderOnly, 'Sender name only', currentValue),
+            _buildPreviewOption(context, themeProvider, NotificationPreview.hidden, 'Hide all content', currentValue),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewOption(
+    BuildContext context,
+    ThemeProvider themeProvider,
+    NotificationPreview preview,
+    String label,
+    NotificationPreview currentValue,
+  ) {
+    final isSelected = preview == currentValue;
+
+    return ListTile(
+      title: Text(label),
+      trailing: isSelected ? Icon(Icons.check, color: Theme.of(context).primaryColor) : null,
+      onTap: () {
+        themeProvider.setNotificationPreview(preview);
+        Navigator.pop(context);
+      },
     );
   }
 

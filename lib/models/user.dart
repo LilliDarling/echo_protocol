@@ -1,5 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+enum NotificationPreview {
+  full('full'),
+  senderOnly('senderOnly'),
+  hidden('hidden');
+
+  final String value;
+  const NotificationPreview(this.value);
+
+  static NotificationPreview fromString(String value) {
+    return NotificationPreview.values.firstWhere(
+      (p) => p.value == value,
+      orElse: () => NotificationPreview.senderOnly,
+    );
+  }
+}
+
 class UserModel {
   final String id;
   final String name;
@@ -65,11 +81,13 @@ class UserModel {
 class UserPreferences {
   final String theme;
   final bool notifications;
+  final NotificationPreview notificationPreview;
   final int autoDeleteDays;
 
   UserPreferences({
     required this.theme,
     required this.notifications,
+    required this.notificationPreview,
     required this.autoDeleteDays,
   });
 
@@ -77,6 +95,9 @@ class UserPreferences {
     return UserPreferences(
       theme: json['theme'] as String,
       notifications: json['notifications'] as bool,
+      notificationPreview: NotificationPreview.fromString(
+        json['notificationPreview'] as String? ?? 'senderOnly',
+      ),
       autoDeleteDays: json['autoDeleteDays'] as int,
     );
   }
@@ -85,6 +106,7 @@ class UserPreferences {
     return {
       'theme': theme,
       'notifications': notifications,
+      'notificationPreview': notificationPreview.value,
       'autoDeleteDays': autoDeleteDays,
     };
   }
@@ -92,11 +114,13 @@ class UserPreferences {
   UserPreferences copyWith({
     String? theme,
     bool? notifications,
+    NotificationPreview? notificationPreview,
     int? autoDeleteDays,
   }) {
     return UserPreferences(
       theme: theme ?? this.theme,
       notifications: notifications ?? this.notifications,
+      notificationPreview: notificationPreview ?? this.notificationPreview,
       autoDeleteDays: autoDeleteDays ?? this.autoDeleteDays,
     );
   }
@@ -105,6 +129,7 @@ class UserPreferences {
     return UserPreferences(
       theme: 'light',
       notifications: true,
+      notificationPreview: NotificationPreview.senderOnly,
       autoDeleteDays: 30,
     );
   }

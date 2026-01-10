@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'user.dart';
 
 class NotificationModel {
   final String id;
   final String userId;
   final String echoId;
-  final String title;
-  final String body;
+  final String senderName;
   final bool read;
   final DateTime timestamp;
   final NotificationType type;
@@ -14,20 +14,28 @@ class NotificationModel {
     required this.id,
     required this.userId,
     required this.echoId,
-    required this.title,
-    required this.body,
+    required this.senderName,
     required this.read,
     required this.timestamp,
     required this.type,
   });
+
+  String getDisplayBody(NotificationPreview preference) {
+    switch (preference) {
+      case NotificationPreview.full:
+      case NotificationPreview.senderOnly:
+        return 'New message from $senderName';
+      case NotificationPreview.hidden:
+        return 'New message';
+    }
+  }
 
   factory NotificationModel.fromJson(String id, Map<String, dynamic> json) {
     return NotificationModel(
       id: id,
       userId: json['userId'] as String,
       echoId: json['echoId'] as String,
-      title: json['title'] as String,
-      body: json['body'] as String,
+      senderName: json['senderName'] as String,
       read: json['read'] as bool,
       timestamp: (json['timestamp'] as Timestamp).toDate(),
       type: NotificationType.fromString(json['type'] as String),
@@ -43,8 +51,7 @@ class NotificationModel {
     return {
       'userId': userId,
       'echoId': echoId,
-      'title': title,
-      'body': body,
+      'senderName': senderName,
       'read': read,
       'timestamp': Timestamp.fromDate(timestamp),
       'type': type.value,
@@ -55,8 +62,7 @@ class NotificationModel {
     String? id,
     String? userId,
     String? echoId,
-    String? title,
-    String? body,
+    String? senderName,
     bool? read,
     DateTime? timestamp,
     NotificationType? type,
@@ -65,8 +71,7 @@ class NotificationModel {
       id: id ?? this.id,
       userId: userId ?? this.userId,
       echoId: echoId ?? this.echoId,
-      title: title ?? this.title,
-      body: body ?? this.body,
+      senderName: senderName ?? this.senderName,
       read: read ?? this.read,
       timestamp: timestamp ?? this.timestamp,
       type: type ?? this.type,
