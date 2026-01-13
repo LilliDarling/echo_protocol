@@ -247,11 +247,12 @@ class DeviceLinkingService {
 
   Future<void> _addLinkedDevice(String userId) async {
     final deviceId = await _getDeviceId();
+    final now = DateTime.now();
+    final dayOnly = DateTime.utc(now.year, now.month, now.day);
     final deviceInfo = {
       'deviceId': deviceId,
       'deviceName': await _getDeviceName(),
-      'linkedAt': FieldValue.serverTimestamp(),
-      'lastActive': FieldValue.serverTimestamp(),
+      'linkedAt': Timestamp.fromDate(dayOnly),
       'platform': await _getPlatform(),
     };
 
@@ -361,14 +362,12 @@ class LinkedDevice {
   final String deviceId;
   final String deviceName;
   final DateTime linkedAt;
-  final DateTime lastActive;
   final String platform;
 
   LinkedDevice({
     required this.deviceId,
     required this.deviceName,
     required this.linkedAt,
-    required this.lastActive,
     required this.platform,
   });
 
@@ -377,7 +376,6 @@ class LinkedDevice {
       deviceId: json['deviceId'] as String,
       deviceName: json['deviceName'] as String,
       linkedAt: (json['linkedAt'] as Timestamp).toDate(),
-      lastActive: (json['lastActive'] as Timestamp).toDate(),
       platform: json['platform'] as String,
     );
   }
@@ -387,13 +385,7 @@ class LinkedDevice {
       'deviceId': deviceId,
       'deviceName': deviceName,
       'linkedAt': Timestamp.fromDate(linkedAt),
-      'lastActive': Timestamp.fromDate(lastActive),
       'platform': platform,
     };
-  }
-
-  bool get isRecentlyActive {
-    final daysSinceActive = DateTime.now().difference(lastActive).inDays;
-    return daysSinceActive < 30;
   }
 }

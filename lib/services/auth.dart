@@ -107,9 +107,6 @@ class AuthService {
       );
 
       final needsRecovery = !await _tryLoadUserKeys(credential.user!.uid);
-      if (!needsRecovery) {
-        await _updateLastActive(credential.user!.uid);
-      }
 
       LoggerService.auth('Sign in complete');
       return SignInResult(credential: credential, needsRecovery: needsRecovery);
@@ -173,9 +170,6 @@ class AuthService {
         );
       } else {
         final needsRecovery = !await _tryLoadUserKeys(userCredential.user!.uid);
-        if (!needsRecovery) {
-          await _updateLastActive(userCredential.user!.uid);
-        }
 
         LoggerService.auth('Google sign-in complete');
         return SignInResult(credential: userCredential, needsRecovery: needsRecovery);
@@ -312,7 +306,6 @@ class AuthService {
     }
 
     await _secureStorage.storeUserId(user.uid);
-    await _updateLastActive(user.uid);
     LoggerService.auth('Recovery complete');
   }
 
@@ -325,14 +318,14 @@ class AuthService {
     required String fingerprint,
   }) async {
     final now = DateTime.now();
+    final dayOnly = DateTime.utc(now.year, now.month, now.day);
     const initialVersion = 1;
 
     final userModel = UserModel(
       id: userId,
       name: displayName,
       avatar: photoUrl ?? '',
-      createdAt: now,
-      lastActive: now,
+      createdAt: dayOnly,
       preferences: UserPreferences.defaultPreferences,
     );
 
@@ -341,15 +334,8 @@ class AuthService {
       'email': email,
       'publicKey': publicKey,
       'publicKeyVersion': initialVersion,
-      'publicKeyRotatedAt': now.toIso8601String(),
       'publicKeyFingerprint': fingerprint,
       'linkedDevices': [],
-    });
-  }
-
-  Future<void> _updateLastActive(String userId) async {
-    await _db.collection('users').doc(userId).update({
-      'lastActive': FieldValue.serverTimestamp(),
     });
   }
 

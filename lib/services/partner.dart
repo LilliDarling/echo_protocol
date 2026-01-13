@@ -90,6 +90,18 @@ class PartnerService {
       throw Exception('You already have a partner linked');
     }
 
+    final identityKey = userDoc.data()?['identityKey'];
+    if (identityKey == null || identityKey['ed25519'] == null) {
+      if (!_protocolService.isInitialized) {
+        throw Exception('Encryption not initialized. Please sign out and sign in again.');
+      }
+      await _protocolService.uploadPreKeys();
+      final refreshedDoc = await _db.collection('users').doc(user.uid).get();
+      if (refreshedDoc.data()?['identityKey']?['ed25519'] == null) {
+        throw Exception('Failed to register identity key. Please try again.');
+      }
+    }
+
     await cancelExistingInvites();
 
     String inviteCode;
@@ -225,12 +237,25 @@ class PartnerService {
       throw Exception('Invalid invite code');
     }
 
+    final userDoc = await _db.collection('users').doc(user.uid).get();
+    final userData = userDoc.data();
+
+    final identityKey = userData?['identityKey'];
+    if (identityKey == null || identityKey['ed25519'] == null) {
+      if (!_protocolService.isInitialized) {
+        throw Exception('Encryption not initialized. Please sign out and sign in again.');
+      }
+      await _protocolService.uploadPreKeys();
+      final refreshedDoc = await _db.collection('users').doc(user.uid).get();
+      if (refreshedDoc.data()?['identityKey']?['ed25519'] == null) {
+        throw Exception('Failed to register identity key. Please try again.');
+      }
+    }
+
     var myPublicKey = await _secureStorage.getPublicKey();
     var myKeyVersion = await _secureStorage.getCurrentKeyVersion();
 
     if (myPublicKey == null || myKeyVersion == null) {
-      final userDoc = await _db.collection('users').doc(user.uid).get();
-      final userData = userDoc.data();
 
       if (myPublicKey == null) {
         final storedPublicKey = userData?['publicKey'] as String?;
@@ -343,7 +368,6 @@ class PartnerService {
       avatar: partnerData['avatar'] as String?,
       publicKey: publicKey,
       keyVersion: keyVersion,
-      lastActive: (partnerData['lastActive'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -389,7 +413,6 @@ class PartnerService {
         avatar: partnerData['avatar'] as String?,
         publicKey: partnerData['publicKey'] as String,
         keyVersion: partnerData['publicKeyVersion'] as int? ?? 1,
-        lastActive: (partnerData['lastActive'] as Timestamp?)?.toDate(),
       );
     });
   }
@@ -578,7 +601,6 @@ class PartnerInfo {
   final String? avatar;
   final String publicKey;
   final int keyVersion;
-  final DateTime? lastActive;
   final String? fingerprint;
   final bool isNewlyLinked;
 
@@ -588,15 +610,9 @@ class PartnerInfo {
     this.avatar,
     required this.publicKey,
     required this.keyVersion,
-    this.lastActive,
     this.fingerprint,
     this.isNewlyLinked = false,
   });
-
-  bool get isOnline {
-    if (lastActive == null) return false;
-    return DateTime.now().difference(lastActive!).inMinutes < 5;
-  }
 
   PartnerInfo copyWithVerificationShown() {
     return PartnerInfo(
@@ -605,7 +621,6 @@ class PartnerInfo {
       avatar: avatar,
       publicKey: publicKey,
       keyVersion: keyVersion,
-      lastActive: lastActive,
       fingerprint: fingerprint,
       isNewlyLinked: false,
     );

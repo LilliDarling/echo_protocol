@@ -45,6 +45,23 @@ class PreferencesScreen extends StatelessWidget {
 
               _buildSectionHeader(context, 'Privacy'),
               _buildAutoDeleteSelector(context, themeProvider),
+              SwitchListTile(
+                title: const Text('Typing Indicator'),
+                subtitle: const Text('Show when you are typing'),
+                value: themeProvider.preferences.showTypingIndicator,
+                onChanged: (value) => themeProvider.setShowTypingIndicator(value),
+                secondary: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.keyboard,
+                    color: Colors.purple.shade700,
+                  ),
+                ),
+              ),
 
               const SizedBox(height: 32),
 

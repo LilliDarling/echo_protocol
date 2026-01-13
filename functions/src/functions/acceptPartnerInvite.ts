@@ -1,4 +1,4 @@
-import {FieldValue} from "firebase-admin/firestore";
+import {FieldValue, Timestamp} from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {validateRequest} from "../utils/validation.js";
@@ -18,6 +18,18 @@ ed.hashes.sha512Async = (msg: Uint8Array) => Promise.resolve(sha512(msg));
  */
 function generateCorrelationId(): string {
   return randomBytes(4).toString("hex");
+}
+
+/**
+ * Get a timestamp representing the start of the current UTC day.
+ * @return {Timestamp} Firestore timestamp for midnight UTC today
+ */
+function getDayTimestamp(): Timestamp {
+  const now = new Date();
+  const dayOnly = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  );
+  return Timestamp.fromDate(dayOnly);
 }
 
 export const acceptPartnerInvite = onCall(
@@ -91,7 +103,17 @@ export const acceptPartnerInvite = onCall(
     }
 
     const timestampAge = Date.now() - timestamp;
-    if (timestampAge < 0 || timestampAge > 5 * 60 * 1000) {
+    const clockSkewTolerance = 30 * 1000;
+    const maxAge = 5 * 60 * 1000;
+
+    if (timestampAge < -clockSkewTolerance) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Request timestamp is invalid"
+      );
+    }
+
+    if (timestampAge > maxAge) {
       throw new HttpsError(
         "failed-precondition",
         "Request expired"
@@ -389,12 +411,14 @@ export const acceptPartnerInvite = onCall(
           .update(userId)
           .digest("hex");
 
+        const linkedAt = getDayTimestamp();
+
         transaction.update(db.collection("users").doc(userId), {
           partnerId: partnerId,
           partnerIdHash: userPartnerIdHash,
           partnerPublicKey: partnerPublicKey,
           partnerKeyVersion: partnerKeyVersion,
-          partnerLinkedAt: FieldValue.serverTimestamp(),
+          partnerLinkedAt: linkedAt,
         });
 
         transaction.update(db.collection("users").doc(partnerId), {
@@ -402,7 +426,7 @@ export const acceptPartnerInvite = onCall(
           partnerIdHash: partnerPartnerIdHash,
           partnerPublicKey: myPublicKey,
           partnerKeyVersion: keyVersion,
-          partnerLinkedAt: FieldValue.serverTimestamp(),
+          partnerLinkedAt: linkedAt,
         });
 
         const sortedIds = [userId, partnerId].sort();

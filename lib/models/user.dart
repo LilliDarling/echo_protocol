@@ -21,7 +21,6 @@ class UserModel {
   final String name;
   final String avatar;
   final DateTime createdAt;
-  final DateTime lastActive;
   final UserPreferences preferences;
 
   UserModel({
@@ -29,7 +28,6 @@ class UserModel {
     required this.name,
     required this.avatar,
     required this.createdAt,
-    required this.lastActive,
     required this.preferences,
   });
 
@@ -39,7 +37,6 @@ class UserModel {
       name: json['name'] as String,
       avatar: json['avatar'] as String,
       createdAt: (json['createdAt'] as Timestamp).toDate(),
-      lastActive: (json['lastActive'] as Timestamp).toDate(),
       preferences: UserPreferences.fromJson(json['preferences'] as Map<String, dynamic>),
     );
   }
@@ -54,7 +51,6 @@ class UserModel {
       'name': name,
       'avatar': avatar,
       'createdAt': Timestamp.fromDate(createdAt),
-      'lastActive': Timestamp.fromDate(lastActive),
       'preferences': preferences.toJson(),
     };
   }
@@ -64,7 +60,6 @@ class UserModel {
     String? name,
     String? avatar,
     DateTime? createdAt,
-    DateTime? lastActive,
     UserPreferences? preferences,
   }) {
     return UserModel(
@@ -72,7 +67,6 @@ class UserModel {
       name: name ?? this.name,
       avatar: avatar ?? this.avatar,
       createdAt: createdAt ?? this.createdAt,
-      lastActive: lastActive ?? this.lastActive,
       preferences: preferences ?? this.preferences,
     );
   }
@@ -82,12 +76,14 @@ class UserPreferences {
   final String theme;
   final bool notifications;
   final NotificationPreview notificationPreview;
+  final bool showTypingIndicator;
   final int autoDeleteDays;
 
   UserPreferences({
     required this.theme,
     required this.notifications,
     required this.notificationPreview,
+    required this.showTypingIndicator,
     required this.autoDeleteDays,
   });
 
@@ -98,6 +94,7 @@ class UserPreferences {
       notificationPreview: NotificationPreview.fromString(
         json['notificationPreview'] as String? ?? 'senderOnly',
       ),
+      showTypingIndicator: json['showTypingIndicator'] as bool? ?? false,
       autoDeleteDays: json['autoDeleteDays'] as int,
     );
   }
@@ -107,6 +104,7 @@ class UserPreferences {
       'theme': theme,
       'notifications': notifications,
       'notificationPreview': notificationPreview.value,
+      'showTypingIndicator': showTypingIndicator,
       'autoDeleteDays': autoDeleteDays,
     };
   }
@@ -115,12 +113,14 @@ class UserPreferences {
     String? theme,
     bool? notifications,
     NotificationPreview? notificationPreview,
+    bool? showTypingIndicator,
     int? autoDeleteDays,
   }) {
     return UserPreferences(
       theme: theme ?? this.theme,
       notifications: notifications ?? this.notifications,
       notificationPreview: notificationPreview ?? this.notificationPreview,
+      showTypingIndicator: showTypingIndicator ?? this.showTypingIndicator,
       autoDeleteDays: autoDeleteDays ?? this.autoDeleteDays,
     );
   }
@@ -130,6 +130,7 @@ class UserPreferences {
       theme: 'light',
       notifications: true,
       notificationPreview: NotificationPreview.senderOnly,
+      showTypingIndicator: false,
       autoDeleteDays: 30,
     );
   }

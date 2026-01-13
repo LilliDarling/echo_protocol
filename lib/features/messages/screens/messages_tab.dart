@@ -208,43 +208,24 @@ class _ConversationPreview extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              // Partner avatar
-              Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: Colors.pink.shade100,
-                    backgroundImage: partner.avatar != null
-                        ? NetworkImage(partner.avatar!)
-                        : null,
-                    child: partner.avatar == null
-                        ? Text(
-                            partner.name.isNotEmpty
-                                ? partner.name[0].toUpperCase()
-                                : '?',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.pink.shade700,
-                            ),
-                          )
-                        : null,
-                  ),
-                  if (partner.isOnline)
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: Colors.pink.shade100,
+                backgroundImage: partner.avatar != null
+                    ? NetworkImage(partner.avatar!)
+                    : null,
+                child: partner.avatar == null
+                    ? Text(
+                        partner.name.isNotEmpty
+                            ? partner.name[0].toUpperCase()
+                            : '?',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.pink.shade700,
                         ),
-                      ),
-                    ),
-                ],
+                      )
+                    : null,
               ),
               const SizedBox(width: 16),
               Expanded(

@@ -63,12 +63,10 @@ class ReadReceiptService {
 
   Future<void> _processBatch(List<String> messageIds) async {
     final batch = _db.batch();
-    final timestamp = FieldValue.serverTimestamp();
 
     for (final id in messageIds) {
       batch.update(_messagesRef.doc(id), {
         'status': 'read',
-        'readAt': timestamp,
       });
     }
 

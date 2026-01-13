@@ -388,7 +388,6 @@ class ConversationController extends ChangeNotifier {
     for (final doc in undelivered.docs) {
       batch.update(doc.reference, {
         'status': 'delivered',
-        'deliveredAt': FieldValue.serverTimestamp(),
       });
     }
     await batch.commit();
@@ -535,7 +534,6 @@ class ConversationController extends ChangeNotifier {
         _messages[index] = _messages[index].copyWith(
           content: encryptionResult['content'] as String,
           isEdited: true,
-          editedAt: DateTime.now(),
         );
         notifyListeners();
       }
@@ -543,7 +541,6 @@ class ConversationController extends ChangeNotifier {
       await _messagesRef.doc(message.id).update({
         'content': encryptionResult['content'],
         'isEdited': true,
-        'editedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
       rethrow;
@@ -560,7 +557,6 @@ class ConversationController extends ChangeNotifier {
       if (index != -1) {
         _messages[index] = _messages[index].copyWith(
           isDeleted: true,
-          deletedAt: DateTime.now(),
           content: '',
         );
         notifyListeners();
@@ -570,7 +566,6 @@ class ConversationController extends ChangeNotifier {
 
       await _messagesRef.doc(message.id).update({
         'isDeleted': true,
-        'deletedAt': FieldValue.serverTimestamp(),
         'content': '',
         'metadata': {},
       });

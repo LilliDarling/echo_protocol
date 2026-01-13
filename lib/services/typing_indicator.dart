@@ -9,10 +9,13 @@ class TypingIndicatorService {
   Timer? _typingTimer;
   Timer? _debounceTimer;
   bool _isTyping = false;
+  bool _enabled = false;
   StreamSubscription? _partnerTypingSubscription;
 
   static const Duration _typingTimeout = Duration(seconds: 3);
   static const Duration _debounceDelay = Duration(milliseconds: 300);
+
+  set enabled(bool value) => _enabled = value;
 
   final StreamController<bool> _partnerTypingController = StreamController.broadcast();
   Stream<bool> get partnerTypingStream => _partnerTypingController.stream;
@@ -60,6 +63,7 @@ class TypingIndicatorService {
   }
 
   void _setTyping(bool typing) {
+    if (!_enabled) return;
     if (_isTyping == typing) return;
     _isTyping = typing;
 

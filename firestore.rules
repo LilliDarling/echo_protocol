@@ -60,7 +60,7 @@ service cloud.firestore {
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['email']))
         // Allow updating specific fields only
         && request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['name', 'avatar', 'lastActive', 'preferences',
+           .hasOnly(['name', 'avatar', 'preferences',
                      'twoFactorEnabled', 'backupCodes', 'twoFactorEnabledAt',
                      'twoFactorDisabledAt', 'backupCodesRegeneratedAt', 'linkedDevices',
                      'publicKey', 'publicKeyVersion', 'publicKeyRotatedAt', 'publicKeyFingerprint',
@@ -221,22 +221,20 @@ service cloud.firestore {
         allow update: if isAuthenticated()
           && (
             (request.auth.uid == resource.data.recipientId
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'readAt', 'deliveredAt']))
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
             ||
             (request.auth.uid == resource.data.senderId
               && resource.data.isDeleted != true
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'isEdited', 'editedAt'])
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'isEdited'])
               && request.resource.data.isEdited == true
-              && request.resource.data.editedAt is timestamp
               && request.resource.data.content is string
               && request.resource.data.content.size() > 0
               && request.resource.data.content.size() < 100000)
             ||
             (request.auth.uid == resource.data.senderId
               && resource.data.isDeleted != true
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDeleted', 'deletedAt', 'content'])
-              && request.resource.data.isDeleted == true
-              && request.resource.data.deletedAt is timestamp)
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDeleted', 'content', 'metadata'])
+              && request.resource.data.isDeleted == true)
           );
 
         allow delete: if false;

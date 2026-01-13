@@ -14,9 +14,7 @@ class EchoModel {
   final int sequenceNumber;
   final String? conversationId;
   final bool isEdited;
-  final DateTime? editedAt;
   final bool isDeleted;
-  final DateTime? deletedAt;
   final int encryptionVersion;
 
   EchoModel({
@@ -33,9 +31,7 @@ class EchoModel {
     required this.sequenceNumber,
     this.conversationId,
     this.isEdited = false,
-    this.editedAt,
     this.isDeleted = false,
-    this.deletedAt,
     this.encryptionVersion = 2,
   });
 
@@ -60,13 +56,7 @@ class EchoModel {
       sequenceNumber: (json['sequenceNumber'] as num?)?.toInt() ?? 0,
       conversationId: json['conversationId'] as String?,
       isEdited: json['isEdited'] as bool? ?? false,
-      editedAt: json['editedAt'] != null
-          ? (json['editedAt'] as Timestamp).toDate()
-          : null,
       isDeleted: json['isDeleted'] as bool? ?? false,
-      deletedAt: json['deletedAt'] != null
-          ? (json['deletedAt'] as Timestamp).toDate()
-          : null,
       encryptionVersion: (json['encryptionVersion'] as num?)?.toInt() ?? 2,
     );
   }
@@ -90,9 +80,7 @@ class EchoModel {
       'sequenceNumber': sequenceNumber,
       if (conversationId != null) 'conversationId': conversationId,
       'isEdited': isEdited,
-      if (editedAt != null) 'editedAt': Timestamp.fromDate(editedAt!),
       'isDeleted': isDeleted,
-      if (deletedAt != null) 'deletedAt': Timestamp.fromDate(deletedAt!),
       'encryptionVersion': encryptionVersion,
     };
   }
@@ -111,9 +99,7 @@ class EchoModel {
     int? sequenceNumber,
     String? conversationId,
     bool? isEdited,
-    DateTime? editedAt,
     bool? isDeleted,
-    DateTime? deletedAt,
     int? encryptionVersion,
   }) {
     return EchoModel(
@@ -130,9 +116,7 @@ class EchoModel {
       sequenceNumber: sequenceNumber ?? this.sequenceNumber,
       conversationId: conversationId ?? this.conversationId,
       isEdited: isEdited ?? this.isEdited,
-      editedAt: editedAt ?? this.editedAt,
       isDeleted: isDeleted ?? this.isDeleted,
-      deletedAt: deletedAt ?? this.deletedAt,
       encryptionVersion: encryptionVersion ?? this.encryptionVersion,
     );
   }
