@@ -335,11 +335,13 @@ export const sendMessage = onCall<SendMessageRequest>(
           {merge: true}
         );
 
+        const minutePrecisionTime = Math.floor(messageTime / 60000) * 60000;
+
         const messageData: Record<string, unknown> = {
           content,
           senderId,
           recipientId,
-          timestamp: Timestamp.fromMillis(messageTime),
+          timestamp: Timestamp.fromMillis(minutePrecisionTime),
           senderKeyVersion,
           recipientKeyVersion,
           sequenceNumber,

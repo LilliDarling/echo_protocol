@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 import 'secure_storage.dart';
 import '../utils/logger.dart';
 
@@ -262,30 +261,18 @@ class DeviceLinkingService {
   }
 
   Future<String> _getDeviceName() async {
-    final deviceInfo = DeviceInfoPlugin();
-
-    try {
-      if (kIsWeb) {
-        final webInfo = await deviceInfo.webBrowserInfo;
-        return '${webInfo.browserName} on ${webInfo.platform}';
-      } else if (Platform.isAndroid) {
-        final androidInfo = await deviceInfo.androidInfo;
-        return '${androidInfo.brand} ${androidInfo.model}';
-      } else if (Platform.isIOS) {
-        final iosInfo = await deviceInfo.iosInfo;
-        return '${iosInfo.name} (${iosInfo.model})';
-      } else if (Platform.isMacOS) {
-        final macInfo = await deviceInfo.macOsInfo;
-        return macInfo.computerName;
-      } else if (Platform.isWindows) {
-        final windowsInfo = await deviceInfo.windowsInfo;
-        return windowsInfo.computerName;
-      } else if (Platform.isLinux) {
-        final linuxInfo = await deviceInfo.linuxInfo;
-        return linuxInfo.name;
-      }
-    } catch (e) {
-      LoggerService.warning('Device info unavailable');
+    if (kIsWeb) {
+      return 'Web Browser';
+    } else if (Platform.isAndroid) {
+      return 'Android Device';
+    } else if (Platform.isIOS) {
+      return 'iOS Device';
+    } else if (Platform.isMacOS) {
+      return 'Mac';
+    } else if (Platform.isWindows) {
+      return 'Windows PC';
+    } else if (Platform.isLinux) {
+      return 'Linux PC';
     }
 
     return 'Unknown Device';
