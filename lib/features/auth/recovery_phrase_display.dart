@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../services/secure_storage.dart';
 import 'recovery_phrase_verify.dart';
 
 class RecoveryPhraseDisplayScreen extends StatefulWidget {
@@ -17,6 +18,7 @@ class RecoveryPhraseDisplayScreen extends StatefulWidget {
 }
 
 class _RecoveryPhraseDisplayScreenState extends State<RecoveryPhraseDisplayScreen> {
+  final SecureStorageService _secureStorage = SecureStorageService();
   bool _hasSaved = false;
   bool _showPhrase = false;
 
@@ -45,18 +47,23 @@ class _RecoveryPhraseDisplayScreenState extends State<RecoveryPhraseDisplayScree
     );
 
     if (verified == true && mounted) {
-      widget.onComplete(context);
+      await _secureStorage.clearPendingRecoveryPhrase();
+      if (mounted) {
+        widget.onComplete(context);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recovery Phrase'),
-        automaticallyImplyLeading: false,
-      ),
-      body: SafeArea(
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Recovery Phrase'),
+          automaticallyImplyLeading: false,
+        ),
+        body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -242,6 +249,7 @@ class _RecoveryPhraseDisplayScreenState extends State<RecoveryPhraseDisplayScree
             ],
           ),
         ),
+      ),
       ),
     );
   }

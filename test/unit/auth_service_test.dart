@@ -391,10 +391,10 @@ void main() {
           return Future.value();
         });
 
-        await authService.signUpWithEmail(
-          email: 'test@example.com',
+        await authService.signUp(
+          username: 'TestUser',
           password: 'ValidPass123!',
-          displayName: 'Test User',
+          email: 'test@example.com',
         );
 
         expect(firestoreData, isNotNull);
@@ -436,10 +436,10 @@ void main() {
         when(mockCollection.doc(userId)).thenReturn(mockDocument);
         when(mockDocument.set(any)).thenAnswer((_) async {});
 
-        await authService.signUpWithEmail(
-          email: 'test@example.com',
+        await authService.signUp(
+          username: 'TestUser',
           password: 'ValidPass123!',
-          displayName: 'Test User',
+          email: 'test@example.com',
         );
 
         verify(mockProtocol.generateRecoveryPhrase()).called(1);
@@ -470,8 +470,8 @@ void main() {
         when(mockCollection.doc(userId)).thenReturn(mockDocument);
         when(mockDocument.update(any)).thenAnswer((_) async {});
 
-        await authService.signInWithEmail(
-          email: 'test@example.com',
+        await authService.signIn(
+          usernameOrEmail: 'test@example.com',
           password: 'ValidPass123!',
         );
 
@@ -484,8 +484,6 @@ void main() {
         when(mockAuth.currentUser).thenReturn(mockUser);
         when(mockUser.uid).thenReturn('test-user-id');
         when(mockAuth.signOut()).thenAnswer((_) async {});
-        when(mockSecureStorage.clear2FASessionVerified())
-            .thenAnswer((_) async {});
 
         await authService.signOut();
 
@@ -501,10 +499,10 @@ void main() {
         ));
 
         expect(
-          () async => await authService.signUpWithEmail(
-            email: 'existing@example.com',
+          () async => await authService.signUp(
+            username: 'Test',
             password: 'ValidPass123!',
-            displayName: 'Test',
+            email: 'existing@example.com',
           ),
           throwsA(isA<String>()),
         );
@@ -527,8 +525,8 @@ void main() {
 
         // Act & Assert
         try {
-          await authService.signInWithEmail(
-            email: 'nonexistent@example.com',
+          await authService.signIn(
+            usernameOrEmail: 'nonexistent@example.com',
             password: 'AnyPass123!',
           );
           fail('Should have thrown');
@@ -554,8 +552,8 @@ void main() {
 
         // Act & Assert
         try {
-          await authService.signInWithEmail(
-            email: 'user@example.com',
+          await authService.signIn(
+            usernameOrEmail: 'user@example.com',
             password: 'WrongPass123!',
           );
           fail('Should have thrown');
@@ -579,8 +577,8 @@ void main() {
 
         // Act & Assert
         try {
-          await authService.signInWithEmail(
-            email: 'user@example.com',
+          await authService.signIn(
+            usernameOrEmail: 'user@example.com',
             password: 'ValidPass123!',
           );
           fail('Should have thrown');
@@ -608,8 +606,8 @@ void main() {
 
         // Act & Assert
         try {
-          await authService.signInWithEmail(
-            email: 'user@example.com',
+          await authService.signIn(
+            usernameOrEmail: 'user@example.com',
             password: 'AnyPass123!',
           );
           fail('Should have thrown');
@@ -622,5 +620,79 @@ void main() {
         }
       });
     });
+
+    group('Account Linking', () {
+      test('SECURITY: Linked providers MUST be accurately reported', () {
+        final mockProviderData = [
+          MockUserInfo('password'),
+          MockUserInfo('google.com'),
+        ];
+
+        when(mockAuth.currentUser).thenReturn(mockUser);
+        when(mockUser.providerData).thenReturn(mockProviderData);
+
+        final providers = authService.getLinkedProviders();
+
+        expect(providers, contains('password'));
+        expect(providers, contains('google.com'));
+      });
+
+      test('SECURITY: canReauthenticateWithPassword MUST check providers', () {
+        when(mockAuth.currentUser).thenReturn(mockUser);
+        when(mockUser.providerData).thenReturn([MockUserInfo('password')]);
+
+        expect(authService.canReauthenticateWithPassword, isTrue);
+
+        when(mockUser.providerData).thenReturn([MockUserInfo('google.com')]);
+        expect(authService.canReauthenticateWithPassword, isFalse);
+      });
+
+      test('SECURITY: canReauthenticateWithGoogle MUST check providers', () {
+        when(mockAuth.currentUser).thenReturn(mockUser);
+        when(mockUser.providerData).thenReturn([MockUserInfo('google.com')]);
+
+        expect(authService.canReauthenticateWithGoogle, isTrue);
+
+        when(mockUser.providerData).thenReturn([MockUserInfo('password')]);
+        expect(authService.canReauthenticateWithGoogle, isFalse);
+      });
+    });
+
+    group('Account Deletion', () {
+      test('SECURITY: Account deletion MUST require re-auth', () async {
+        when(mockAuth.currentUser).thenReturn(mockUser);
+        when(mockUser.uid).thenReturn('user-123');
+        when(mockUser.providerData).thenReturn([MockUserInfo('google.com')]);
+
+        expect(
+          () async => await authService.deleteAccount(),
+          throwsA(predicate((e) => e.toString().contains('Re-authentication required'))),
+        );
+      });
+    });
   });
+}
+
+class MockUserInfo implements UserInfo {
+  final String _providerId;
+
+  MockUserInfo(this._providerId);
+
+  @override
+  String? get displayName => null;
+
+  @override
+  String? get email => null;
+
+  @override
+  String? get phoneNumber => null;
+
+  @override
+  String? get photoURL => null;
+
+  @override
+  String get providerId => _providerId;
+
+  @override
+  String? get uid => null;
 }

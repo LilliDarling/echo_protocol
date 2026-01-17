@@ -1507,6 +1507,49 @@ class MockSecureStorageService extends _i1.Mock
           as _i5.Future<bool>);
 
   @override
+  _i5.Future<void> storeTrustedFingerprint(String? fingerprint) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeTrustedFingerprint, [fingerprint]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<String?> getTrustedFingerprint() =>
+      (super.noSuchMethod(
+            Invocation.method(#getTrustedFingerprint, []),
+            returnValue: _i5.Future<String?>.value(),
+          )
+          as _i5.Future<String?>);
+
+  @override
+  _i5.Future<bool> isFingerprintAcknowledged() =>
+      (super.noSuchMethod(
+            Invocation.method(#isFingerprintAcknowledged, []),
+            returnValue: _i5.Future<bool>.value(false),
+          )
+          as _i5.Future<bool>);
+
+  @override
+  _i5.Future<void> clearFingerprintAcknowledgment() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearFingerprintAcknowledgment, []),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> clearTrustedFingerprint() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearTrustedFingerprint, []),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
   _i5.Future<void> storeTwoFactorSecret(String? secret) =>
       (super.noSuchMethod(
             Invocation.method(#storeTwoFactorSecret, [secret]),
@@ -1625,6 +1668,32 @@ class MockSecureStorageService extends _i1.Mock
           as _i5.Future<int?>);
 
   @override
+  _i5.Future<void> storePendingRecoveryPhrase(String? phrase) =>
+      (super.noSuchMethod(
+            Invocation.method(#storePendingRecoveryPhrase, [phrase]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<String?> getPendingRecoveryPhrase() =>
+      (super.noSuchMethod(
+            Invocation.method(#getPendingRecoveryPhrase, []),
+            returnValue: _i5.Future<String?>.value(),
+          )
+          as _i5.Future<String?>);
+
+  @override
+  _i5.Future<void> clearPendingRecoveryPhrase() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearPendingRecoveryPhrase, []),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
   _i5.Future<void> storeCacheKey(String? cacheKey) =>
       (super.noSuchMethod(
             Invocation.method(#storeCacheKey, [cacheKey]),
@@ -1659,18 +1728,9 @@ class MockSecureStorageService extends _i1.Mock
           as _i5.Future<bool>);
 
   @override
-  _i5.Future<void> set2FASessionVerified(bool? verified) =>
+  _i5.Future<void> refresh2FASession() =>
       (super.noSuchMethod(
-            Invocation.method(#set2FASessionVerified, [verified]),
-            returnValue: _i5.Future<void>.value(),
-            returnValueForMissingStub: _i5.Future<void>.value(),
-          )
-          as _i5.Future<void>);
-
-  @override
-  _i5.Future<void> clear2FASessionVerified() =>
-      (super.noSuchMethod(
-            Invocation.method(#clear2FASessionVerified, []),
+            Invocation.method(#refresh2FASession, []),
             returnValue: _i5.Future<void>.value(),
             returnValueForMissingStub: _i5.Future<void>.value(),
           )
@@ -1747,6 +1807,7 @@ class MockHttpsCallableResult<T> extends _i1.Mock
 /// A class which mocks [CollectionReference].
 ///
 /// See the documentation for Mockito's code generation for more information.
+// ignore: must_be_immutable
 class MockCollectionReference extends _i1.Mock
     implements _i4.CollectionReference<Map<String, dynamic>> {
   MockCollectionReference() {
@@ -2176,6 +2237,7 @@ class MockCollectionReference extends _i1.Mock
 /// A class which mocks [DocumentReference].
 ///
 /// See the documentation for Mockito's code generation for more information.
+// ignore: must_be_immutable
 class MockDocumentReference extends _i1.Mock
     implements _i4.DocumentReference<Map<String, dynamic>> {
   MockDocumentReference() {

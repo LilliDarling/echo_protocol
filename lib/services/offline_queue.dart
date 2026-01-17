@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/echo.dart';
@@ -17,7 +17,6 @@ class PendingMessage {
   final int senderKeyVersion;
   final int recipientKeyVersion;
   final int sequenceNumber;
-  final String? validationToken;
   final DateTime createdAt;
   int retryCount;
   DateTime? lastRetryAt;
@@ -35,7 +34,6 @@ class PendingMessage {
     required this.senderKeyVersion,
     required this.recipientKeyVersion,
     required this.sequenceNumber,
-    this.validationToken,
     required this.createdAt,
     this.retryCount = 0,
     this.lastRetryAt,
@@ -47,14 +45,12 @@ class PendingMessage {
         'conversationId': conversationId,
         'senderId': senderId,
         'recipientId': recipientId,
-        'plaintext': plaintext,
         'encryptedContent': encryptedContent,
         'type': type.value,
         'metadata': metadata.toJson(),
         'senderKeyVersion': senderKeyVersion,
         'recipientKeyVersion': recipientKeyVersion,
         'sequenceNumber': sequenceNumber,
-        'validationToken': validationToken,
         'createdAt': createdAt.toIso8601String(),
         'retryCount': retryCount,
         'lastRetryAt': lastRetryAt?.toIso8601String(),
@@ -66,14 +62,13 @@ class PendingMessage {
         conversationId: json['conversationId'] as String,
         senderId: json['senderId'] as String,
         recipientId: json['recipientId'] as String,
-        plaintext: json['plaintext'] as String,
+        plaintext: '',
         encryptedContent: json['encryptedContent'] as String,
         type: EchoType.fromString(json['type'] as String),
         metadata: EchoMetadata.fromJson(json['metadata'] as Map<String, dynamic>),
         senderKeyVersion: json['senderKeyVersion'] as int,
         recipientKeyVersion: json['recipientKeyVersion'] as int,
         sequenceNumber: json['sequenceNumber'] as int,
-        validationToken: json['validationToken'] as String?,
         createdAt: DateTime.parse(json['createdAt'] as String),
         retryCount: json['retryCount'] as int? ?? 0,
         lastRetryAt: json['lastRetryAt'] != null
@@ -96,13 +91,12 @@ class PendingMessage {
         senderKeyVersion: senderKeyVersion,
         recipientKeyVersion: recipientKeyVersion,
         sequenceNumber: sequenceNumber,
-        validationToken: validationToken,
         conversationId: conversationId,
       );
 }
 
 class OfflineQueueService {
-  final FirebaseFirestore _db;
+  final FirebaseFunctions _functions;
   final Connectivity _connectivity;
 
   static const String _storageKey = 'offline_message_queue';
@@ -122,9 +116,9 @@ class OfflineQueueService {
   Stream<Map<String, PendingMessage>> get statusStream => _statusController.stream;
 
   OfflineQueueService({
-    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
     Connectivity? connectivity,
-  })  : _db = firestore ?? FirebaseFirestore.instance,
+  })  : _functions = functions ?? FirebaseFunctions.instance,
         _connectivity = connectivity ?? Connectivity();
 
   Future<void> initialize() async {
@@ -191,7 +185,6 @@ class OfflineQueueService {
     required int senderKeyVersion,
     required int recipientKeyVersion,
     required int sequenceNumber,
-    String? validationToken,
   }) async {
     final pending = PendingMessage(
       id: messageId,
@@ -205,7 +198,6 @@ class OfflineQueueService {
       senderKeyVersion: senderKeyVersion,
       recipientKeyVersion: recipientKeyVersion,
       sequenceNumber: sequenceNumber,
-      validationToken: validationToken,
       createdAt: DateTime.now(),
     );
 
@@ -274,34 +266,31 @@ class OfflineQueueService {
       pending.lastRetryAt = DateTime.now();
       _statusController.add({pending.id: pending});
 
-      final messagesRef = _db
-          .collection('conversations')
-          .doc(pending.conversationId)
-          .collection('messages');
-
-      final message = EchoModel(
-        id: pending.id,
-        senderId: pending.senderId,
-        recipientId: pending.recipientId,
-        content: pending.encryptedContent,
-        timestamp: pending.createdAt,
-        type: pending.type,
-        status: EchoStatus.sent,
-        metadata: pending.metadata,
-        senderKeyVersion: pending.senderKeyVersion,
-        recipientKeyVersion: pending.recipientKeyVersion,
-        sequenceNumber: pending.sequenceNumber,
-        validationToken: pending.validationToken,
-        conversationId: pending.conversationId,
-      );
-
-      await messagesRef.doc(pending.id).set(message.toJson());
-
-      await _db.collection('conversations').doc(pending.conversationId).update({
-        'lastMessage': pending.encryptedContent,
-        'lastMessageAt': FieldValue.serverTimestamp(),
-        'unreadCount.${pending.recipientId}': FieldValue.increment(1),
+      final result = await _functions.httpsCallable('sendMessage').call({
+        'messageId': pending.id,
+        'conversationId': pending.conversationId,
+        'recipientId': pending.recipientId,
+        'content': pending.encryptedContent,
+        'sequenceNumber': pending.sequenceNumber,
+        'timestamp': pending.createdAt.millisecondsSinceEpoch,
+        'senderKeyVersion': pending.senderKeyVersion,
+        'recipientKeyVersion': pending.recipientKeyVersion,
+        'type': pending.type.value,
+        'metadata': pending.metadata.toJson(),
+        if (pending.type == EchoType.image || pending.type == EchoType.video)
+          'mediaType': pending.type.name,
+        if (pending.metadata.fileUrl != null)
+          'mediaUrl': pending.metadata.fileUrl,
+        if (pending.metadata.thumbnailUrl != null)
+          'thumbnailUrl': pending.metadata.thumbnailUrl,
       });
+
+      final data = Map<String, dynamic>.from(result.data as Map);
+
+      if (data['success'] != true) {
+        final error = data['error'] as String? ?? 'Unknown error';
+        throw Exception(error);
+      }
 
       _removeFromQueue(pending);
     } catch (e) {

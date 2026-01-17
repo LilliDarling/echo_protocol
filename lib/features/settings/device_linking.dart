@@ -232,11 +232,7 @@ class _DeviceLinkingScreenState extends State<DeviceLinkingScreen> {
                         Text(
                           'Linked: ${_formatDate(device.linkedAt)}',
                           style: const TextStyle(fontSize: 12),
-                        ),
-                        Text(
-                          'Last active: ${_formatDate(device.lastActive)}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
+                        )
                       ],
                     ),
                     trailing: IconButton(

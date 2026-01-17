@@ -8,13 +8,10 @@ rules_version = '2';
 // 1. message_nonces collection:
 //    Field: expireAt | Deletes documents ~1 hour after message creation
 //
-// 2. message_tokens collection:
-//    Field: expireAt | Deletes documents ~1 hour after token creation
-//
-// 3. message_sequences collection:
+// 2. message_sequences collection:
 //    Field: expireAt | Deletes documents 30 days after last update
 //
-// 4. message_rate_limits collection:
+// 3. message_rate_limits collection:
 //    Field: expireAt | Deletes documents 2 hours after last attempt
 //
 // To create TTL policies via gcloud:
@@ -22,7 +19,7 @@ rules_version = '2';
 //     --collection-group=message_nonces \
 //     --enable-ttl
 //
-// Repeat for: message_tokens, message_sequences, message_rate_limits
+// Repeat for: message_sequences, message_rate_limits
 // =============================================================================
 
 service cloud.firestore {
@@ -63,7 +60,7 @@ service cloud.firestore {
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['email']))
         // Allow updating specific fields only
         && request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['name', 'avatar', 'lastActive', 'preferences',
+           .hasOnly(['name', 'avatar', 'preferences',
                      'twoFactorEnabled', 'backupCodes', 'twoFactorEnabledAt',
                      'twoFactorDisabledAt', 'backupCodesRegeneratedAt', 'linkedDevices',
                      'publicKey', 'publicKeyVersion', 'publicKeyRotatedAt', 'publicKeyFingerprint',
@@ -168,12 +165,6 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Message tokens collection - One-time validation tokens
-    // Only Cloud Functions can write via Admin SDK
-    match /message_tokens/{tokenId} {
-      allow read, write: if false;
-    }
-
     // Message rate limits collection - Server-side rate limiting
     // Only Cloud Functions can write via Admin SDK
     match /message_rate_limits/{limitId} {
@@ -230,22 +221,20 @@ service cloud.firestore {
         allow update: if isAuthenticated()
           && (
             (request.auth.uid == resource.data.recipientId
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'readAt', 'deliveredAt']))
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
             ||
             (request.auth.uid == resource.data.senderId
               && resource.data.isDeleted != true
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'isEdited', 'editedAt'])
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'isEdited'])
               && request.resource.data.isEdited == true
-              && request.resource.data.editedAt is timestamp
               && request.resource.data.content is string
               && request.resource.data.content.size() > 0
               && request.resource.data.content.size() < 100000)
             ||
             (request.auth.uid == resource.data.senderId
               && resource.data.isDeleted != true
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDeleted', 'deletedAt', 'content'])
-              && request.resource.data.isDeleted == true
-              && request.resource.data.deletedAt is timestamp)
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDeleted', 'content', 'metadata'])
+              && request.resource.data.isDeleted == true)
           );
 
         allow delete: if false;
@@ -347,12 +336,8 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && isValidLinkToken()
         && request.resource.data.userId == request.auth.uid
-        && request.resource.data.keys().hasAll(['userId', 'sessionKey', 'encryptedPrivateKey', 'publicKey', 'keyVersion', 'iv', 'createdAt', 'expiresAt', 'used'])
+        && request.resource.data.keys().hasAll(['userId', 'encryptedPrivateKey', 'publicKey', 'keyVersion', 'iv', 'createdAt', 'expiresAt', 'used'])
         && request.resource.data.used == false
-        // Validate session key is present and reasonable length (43-44 chars base64)
-        && request.resource.data.sessionKey is string
-        && request.resource.data.sessionKey.size() >= 40
-        && request.resource.data.sessionKey.size() <= 50
         // Validate encrypted private key is present and reasonable length
         && request.resource.data.encryptedPrivateKey is string
         && request.resource.data.encryptedPrivateKey.size() > 100

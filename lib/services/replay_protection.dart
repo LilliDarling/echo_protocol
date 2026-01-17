@@ -1,22 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class ReplayProtectionService {
   static const Duration _nonceExpiry = Duration(hours: 1);
   static const Duration _clockSkewTolerance = Duration(minutes: 2);
 
   final FirebaseFirestore _db;
-  final FirebaseFunctions _functions;
   final String _userId;
 
   ReplayProtectionService({
     required String userId,
     FirebaseFirestore? firestore,
-    FirebaseFunctions? functions,
   })  : _userId = userId,
-        _db = firestore ?? FirebaseFirestore.instance,
-        _functions = functions ?? FirebaseFunctions.instance;
+        _db = firestore ?? FirebaseFirestore.instance;
 
   String _getConversationId(String userId1, String userId2) {
     final ids = [userId1, userId2]..sort();
@@ -146,107 +141,6 @@ class ReplayProtectionService {
     });
   }
 
-  Future<ServerValidationResult> validateMessageServerSide({
-    required String messageId,
-    required String conversationId,
-    required String recipientId,
-    required int sequenceNumber,
-    required DateTime timestamp,
-  }) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      return ServerValidationResult(
-        valid: false,
-        error: 'Not authenticated. Please sign in again.',
-      );
-    }
-
-    return await _callValidateFunction(
-      user: user,
-      messageId: messageId,
-      conversationId: conversationId,
-      recipientId: recipientId,
-      sequenceNumber: sequenceNumber,
-      timestamp: timestamp,
-      forceRefresh: false,
-    );
-  }
-
-  Future<ServerValidationResult> _callValidateFunction({
-    required User user,
-    required String messageId,
-    required String conversationId,
-    required String recipientId,
-    required int sequenceNumber,
-    required DateTime timestamp,
-    required bool forceRefresh,
-  }) async {
-    try {
-      if (forceRefresh) {
-        try {
-          await user.getIdToken(true);
-        } catch (e) {
-          return ServerValidationResult(
-            valid: false,
-            error: 'Token refresh failed: ${e.runtimeType}: $e',
-          );
-        }
-      }
-
-      final callable = _functions.httpsCallable('validateMessageSend');
-      final result = await callable.call({
-        'messageId': messageId,
-        'conversationId': conversationId,
-        'recipientId': recipientId,
-        'sequenceNumber': sequenceNumber,
-        'timestamp': timestamp.millisecondsSinceEpoch,
-      });
-
-      final data = result.data as Map<String, dynamic>;
-      return ServerValidationResult(
-        valid: data['valid'] as bool? ?? false,
-        token: data['token'] as String?,
-        error: data['error'] as String?,
-        retryAfterMs: data['retryAfterMs'] as int?,
-        remainingMinute: data['remainingMinute'] as int?,
-        remainingHour: data['remainingHour'] as int?,
-      );
-    } on FirebaseFunctionsException catch (e) {
-      if (e.code == 'unauthenticated' && !forceRefresh) {
-        return await _callValidateFunction(
-          user: user,
-          messageId: messageId,
-          conversationId: conversationId,
-          recipientId: recipientId,
-          sequenceNumber: sequenceNumber,
-          timestamp: timestamp,
-          forceRefresh: true,
-        );
-      }
-
-      return ServerValidationResult(
-        valid: false,
-        error: 'Functions error [${e.code}]: ${e.message}',
-      );
-    } catch (e) {
-      if (!forceRefresh) {
-        return await _callValidateFunction(
-          user: user,
-          messageId: messageId,
-          conversationId: conversationId,
-          recipientId: recipientId,
-          sequenceNumber: sequenceNumber,
-          timestamp: timestamp,
-          forceRefresh: true,
-        );
-      }
-      return ServerValidationResult(
-        valid: false,
-        error: 'Unexpected error: ${e.runtimeType}: $e',
-      );
-    }
-  }
-
   Future<void> resetConversation(String senderId, String recipientId) async {
     final conversationId = _getConversationId(senderId, recipientId);
     await _sequencesCollection.doc(conversationId).delete();
@@ -267,27 +161,4 @@ class ReplayProtectionService {
     }
     await batch.commit();
   }
-}
-
-class ServerValidationResult {
-  final bool valid;
-  final String? token;
-  final String? error;
-  final int? retryAfterMs;
-  final int? remainingMinute;
-  final int? remainingHour;
-
-  ServerValidationResult({
-    required this.valid,
-    this.token,
-    this.error,
-    this.retryAfterMs,
-    this.remainingMinute,
-    this.remainingHour,
-  });
-
-  Duration get retryAfter =>
-      retryAfterMs != null ? Duration(milliseconds: retryAfterMs!) : Duration.zero;
-
-  bool get isRateLimited => retryAfterMs != null && retryAfterMs! > 0;
 }

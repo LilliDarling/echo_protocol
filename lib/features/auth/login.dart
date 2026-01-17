@@ -35,14 +35,14 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _signInWithEmail() async {
+  Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      final result = await _authService.signInWithEmail(
-        email: _emailController.text.trim(),
+      final result = await _authService.signIn(
+        usernameOrEmail: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
@@ -217,11 +217,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   CustomTextField(
                     controller: _emailController,
-                    label: 'Email',
-                    hint: 'your@email.com',
-                    keyboardType: TextInputType.emailAddress,
-                    validator: Validators.validateEmail,
-                    prefixIcon: const Icon(Icons.email),
+                    label: 'Username or Email',
+                    hint: 'Enter your username or email',
+                    keyboardType: TextInputType.text,
+                    validator: (value) => Validators.validateRequired(value, 'Username or email'),
+                    prefixIcon: const Icon(Icons.person),
                   ),
                   const SizedBox(height: 16),
 
@@ -254,7 +254,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   CustomButton(
                     text: 'Sign In',
-                    onPressed: _signInWithEmail,
+                    onPressed: _signIn,
                     isLoading: _isLoading,
                   ),
                   const SizedBox(height: 16),

@@ -6,11 +6,13 @@ import 'media_placeholders.dart';
 class VideoPlayerView extends StatefulWidget {
   final String? networkUrl;
   final String? filePath;
+  final bool deleteOnDispose;
 
   const VideoPlayerView({
     super.key,
     this.networkUrl,
     this.filePath,
+    this.deleteOnDispose = false,
   }) : assert(networkUrl != null || filePath != null);
 
   @override
@@ -51,7 +53,20 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
   @override
   void dispose() {
     _controller?.dispose();
+    _deleteFileIfNeeded();
     super.dispose();
+  }
+
+  Future<void> _deleteFileIfNeeded() async {
+    if (!widget.deleteOnDispose || widget.filePath == null) return;
+    try {
+      final file = File(widget.filePath!);
+      if (await file.exists()) {
+        final length = await file.length();
+        await file.writeAsBytes(List.filled(length, 0));
+        await file.delete();
+      }
+    } catch (_) {}
   }
 
   @override

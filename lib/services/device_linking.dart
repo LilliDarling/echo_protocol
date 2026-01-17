@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 import 'secure_storage.dart';
 import '../utils/logger.dart';
 
@@ -65,7 +64,6 @@ class DeviceLinkingService {
     final expiresAt = DateTime.now().add(const Duration(minutes: 2));
     await _db.collection('deviceLinking').doc(linkToken).set({
       'userId': userId,
-      'sessionKey': sessionKey,
       'encryptedPrivateKey': encryptedPrivateKey.base64,
       'publicKey': publicKey,
       'keyVersion': keyVersion,
@@ -82,6 +80,7 @@ class DeviceLinkingService {
       'type': 'echo_protocol_device_link',
       'version': 1,
       'token': linkToken,
+      'sessionKey': sessionKey,
       'userId': userId,
       'expires': expiresAt.millisecondsSinceEpoch,
     });
@@ -106,6 +105,7 @@ class DeviceLinkingService {
       }
 
       final linkToken = data['token'] as String;
+      final sessionKey = data['sessionKey'] as String;
       final userId = data['userId'] as String;
       final expiresTimestamp = data['expires'] as int;
 
@@ -130,7 +130,6 @@ class DeviceLinkingService {
         throw Exception('Link has expired');
       }
 
-      final sessionKey = linkData['sessionKey'] as String;
       final encryptedPrivateKey = linkData['encryptedPrivateKey'] as String;
       final publicKey = linkData['publicKey'] as String;
       final keyVersion = linkData['keyVersion'] as int;
@@ -247,11 +246,12 @@ class DeviceLinkingService {
 
   Future<void> _addLinkedDevice(String userId) async {
     final deviceId = await _getDeviceId();
+    final now = DateTime.now();
+    final dayOnly = DateTime.utc(now.year, now.month, now.day);
     final deviceInfo = {
       'deviceId': deviceId,
       'deviceName': await _getDeviceName(),
-      'linkedAt': FieldValue.serverTimestamp(),
-      'lastActive': FieldValue.serverTimestamp(),
+      'linkedAt': Timestamp.fromDate(dayOnly),
       'platform': await _getPlatform(),
     };
 
@@ -261,30 +261,18 @@ class DeviceLinkingService {
   }
 
   Future<String> _getDeviceName() async {
-    final deviceInfo = DeviceInfoPlugin();
-
-    try {
-      if (kIsWeb) {
-        final webInfo = await deviceInfo.webBrowserInfo;
-        return '${webInfo.browserName} on ${webInfo.platform}';
-      } else if (Platform.isAndroid) {
-        final androidInfo = await deviceInfo.androidInfo;
-        return '${androidInfo.brand} ${androidInfo.model}';
-      } else if (Platform.isIOS) {
-        final iosInfo = await deviceInfo.iosInfo;
-        return '${iosInfo.name} (${iosInfo.model})';
-      } else if (Platform.isMacOS) {
-        final macInfo = await deviceInfo.macOsInfo;
-        return macInfo.computerName;
-      } else if (Platform.isWindows) {
-        final windowsInfo = await deviceInfo.windowsInfo;
-        return windowsInfo.computerName;
-      } else if (Platform.isLinux) {
-        final linuxInfo = await deviceInfo.linuxInfo;
-        return linuxInfo.name;
-      }
-    } catch (e) {
-      LoggerService.warning('Device info unavailable');
+    if (kIsWeb) {
+      return 'Web Browser';
+    } else if (Platform.isAndroid) {
+      return 'Android Device';
+    } else if (Platform.isIOS) {
+      return 'iOS Device';
+    } else if (Platform.isMacOS) {
+      return 'Mac';
+    } else if (Platform.isWindows) {
+      return 'Windows PC';
+    } else if (Platform.isLinux) {
+      return 'Linux PC';
     }
 
     return 'Unknown Device';
@@ -361,14 +349,12 @@ class LinkedDevice {
   final String deviceId;
   final String deviceName;
   final DateTime linkedAt;
-  final DateTime lastActive;
   final String platform;
 
   LinkedDevice({
     required this.deviceId,
     required this.deviceName,
     required this.linkedAt,
-    required this.lastActive,
     required this.platform,
   });
 
@@ -377,7 +363,6 @@ class LinkedDevice {
       deviceId: json['deviceId'] as String,
       deviceName: json['deviceName'] as String,
       linkedAt: (json['linkedAt'] as Timestamp).toDate(),
-      lastActive: (json['lastActive'] as Timestamp).toDate(),
       platform: json['platform'] as String,
     );
   }
@@ -387,13 +372,7 @@ class LinkedDevice {
       'deviceId': deviceId,
       'deviceName': deviceName,
       'linkedAt': Timestamp.fromDate(linkedAt),
-      'lastActive': Timestamp.fromDate(lastActive),
       'platform': platform,
     };
-  }
-
-  bool get isRecentlyActive {
-    final daysSinceActive = DateTime.now().difference(lastActive).inDays;
-    return daysSinceActive < 30;
   }
 }

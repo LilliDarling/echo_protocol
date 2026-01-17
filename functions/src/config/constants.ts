@@ -5,6 +5,7 @@
 export const RATE_LIMITS = {
   TOTP: {maxAttempts: 5, windowMinutes: 5},
   BACKUP_CODE: {maxAttempts: 3, windowMinutes: 5},
+  PARTNER_INVITE: {maxAttempts: 10, windowMinutes: 15},
   IP: {maxAttemptsPerIp: 50, windowMinutes: 60},
   MESSAGE: {
     maxPerMinute: 30,

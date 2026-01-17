@@ -1,4 +1,4 @@
-import {FieldValue} from "firebase-admin/firestore";
+import {FieldValue, Timestamp} from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {validateRequest} from "../utils/validation.js";
@@ -6,6 +6,7 @@ import {createHash, randomBytes} from "crypto";
 import * as ed from "@noble/ed25519";
 import {sha512} from "@noble/hashes/sha2.js";
 import {db} from "../firebase.js";
+import {checkUserRateLimit, checkIpRateLimit} from "../services/rateLimit.js";
 
 ed.hashes.sha512 = sha512;
 ed.hashes.sha512Async = (msg: Uint8Array) => Promise.resolve(sha512(msg));
@@ -19,6 +20,18 @@ function generateCorrelationId(): string {
   return randomBytes(4).toString("hex");
 }
 
+/**
+ * Get a timestamp representing the start of the current UTC day.
+ * @return {Timestamp} Firestore timestamp for midnight UTC today
+ */
+function getDayTimestamp(): Timestamp {
+  const now = new Date();
+  const dayOnly = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  );
+  return Timestamp.fromDate(dayOnly);
+}
+
 export const acceptPartnerInvite = onCall(
   {
     maxInstances: 10,
@@ -30,7 +43,19 @@ export const acceptPartnerInvite = onCall(
     const correlationId = generateCorrelationId();
 
     const userId = request.auth?.uid as string;
-    const {inviteCode, myPublicKey, myKeyVersion} = request.data;
+    const ip = request.rawRequest?.ip || "unknown";
+
+    await checkUserRateLimit(db, userId, "PARTNER_INVITE");
+    await checkIpRateLimit(db, ip, userId);
+
+    const {
+      inviteCode,
+      myPublicKey,
+      myKeyVersion,
+      timestamp,
+      signature,
+      ed25519PublicKey,
+    } = request.data;
 
     if (!inviteCode || typeof inviteCode !== "string") {
       throw new HttpsError(
@@ -53,6 +78,45 @@ export const acceptPartnerInvite = onCall(
       throw new HttpsError(
         "invalid-argument",
         "Public key is required"
+      );
+    }
+
+    if (!signature || typeof signature !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Signature is required"
+      );
+    }
+
+    if (!ed25519PublicKey || typeof ed25519PublicKey !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Ed25519 public key is required"
+      );
+    }
+
+    if (typeof timestamp !== "number") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Timestamp is required"
+      );
+    }
+
+    const timestampAge = Date.now() - timestamp;
+    const clockSkewTolerance = 30 * 1000;
+    const maxAge = 5 * 60 * 1000;
+
+    if (timestampAge < -clockSkewTolerance) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Request timestamp is invalid"
+      );
+    }
+
+    if (timestampAge > maxAge) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Request expired"
       );
     }
 
@@ -224,6 +288,55 @@ export const acceptPartnerInvite = onCall(
         );
       }
 
+      const acceptorDoc = await db.collection("users").doc(userId).get();
+      if (!acceptorDoc.exists) {
+        throw new HttpsError("not-found", "User not found");
+      }
+
+      const acceptorData = acceptorDoc.data();
+      const acceptorIdentityKey = acceptorData?.identityKey;
+
+      if (!acceptorIdentityKey ||
+          typeof acceptorIdentityKey.ed25519 !== "string") {
+        logger.warn("Acceptor validation failed", {correlationId});
+        throw new HttpsError("failed-precondition", "Identity key not found");
+      }
+
+      if (ed25519PublicKey !== acceptorIdentityKey.ed25519) {
+        logger.warn("Acceptor validation failed", {correlationId});
+        throw new HttpsError("failed-precondition", "Identity key mismatch");
+      }
+
+      try {
+        const signatureBytes = Buffer.from(signature, "base64");
+        const publicKeyBytes = Buffer.from(ed25519PublicKey, "base64");
+
+        if (publicKeyBytes.length !== 32 || signatureBytes.length !== 64) {
+          logger.warn("Acceptor validation failed", {correlationId});
+          throw new HttpsError("failed-precondition", "Invalid signature");
+        }
+
+        const payload = `${normalizedCode}:${userId}:${timestamp}`;
+        const payloadBytes = Buffer.from(payload, "utf-8");
+
+        const sig = new Uint8Array(signatureBytes);
+        const msg = new Uint8Array(payloadBytes);
+        const pub = new Uint8Array(publicKeyBytes);
+
+        const isValid = await ed.verifyAsync(sig, msg, pub);
+
+        if (!isValid) {
+          logger.warn("Acceptor validation failed", {correlationId});
+          throw new HttpsError("failed-precondition", "Invalid signature");
+        }
+      } catch (err) {
+        if (err instanceof HttpsError) {
+          throw err;
+        }
+        logger.error("Acceptor signature error", {correlationId});
+        throw new HttpsError("internal", "Signature verification failed");
+      }
+
       const partnerId = inviteData.userId;
 
       if (partnerId === userId) {
@@ -298,12 +411,14 @@ export const acceptPartnerInvite = onCall(
           .update(userId)
           .digest("hex");
 
+        const linkedAt = getDayTimestamp();
+
         transaction.update(db.collection("users").doc(userId), {
           partnerId: partnerId,
           partnerIdHash: userPartnerIdHash,
           partnerPublicKey: partnerPublicKey,
           partnerKeyVersion: partnerKeyVersion,
-          partnerLinkedAt: FieldValue.serverTimestamp(),
+          partnerLinkedAt: linkedAt,
         });
 
         transaction.update(db.collection("users").doc(partnerId), {
@@ -311,7 +426,7 @@ export const acceptPartnerInvite = onCall(
           partnerIdHash: partnerPartnerIdHash,
           partnerPublicKey: myPublicKey,
           partnerKeyVersion: keyVersion,
-          partnerLinkedAt: FieldValue.serverTimestamp(),
+          partnerLinkedAt: linkedAt,
         });
 
         const sortedIds = [userId, partnerId].sort();

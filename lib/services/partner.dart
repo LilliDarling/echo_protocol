@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'secure_storage.dart';
 import 'crypto/protocol_service.dart';
 import '../utils/security.dart';
+import '../models/key_change_event.dart';
 
 class PartnerService {
   final FirebaseFirestore _db;
@@ -87,6 +88,18 @@ class PartnerService {
     final existingPartnerId = userDoc.data()?['partnerId'] as String?;
     if (existingPartnerId != null) {
       throw Exception('You already have a partner linked');
+    }
+
+    final identityKey = userDoc.data()?['identityKey'];
+    if (identityKey == null || identityKey['ed25519'] == null) {
+      if (!_protocolService.isInitialized) {
+        throw Exception('Encryption not initialized. Please sign out and sign in again.');
+      }
+      await _protocolService.uploadPreKeys();
+      final refreshedDoc = await _db.collection('users').doc(user.uid).get();
+      if (refreshedDoc.data()?['identityKey']?['ed25519'] == null) {
+        throw Exception('Failed to register identity key. Please try again.');
+      }
     }
 
     await cancelExistingInvites();
@@ -183,6 +196,25 @@ class PartnerService {
     await batch.commit();
   }
 
+  Future<({String signature, String ed25519PublicKey})> _generateAcceptSignature({
+    required String inviteCode,
+    required String userId,
+    required int timestamp,
+  }) async {
+    if (!_protocolService.isInitialized) {
+      throw Exception('Encryption keys not available');
+    }
+
+    final payload = '$inviteCode:$userId:$timestamp';
+    final payloadBytes = Uint8List.fromList(utf8.encode(payload));
+    final result = await _protocolService.sign(payloadBytes);
+
+    return (
+      signature: base64Encode(result.signature),
+      ed25519PublicKey: base64Encode(result.publicKey),
+    );
+  }
+
   Future<PartnerInfo> acceptInvite(String inviteCode) async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -205,12 +237,25 @@ class PartnerService {
       throw Exception('Invalid invite code');
     }
 
+    final userDoc = await _db.collection('users').doc(user.uid).get();
+    final userData = userDoc.data();
+
+    final identityKey = userData?['identityKey'];
+    if (identityKey == null || identityKey['ed25519'] == null) {
+      if (!_protocolService.isInitialized) {
+        throw Exception('Encryption not initialized. Please sign out and sign in again.');
+      }
+      await _protocolService.uploadPreKeys();
+      final refreshedDoc = await _db.collection('users').doc(user.uid).get();
+      if (refreshedDoc.data()?['identityKey']?['ed25519'] == null) {
+        throw Exception('Failed to register identity key. Please try again.');
+      }
+    }
+
     var myPublicKey = await _secureStorage.getPublicKey();
     var myKeyVersion = await _secureStorage.getCurrentKeyVersion();
 
     if (myPublicKey == null || myKeyVersion == null) {
-      final userDoc = await _db.collection('users').doc(user.uid).get();
-      final userData = userDoc.data();
 
       if (myPublicKey == null) {
         final storedPublicKey = userData?['publicKey'] as String?;
@@ -235,6 +280,13 @@ class PartnerService {
       }
     }
 
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final signatureResult = await _generateAcceptSignature(
+      inviteCode: normalizedCode,
+      userId: user.uid,
+      timestamp: timestamp,
+    );
+
     final functions = FirebaseFunctions.instance;
     final callable = functions.httpsCallable('acceptPartnerInvite');
 
@@ -243,6 +295,9 @@ class PartnerService {
         'inviteCode': normalizedCode,
         'myPublicKey': myPublicKey,
         'myKeyVersion': myKeyVersion,
+        'timestamp': timestamp,
+        'signature': signatureResult.signature,
+        'ed25519PublicKey': signatureResult.ed25519PublicKey,
       });
 
       final data = result.data;
@@ -313,7 +368,6 @@ class PartnerService {
       avatar: partnerData['avatar'] as String?,
       publicKey: publicKey,
       keyVersion: keyVersion,
-      lastActive: (partnerData['lastActive'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -359,7 +413,6 @@ class PartnerService {
         avatar: partnerData['avatar'] as String?,
         publicKey: partnerData['publicKey'] as String,
         keyVersion: partnerData['publicKeyVersion'] as int? ?? 1,
-        lastActive: (partnerData['lastActive'] as Timestamp?)?.toDate(),
       );
     });
   }
@@ -419,35 +472,126 @@ class PartnerService {
     }
   }
 
-  Future<bool> checkAndUpdatePartnerKey() async {
-    final user = _auth.currentUser;
-    if (user == null) return false;
+  String computeFingerprint(String publicKey) {
+    final bytes = utf8.encode(publicKey);
+    final hash = sha256.convert(bytes);
+    final hex = hash.toString().toUpperCase();
+    final chunks = <String>[];
+    for (var i = 0; i < hex.length && chunks.length < 8; i += 4) {
+      chunks.add(hex.substring(i, i + 4));
+    }
+    return chunks.join(' ');
+  }
 
-    final userDoc = await _db.collection('users').doc(user.uid).get();
-    final partnerId = userDoc.data()?['partnerId'] as String?;
-    final storedKeyVersion = userDoc.data()?['partnerKeyVersion'] as int?;
+  Future<KeyChangeResult> checkPartnerKeyChange(String currentPublicKey) async {
+    final currentFingerprint = computeFingerprint(currentPublicKey);
+    final trustedFingerprint = await _secureStorage.getTrustedFingerprint();
 
-    if (partnerId == null) return false;
-
-    final partnerDoc = await _db.collection('users').doc(partnerId).get();
-    final currentKeyVersion = partnerDoc.data()?['publicKeyVersion'] as int?;
-    final currentPublicKey = partnerDoc.data()?['publicKey'] as String?;
-
-    if (currentKeyVersion != null &&
-        storedKeyVersion != null &&
-        currentKeyVersion > storedKeyVersion &&
-        currentPublicKey != null) {
-      await _db.collection('users').doc(user.uid).update({
-        'partnerPublicKey': currentPublicKey,
-        'partnerKeyVersion': currentKeyVersion,
-      });
-
-      await _secureStorage.storePartnerPublicKey(currentPublicKey);
-
-      return true;
+    if (trustedFingerprint == null) {
+      return KeyChangeResult(
+        status: KeyChangeStatus.firstKey,
+        currentFingerprint: currentFingerprint,
+      );
     }
 
-    return false;
+    if (trustedFingerprint != currentFingerprint) {
+      return KeyChangeResult(
+        status: KeyChangeStatus.changed,
+        previousFingerprint: trustedFingerprint,
+        currentFingerprint: currentFingerprint,
+      );
+    }
+
+    return KeyChangeResult(
+      status: KeyChangeStatus.noChange,
+      previousFingerprint: trustedFingerprint,
+      currentFingerprint: currentFingerprint,
+    );
+  }
+
+  Future<KeyChangeEvent?> logKeyChangeEvent({
+    required String previousFingerprint,
+    required String newFingerprint,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+
+    final random = Random.secure();
+    final visibleId = List.generate(8, (_) => random.nextInt(16).toRadixString(16)).join().toUpperCase();
+
+    final event = KeyChangeEvent(
+      id: '',
+      visibleId: visibleId,
+      detectedAt: DateTime.now(),
+      previousFingerprint: previousFingerprint,
+      newFingerprint: newFingerprint,
+    );
+
+    final docRef = await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('key_change_events')
+        .add(event.toFirestore());
+
+    return KeyChangeEvent(
+      id: docRef.id,
+      visibleId: visibleId,
+      detectedAt: event.detectedAt,
+      previousFingerprint: previousFingerprint,
+      newFingerprint: newFingerprint,
+    );
+  }
+
+  Future<void> acknowledgeKeyChange(String eventId) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('key_change_events')
+        .doc(eventId)
+        .update({
+      'acknowledged': true,
+      'acknowledgedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> trustCurrentKey(String publicKey) async {
+    final fingerprint = computeFingerprint(publicKey);
+    await _secureStorage.storeTrustedFingerprint(fingerprint);
+  }
+
+  Future<List<KeyChangeEvent>> getKeyChangeHistory() async {
+    final user = _auth.currentUser;
+    if (user == null) return [];
+
+    final snapshot = await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('key_change_events')
+        .orderBy('detectedAt', descending: true)
+        .limit(50)
+        .get();
+
+    return snapshot.docs.map((doc) => KeyChangeEvent.fromFirestore(doc)).toList();
+  }
+
+  Future<KeyChangeEvent?> getUnacknowledgedKeyChange() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+
+    final snapshot = await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('key_change_events')
+        .where('acknowledged', isEqualTo: false)
+        .orderBy('detectedAt', descending: true)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) return null;
+    return KeyChangeEvent.fromFirestore(snapshot.docs.first);
   }
 }
 
@@ -457,7 +601,6 @@ class PartnerInfo {
   final String? avatar;
   final String publicKey;
   final int keyVersion;
-  final DateTime? lastActive;
   final String? fingerprint;
   final bool isNewlyLinked;
 
@@ -467,15 +610,9 @@ class PartnerInfo {
     this.avatar,
     required this.publicKey,
     required this.keyVersion,
-    this.lastActive,
     this.fingerprint,
     this.isNewlyLinked = false,
   });
-
-  bool get isOnline {
-    if (lastActive == null) return false;
-    return DateTime.now().difference(lastActive!).inMinutes < 5;
-  }
 
   PartnerInfo copyWithVerificationShown() {
     return PartnerInfo(
@@ -484,7 +621,6 @@ class PartnerInfo {
       avatar: avatar,
       publicKey: publicKey,
       keyVersion: keyVersion,
-      lastActive: lastActive,
       fingerprint: fingerprint,
       isNewlyLinked: false,
     );

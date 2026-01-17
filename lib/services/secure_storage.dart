@@ -230,6 +230,32 @@ class SecureStorageService {
     return partnerKey != null;
   }
 
+  static const String _trustedFingerprintKey = 'trusted_partner_fingerprint';
+  static const String _fingerprintAcknowledgedKey = 'fingerprint_acknowledged';
+
+  Future<void> storeTrustedFingerprint(String fingerprint) async {
+    await _secureWrite(_trustedFingerprintKey, fingerprint);
+    await _secureWrite(_fingerprintAcknowledgedKey, 'true');
+  }
+
+  Future<String?> getTrustedFingerprint() async {
+    return await _secureRead(_trustedFingerprintKey);
+  }
+
+  Future<bool> isFingerprintAcknowledged() async {
+    final value = await _secureRead(_fingerprintAcknowledgedKey);
+    return value == 'true';
+  }
+
+  Future<void> clearFingerprintAcknowledgment() async {
+    await _secureDelete(_fingerprintAcknowledgedKey);
+  }
+
+  Future<void> clearTrustedFingerprint() async {
+    await _secureDelete(_trustedFingerprintKey);
+    await _secureDelete(_fingerprintAcknowledgedKey);
+  }
+
   Future<void> storeTwoFactorSecret(String secret) async {
     await _secureWrite('totp_secret', secret);
   }
@@ -304,6 +330,19 @@ class SecureStorageService {
   }
 
   static const String _cacheKeyKey = 'decrypted_content_cache_key';
+  static const String _pendingRecoveryPhraseKey = 'pending_recovery_phrase';
+
+  Future<void> storePendingRecoveryPhrase(String phrase) async {
+    await _secureWrite(_pendingRecoveryPhraseKey, phrase);
+  }
+
+  Future<String?> getPendingRecoveryPhrase() async {
+    return await _secureRead(_pendingRecoveryPhraseKey);
+  }
+
+  Future<void> clearPendingRecoveryPhrase() async {
+    await _secureDelete(_pendingRecoveryPhraseKey);
+  }
 
   Future<void> storeCacheKey(String cacheKey) async {
     await _secureWrite(_cacheKeyKey, cacheKey);
@@ -344,54 +383,45 @@ class SecureStorageService {
     return null;
   }
 
-  static const String _twoFaSessionVerifiedKey = '2fa_session_verified';
   static const Duration _twoFaSessionTimeout = Duration(hours: 24);
 
   Future<bool> get2FASessionVerified() async {
-    final value = await _secureRead(_twoFaSessionVerifiedKey);
-    if (value == null) return false;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
 
-    final timestamp = int.tryParse(value);
-    if (timestamp == null) {
-      await clear2FASessionVerified();
-      return false;
-    }
+    final idTokenResult = await user.getIdTokenResult();
+    final claims = idTokenResult.claims;
+    if (claims == null) return false;
 
-    final verifiedAt = DateTime.fromMillisecondsSinceEpoch(timestamp);
-    final isExpired = DateTime.now().difference(verifiedAt) >= _twoFaSessionTimeout;
+    final verifiedAt = claims['twoFactorVerifiedAt'] as int?;
+    if (verifiedAt == null) return false;
 
-    if (isExpired) {
-      await clear2FASessionVerified();
-      return false;
-    }
+    final verifiedTime = DateTime.fromMillisecondsSinceEpoch(verifiedAt);
+    final isExpired = DateTime.now().difference(verifiedTime) >= _twoFaSessionTimeout;
 
-    return true;
+    return !isExpired;
   }
 
-  Future<void> set2FASessionVerified(bool verified) async {
-    if (verified) {
-      await _secureWrite(
-        _twoFaSessionVerifiedKey,
-        DateTime.now().millisecondsSinceEpoch.toString(),
-      );
-    } else {
-      await clear2FASessionVerified();
+  Future<void> refresh2FASession() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await user.getIdToken(true);
     }
-  }
-
-  Future<void> clear2FASessionVerified() async {
-    await _secureDelete(_twoFaSessionVerifiedKey);
   }
 
   Future<Duration?> get2FASessionTimeRemaining() async {
-    final value = await _secureRead(_twoFaSessionVerifiedKey);
-    if (value == null) return null;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
 
-    final timestamp = int.tryParse(value);
-    if (timestamp == null) return null;
+    final idTokenResult = await user.getIdTokenResult();
+    final claims = idTokenResult.claims;
+    if (claims == null) return null;
 
-    final verifiedAt = DateTime.fromMillisecondsSinceEpoch(timestamp);
-    final elapsed = DateTime.now().difference(verifiedAt);
+    final verifiedAt = claims['twoFactorVerifiedAt'] as int?;
+    if (verifiedAt == null) return null;
+
+    final verifiedTime = DateTime.fromMillisecondsSinceEpoch(verifiedAt);
+    final elapsed = DateTime.now().difference(verifiedTime);
 
     if (elapsed >= _twoFaSessionTimeout) return null;
 

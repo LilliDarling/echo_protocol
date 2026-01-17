@@ -22,6 +22,13 @@ class SignInResult {
   SignInResult({required this.credential, this.needsRecovery = false});
 }
 
+class LinkAccountResult {
+  final UserCredential credential;
+  final bool success;
+
+  LinkAccountResult({required this.credential, required this.success});
+}
+
 class AuthService {
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
@@ -44,23 +51,45 @@ class AuthService {
 
   String? get currentUserId => _auth.currentUser?.uid;
 
-  Future<SignUpResult> signUpWithEmail({
-    required String email,
+  static const String _syntheticEmailDomain = 'echo-protocol.local';
+
+  String _toAuthEmail(String usernameOrEmail) {
+    if (usernameOrEmail.contains('@')) {
+      return usernameOrEmail;
+    }
+    return '${usernameOrEmail.toLowerCase()}@$_syntheticEmailDomain';
+  }
+
+  bool _isSyntheticEmail(String? email) {
+    return email != null && email.endsWith('@$_syntheticEmailDomain');
+  }
+
+  String? get currentUserEmail {
+    final email = currentUser?.email;
+    if (_isSyntheticEmail(email)) return null;
+    return email;
+  }
+
+  Future<SignUpResult> signUp({
+    required String username,
     required String password,
-    required String displayName,
+    String? email,
   }) async {
     try {
-      final nameValidation = Validators.validateDisplayName(displayName);
-      if (nameValidation != null) {
-        throw Exception(nameValidation);
+      final usernameValidation = Validators.validateUsername(username);
+      if (usernameValidation != null) {
+        throw Exception(usernameValidation);
       }
 
+      final authEmail = email?.isNotEmpty == true ? email! : _toAuthEmail(username);
+      final hasRealEmail = email?.isNotEmpty == true;
+
       final credential = await _auth.createUserWithEmailAndPassword(
-        email: email,
+        email: authEmail,
         password: password,
       );
 
-      final sanitizedName = displayName.trim();
+      final sanitizedName = username.trim();
       await credential.user?.updateDisplayName(sanitizedName);
 
       await _secureStorage.storeUserId(credential.user!.uid);
@@ -76,14 +105,16 @@ class AuthService {
 
       await _createUserDocument(
         userId: credential.user!.uid,
-        email: email,
-        displayName: displayName,
+        email: hasRealEmail ? authEmail : '',
+        displayName: username,
         photoUrl: null,
         publicKey: publicKey ?? '',
         fingerprint: fingerprint ?? '',
       );
 
       await _protocolService.uploadPreKeys();
+
+      await _secureStorage.storePendingRecoveryPhrase(mnemonic);
 
       LoggerService.auth('Sign up complete');
       return SignUpResult(
@@ -96,20 +127,19 @@ class AuthService {
     }
   }
 
-  Future<SignInResult> signInWithEmail({
-    required String email,
+  Future<SignInResult> signIn({
+    required String usernameOrEmail,
     required String password,
   }) async {
     try {
+      final authEmail = _toAuthEmail(usernameOrEmail);
+
       final credential = await _auth.signInWithEmailAndPassword(
-        email: email,
+        email: authEmail,
         password: password,
       );
 
       final needsRecovery = !await _tryLoadUserKeys(credential.user!.uid);
-      if (!needsRecovery) {
-        await _updateLastActive(credential.user!.uid);
-      }
 
       LoggerService.auth('Sign in complete');
       return SignInResult(credential: credential, needsRecovery: needsRecovery);
@@ -127,7 +157,8 @@ class AuthService {
         final GoogleAuthProvider googleProvider = GoogleAuthProvider();
         userCredential = await _auth.signInWithPopup(googleProvider);
       } else {
-        final GoogleSignInAccount googleUser = await GoogleSignIn.instance.authenticate();
+        final GoogleSignInAccount googleUser =
+            await GoogleSignIn.instance.authenticate();
         final GoogleSignInAuthentication googleAuth = googleUser.authentication;
 
         if (googleAuth.idToken == null) {
@@ -158,13 +189,15 @@ class AuthService {
         await _createUserDocument(
           userId: userCredential.user!.uid,
           email: userCredential.user!.email!,
-          displayName: userCredential.user!.displayName ?? 'User',
-          photoUrl: userCredential.user!.photoURL,
+          displayName: 'User',
+          photoUrl: null,
           publicKey: publicKey ?? '',
           fingerprint: fingerprint ?? '',
         );
 
         await _protocolService.uploadPreKeys();
+
+        await _secureStorage.storePendingRecoveryPhrase(mnemonic);
 
         LoggerService.auth('Google sign-up complete');
         return SignUpResult(
@@ -173,9 +206,6 @@ class AuthService {
         );
       } else {
         final needsRecovery = !await _tryLoadUserKeys(userCredential.user!.uid);
-        if (!needsRecovery) {
-          await _updateLastActive(userCredential.user!.uid);
-        }
 
         LoggerService.auth('Google sign-in complete');
         return SignInResult(credential: userCredential, needsRecovery: needsRecovery);
@@ -198,7 +228,63 @@ class AuthService {
 
     await _auth.signOut();
     LoggerService.auth('Sign out complete');
-    await _secureStorage.clear2FASessionVerified();
+  }
+
+  Future<LinkAccountResult> linkGoogleAccount() async {
+    final user = currentUser;
+    if (user == null) throw Exception('No user signed in');
+
+    try {
+      final AuthCredential googleCredential;
+
+      if (kIsWeb) {
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        final result = await user.linkWithPopup(googleProvider);
+        LoggerService.auth('Account link complete');
+        return LinkAccountResult(credential: result, success: true);
+      } else {
+        final GoogleSignInAccount googleUser =
+            await GoogleSignIn.instance.authenticate();
+        final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+
+        if (googleAuth.idToken == null) {
+          throw Exception('Authentication failed');
+        }
+
+        googleCredential = GoogleAuthProvider.credential(
+          idToken: googleAuth.idToken,
+        );
+      }
+
+      final result = await user.linkWithCredential(googleCredential);
+
+      if (result.user?.email != null && user.email == null) {
+        await _db.collection('users').doc(user.uid).update({
+          'email': result.user!.email,
+        });
+      }
+
+      LoggerService.auth('Account link complete');
+      return LinkAccountResult(credential: result, success: true);
+    } on FirebaseAuthException catch (e) {
+      LoggerService.error('Account link failed');
+      if (e.code == 'credential-already-in-use') {
+        throw Exception('This account is already linked to another user');
+      }
+      if (e.code == 'provider-already-linked') {
+        throw Exception('A Google account is already linked');
+      }
+      throw _handleAuthException(e);
+    } catch (e) {
+      LoggerService.error('Account link failed');
+      throw Exception('Failed to link account');
+    }
+  }
+
+  List<String> getLinkedProviders() {
+    final user = currentUser;
+    if (user == null) return [];
+    return user.providerData.map((info) => info.providerId).toList();
   }
 
   Future<void> resetPassword(String email) async {
@@ -227,6 +313,45 @@ class AuthService {
     await user.reauthenticateWithCredential(credential);
   }
 
+  Future<void> reauthenticateWithGoogle() async {
+    final user = currentUser;
+    if (user == null) throw Exception('No user signed in');
+
+    try {
+      if (kIsWeb) {
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        await user.reauthenticateWithPopup(googleProvider);
+      } else {
+        final GoogleSignInAccount googleUser =
+            await GoogleSignIn.instance.authenticate();
+        final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+
+        if (googleAuth.idToken == null) {
+          throw Exception('Authentication failed');
+        }
+
+        final credential = GoogleAuthProvider.credential(
+          idToken: googleAuth.idToken,
+        );
+
+        await user.reauthenticateWithCredential(credential);
+      }
+    } catch (e) {
+      LoggerService.error('Re-authentication failed');
+      throw Exception('Re-authentication failed');
+    }
+  }
+
+  bool get canReauthenticateWithPassword {
+    final providers = getLinkedProviders();
+    return providers.contains('password');
+  }
+
+  bool get canReauthenticateWithGoogle {
+    final providers = getLinkedProviders();
+    return providers.contains('google.com');
+  }
+
   Future<void> updateProfile({
     String? displayName,
     String? photoURL,
@@ -249,19 +374,27 @@ class AuthService {
     }
   }
 
-  Future<void> deleteAccount(String password) async {
+  Future<void> deleteAccount({String? password, bool useGoogle = false}) async {
     final user = currentUser;
     if (user == null) throw Exception('No user signed in');
 
     try {
-      await reauthenticateWithPassword(password);
+      if (useGoogle && canReauthenticateWithGoogle) {
+        await reauthenticateWithGoogle();
+      } else if (password != null && canReauthenticateWithPassword) {
+        await reauthenticateWithPassword(password);
+      } else {
+        throw Exception('Re-authentication required');
+      }
 
       await _db.collection('users').doc(user.uid).delete();
 
       await _secureStorage.clearAll();
 
       await user.delete();
+      LoggerService.auth('Account deleted');
     } on FirebaseAuthException catch (e) {
+      LoggerService.error('Account deletion failed');
       throw _handleAuthException(e);
     }
   }
@@ -313,7 +446,6 @@ class AuthService {
     }
 
     await _secureStorage.storeUserId(user.uid);
-    await _updateLastActive(user.uid);
     LoggerService.auth('Recovery complete');
   }
 
@@ -326,14 +458,14 @@ class AuthService {
     required String fingerprint,
   }) async {
     final now = DateTime.now();
+    final dayOnly = DateTime.utc(now.year, now.month, now.day);
     const initialVersion = 1;
 
     final userModel = UserModel(
       id: userId,
       name: displayName,
       avatar: photoUrl ?? '',
-      createdAt: now,
-      lastActive: now,
+      createdAt: dayOnly,
       preferences: UserPreferences.defaultPreferences,
     );
 
@@ -342,15 +474,8 @@ class AuthService {
       'email': email,
       'publicKey': publicKey,
       'publicKeyVersion': initialVersion,
-      'publicKeyRotatedAt': now.toIso8601String(),
       'publicKeyFingerprint': fingerprint,
       'linkedDevices': [],
-    });
-  }
-
-  Future<void> _updateLastActive(String userId) async {
-    await _db.collection('users').doc(userId).update({
-      'lastActive': FieldValue.serverTimestamp(),
     });
   }
 

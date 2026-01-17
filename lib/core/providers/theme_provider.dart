@@ -84,6 +84,24 @@ class ThemeProvider extends ChangeNotifier {
     await _savePreferences();
   }
 
+  Future<void> setNotificationPreview(NotificationPreview preview) async {
+    if (_preferences.notificationPreview == preview) return;
+
+    _preferences = _preferences.copyWith(notificationPreview: preview);
+    notifyListeners();
+
+    await _savePreferences();
+  }
+
+  Future<void> setShowTypingIndicator(bool show) async {
+    if (_preferences.showTypingIndicator == show) return;
+
+    _preferences = _preferences.copyWith(showTypingIndicator: show);
+    notifyListeners();
+
+    await _savePreferences();
+  }
+
   Future<void> _savePreferences() async {
     if (_userId == null) return;
 

@@ -1,8 +1,12 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'features/auth/login.dart';
+import 'features/auth/recovery_phrase_display.dart';
+import 'features/auth/onboarding_success.dart';
 import 'features/home/home.dart';
 import 'services/auth.dart';
 import 'services/crypto/protocol_service.dart';
@@ -16,6 +20,10 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  if (!kIsWeb) {
+    await GoogleSignIn.instance.initialize();
+  }
 
   runApp(const EchoProtocolApp());
 }
@@ -57,6 +65,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   bool _keysLoaded = false;
   bool _isLoadingKeys = false;
+  String? _pendingRecoveryPhrase;
+  bool _checkedPendingPhrase = false;
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +93,24 @@ class _AuthWrapperState extends State<AuthWrapper> {
                     ),
                   );
                 }
+
+                if (_pendingRecoveryPhrase != null) {
+                  final userId = _authService.currentUserId!;
+                  return RecoveryPhraseDisplayScreen(
+                    recoveryPhrase: _pendingRecoveryPhrase!,
+                    onComplete: (ctx) {
+                      _secureStorage.clearPendingRecoveryPhrase();
+                      _pendingRecoveryPhrase = null;
+                      Navigator.of(ctx).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (_) => OnboardingSuccessScreen(userId: userId),
+                        ),
+                        (route) => false,
+                      );
+                    },
+                  );
+                }
+
                 return const HomeScreen();
               },
             );
@@ -92,6 +120,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         _keysLoaded = false;
         _isLoadingKeys = false;
+        _pendingRecoveryPhrase = null;
+        _checkedPendingPhrase = false;
         Provider.of<ThemeProvider>(context, listen: false).reset();
         return const LoginScreen();
       },
@@ -106,6 +136,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
         await _protocolService.initializeFromStorage();
       }
 
+      if (!_checkedPendingPhrase) {
+        _pendingRecoveryPhrase = await _secureStorage.getPendingRecoveryPhrase();
+        _checkedPendingPhrase = true;
+      }
+
       final userId = _authService.currentUserId;
       if (userId != null && mounted) {
         final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
@@ -114,7 +149,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       _keysLoaded = true;
     } catch (e) {
-      // Ignore errors - the app will handle missing keys appropriately
+      _checkedPendingPhrase = true;
     } finally {
       _isLoadingKeys = false;
     }

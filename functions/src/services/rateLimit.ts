@@ -14,10 +14,12 @@ import {alertSuspiciousActivity} from "./anomaly.js";
 export async function checkUserRateLimit(
   db: Firestore,
   userId: string,
-  limitType: "TOTP" | "BACKUP_CODE"
+  limitType: "TOTP" | "BACKUP_CODE" | "PARTNER_INVITE"
 ): Promise<void> {
   const config = RATE_LIMITS[limitType];
-  const attemptsRef = db.collection("2fa_rate_limits").doc(userId);
+  const collection = limitType === "PARTNER_INVITE" ?
+    "partner_invite_rate_limits" : "2fa_rate_limits";
+  const attemptsRef = db.collection(collection).doc(userId);
 
   try {
     await db.runTransaction(async (transaction) => {
@@ -136,7 +138,9 @@ export async function checkIpRateLimit(
       );
 
       if (attempts.length >= ANOMALY_THRESHOLDS.suspiciousIpAttempts) {
-        await alertSuspiciousActivity(db, ip, "high_attempt_rate", "Suspicious activity detected");
+        await alertSuspiciousActivity(
+          db, ip, "high_attempt_rate", "Suspicious activity detected"
+        );
       }
     });
   } catch (error) {

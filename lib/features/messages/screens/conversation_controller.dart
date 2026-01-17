@@ -3,7 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../../../models/echo.dart';
+import '../../../models/key_change_event.dart';
 import '../../../services/partner.dart';
 import '../../../services/crypto/protocol_service.dart';
 import '../../../services/crypto/media_encryption.dart';
@@ -49,6 +51,10 @@ class ConversationController extends ChangeNotifier {
   DocumentSnapshot? _oldestMessageDoc;
   String? _error;
 
+  KeyChangeResult? _keyChangeResult;
+  KeyChangeEvent? _pendingKeyChangeEvent;
+  late final PartnerService _partnerService;
+
   static const int _pageSize = 30;
 
   ConversationController({
@@ -78,6 +84,9 @@ class ConversationController extends ChangeNotifier {
   OfflineQueueService get offlineQueue => _offlineQueue;
   TypingIndicatorService get typingService => _typingService;
   DecryptedContentCacheService get contentCache => _contentCache;
+  KeyChangeResult? get keyChangeResult => _keyChangeResult;
+  KeyChangeEvent? get pendingKeyChangeEvent => _pendingKeyChangeEvent;
+  bool get hasKeyChangeWarning => _keyChangeResult?.status == KeyChangeStatus.changed;
 
   String get currentUserId => _auth.currentUser?.uid ?? '';
 
@@ -118,6 +127,7 @@ class ConversationController extends ChangeNotifier {
       _protocolService = ProtocolService();
       _secureStorage = SecureStorageService();
       _rateLimiter = MessageRateLimiter();
+      _partnerService = PartnerService();
 
       _contentCache = DecryptedContentCacheService(secureStorage: _secureStorage);
       await _contentCache.loadFromDisk();
@@ -134,6 +144,9 @@ class ConversationController extends ChangeNotifier {
       );
 
       _mediaEncryptionService = MediaEncryptionService();
+      await _mediaEncryptionService!.clearCache();
+
+      await _checkPartnerKeyChange();
 
       _isServicesInitialized = true;
       notifyListeners();
@@ -142,6 +155,36 @@ class ConversationController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> _checkPartnerKeyChange() async {
+    _keyChangeResult = await _partnerService.checkPartnerKeyChange(partner.publicKey);
+
+    if (_keyChangeResult!.status == KeyChangeStatus.firstKey) {
+      await _partnerService.trustCurrentKey(partner.publicKey);
+    } else if (_keyChangeResult!.status == KeyChangeStatus.changed) {
+      _pendingKeyChangeEvent = await _partnerService.logKeyChangeEvent(
+        previousFingerprint: _keyChangeResult!.previousFingerprint!,
+        newFingerprint: _keyChangeResult!.currentFingerprint,
+      );
+    }
+  }
+
+  Future<void> acknowledgeKeyChange() async {
+    if (_pendingKeyChangeEvent == null) return;
+
+    await _partnerService.acknowledgeKeyChange(_pendingKeyChangeEvent!.id);
+    await _partnerService.trustCurrentKey(partner.publicKey);
+
+    _keyChangeResult = KeyChangeResult(
+      status: KeyChangeStatus.noChange,
+      previousFingerprint: _keyChangeResult!.currentFingerprint,
+      currentFingerprint: _keyChangeResult!.currentFingerprint,
+    );
+    _pendingKeyChangeEvent = null;
+    notifyListeners();
+  }
+
+  String get partnerFingerprint => _partnerService.computeFingerprint(partner.publicKey);
 
   Future<void> _loadInitialMessages() async {
     try {
@@ -345,7 +388,6 @@ class ConversationController extends ChangeNotifier {
     for (final doc in undelivered.docs) {
       batch.update(doc.reference, {
         'status': 'delivered',
-        'deliveredAt': FieldValue.serverTimestamp(),
       });
     }
     await batch.commit();
@@ -492,7 +534,6 @@ class ConversationController extends ChangeNotifier {
         _messages[index] = _messages[index].copyWith(
           content: encryptionResult['content'] as String,
           isEdited: true,
-          editedAt: DateTime.now(),
         );
         notifyListeners();
       }
@@ -500,7 +541,6 @@ class ConversationController extends ChangeNotifier {
       await _messagesRef.doc(message.id).update({
         'content': encryptionResult['content'],
         'isEdited': true,
-        'editedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
       rethrow;
@@ -517,19 +557,33 @@ class ConversationController extends ChangeNotifier {
       if (index != -1) {
         _messages[index] = _messages[index].copyWith(
           isDeleted: true,
-          deletedAt: DateTime.now(),
           content: '',
         );
         notifyListeners();
       }
 
+      await _deleteMediaFromStorage(message.metadata);
+
       await _messagesRef.doc(message.id).update({
         'isDeleted': true,
-        'deletedAt': FieldValue.serverTimestamp(),
         'content': '',
+        'metadata': {},
       });
     } catch (e) {
       rethrow;
+    }
+  }
+
+  Future<void> _deleteMediaFromStorage(EchoMetadata metadata) async {
+    final storage = FirebaseStorage.instance;
+    final urls = [metadata.fileUrl, metadata.thumbnailUrl]
+        .whereType<String>()
+        .where((url) => url.isNotEmpty);
+
+    for (final url in urls) {
+      try {
+        await storage.refFromURL(url).delete();
+      } catch (_) {}
     }
   }
 

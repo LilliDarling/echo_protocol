@@ -38,6 +38,13 @@ class Validators {
     return null;
   }
 
+  static String? validateOptionalEmail(String? value) {
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+    return validateEmail(value);
+  }
+
   static String? validatePassword(String? value) {
     if (value == null || value.isEmpty) {
       return 'Password is required';
@@ -125,6 +132,44 @@ class Validators {
 
     if (RegExp(r'^[^a-zA-Z0-9]+$').hasMatch(trimmedValue)) {
       return 'Name must contain at least one letter or number';
+    }
+
+    return null;
+  }
+
+  static String? validateUsername(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Username is required';
+    }
+
+    final trimmedValue = value.trim();
+
+    if (trimmedValue.length < 3) {
+      return 'Username must be at least 3 characters';
+    }
+
+    if (trimmedValue.length > 30) {
+      return 'Username must be less than 30 characters';
+    }
+
+    if (trimmedValue.contains(' ')) {
+      return 'Username cannot contain spaces';
+    }
+
+    if (!RegExp(r'^[a-zA-Z0-9._-]+$').hasMatch(trimmedValue)) {
+      return 'Username can only contain letters, numbers, dots, underscores, and hyphens';
+    }
+
+    if (trimmedValue.startsWith('.') || trimmedValue.endsWith('.')) {
+      return 'Username cannot start or end with a dot';
+    }
+
+    if (trimmedValue.contains('..')) {
+      return 'Username cannot contain consecutive dots';
+    }
+
+    if (trimmedValue.startsWith('-') || trimmedValue.endsWith('-')) {
+      return 'Username cannot start or end with a hyphen';
     }
 
     return null;

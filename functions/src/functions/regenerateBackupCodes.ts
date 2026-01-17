@@ -3,6 +3,7 @@ import * as logger from "firebase-functions/logger";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as speakeasy from "speakeasy";
 import {validateRequest} from "../utils/validation.js";
+import {checkUserRateLimit, checkIpRateLimit} from "../services/rateLimit.js";
 import {hashBackupCode} from "../utils/hashing.js";
 import {generateBackupCodes} from "../utils/random.js";
 import {TOTP_CONFIG} from "../config/constants.js";
@@ -25,6 +26,9 @@ export const regenerateBackupCodes = onCall(
     }
 
     logger.info("Backup code regeneration initiated");
+
+    await checkIpRateLimit(db, ip, userId);
+    await checkUserRateLimit(db, userId, "TOTP");
 
     try {
       const secretDoc = await db

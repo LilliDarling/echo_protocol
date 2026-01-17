@@ -31,7 +31,8 @@ class MediaUploadService {
     required XFile file,
     required String userId,
   }) async {
-    final fileBytes = await file.readAsBytes();
+    final rawBytes = await file.readAsBytes();
+    final fileBytes = await _stripExifData(rawBytes);
     final hashedFilename = _generateHashedFilename(fileBytes, userId);
 
     final thumbnailBytes = await _generateImageThumbnail(fileBytes);
@@ -185,6 +186,19 @@ class MediaUploadService {
     final input = '$userId:$timestamp:${bytes.length}';
     final hash = sha256.convert(utf8.encode(input));
     return hash.toString();
+  }
+
+  Future<Uint8List> _stripExifData(Uint8List imageBytes) async {
+    try {
+      final result = await FlutterImageCompress.compressWithList(
+        imageBytes,
+        quality: 95,
+        keepExif: false,
+      );
+      return result;
+    } catch (_) {
+      return imageBytes;
+    }
   }
 
   Future<Uint8List> _generateImageThumbnail(Uint8List imageBytes) async {
