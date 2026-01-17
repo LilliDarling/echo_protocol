@@ -7,14 +7,53 @@ import '../settings/two_factor_settings.dart';
 import '../settings/preferences.dart';
 import 'edit_profile.dart';
 
-class ProfileTab extends StatelessWidget {
-  final AuthService _authService = AuthService();
+class ProfileTab extends StatefulWidget {
+  const ProfileTab({super.key});
 
-  ProfileTab({super.key});
+  @override
+  State<ProfileTab> createState() => _ProfileTabState();
+}
+
+class _ProfileTabState extends State<ProfileTab> {
+  final AuthService _authService = AuthService();
+  bool _isLinking = false;
+
+  Future<void> _linkGoogleAccount() async {
+    setState(() => _isLinking = true);
+
+    try {
+      await _authService.linkGoogleAccount();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Google account linked successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLinking = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final user = _authService.currentUser;
+    final providers = _authService.getLinkedProviders();
+    final hasGoogleLinked = providers.contains('google.com');
 
     return ListView(
       children: [
@@ -53,19 +92,42 @@ class ProfileTab extends StatelessWidget {
                   color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                user?.email ?? '',
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.white70,
-                ),
-              ),
             ],
           ),
         ),
 
         const SizedBox(height: 8),
+
+        if (!hasGoogleLinked) ...[
+          _buildSectionHeader(context, 'Link Account'),
+
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.g_mobiledata,
+                color: Colors.red.shade700,
+                size: 24,
+              ),
+            ),
+            title: const Text('Link Google Account'),
+            subtitle: const Text('Enable Google as an alternative sign-in'),
+            trailing: _isLinking
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.chevron_right),
+            onTap: _isLinking ? null : _linkGoogleAccount,
+          ),
+
+          const Divider(height: 32),
+        ],
 
         _buildSectionHeader(context, 'Security'),
 

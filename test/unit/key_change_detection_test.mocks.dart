@@ -1195,6 +1195,32 @@ class MockSecureStorageService extends _i1.Mock
           as _i5.Future<int?>);
 
   @override
+  _i5.Future<void> storePendingRecoveryPhrase(String? phrase) =>
+      (super.noSuchMethod(
+            Invocation.method(#storePendingRecoveryPhrase, [phrase]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<String?> getPendingRecoveryPhrase() =>
+      (super.noSuchMethod(
+            Invocation.method(#getPendingRecoveryPhrase, []),
+            returnValue: _i5.Future<String?>.value(),
+          )
+          as _i5.Future<String?>);
+
+  @override
+  _i5.Future<void> clearPendingRecoveryPhrase() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearPendingRecoveryPhrase, []),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
   _i5.Future<void> storeCacheKey(String? cacheKey) =>
       (super.noSuchMethod(
             Invocation.method(#storeCacheKey, [cacheKey]),

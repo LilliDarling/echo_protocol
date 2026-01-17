@@ -243,8 +243,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                 CustomTextField(
                   controller: _nameController,
-                  label: 'Name',
-                  hint: 'Your display name',
+                  label: 'Username',
+                  hint: 'Your username',
                   validator: Validators.validateDisplayName,
                   prefixIcon: const Icon(Icons.person),
                 ),

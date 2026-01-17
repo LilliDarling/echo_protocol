@@ -330,6 +330,19 @@ class SecureStorageService {
   }
 
   static const String _cacheKeyKey = 'decrypted_content_cache_key';
+  static const String _pendingRecoveryPhraseKey = 'pending_recovery_phrase';
+
+  Future<void> storePendingRecoveryPhrase(String phrase) async {
+    await _secureWrite(_pendingRecoveryPhraseKey, phrase);
+  }
+
+  Future<String?> getPendingRecoveryPhrase() async {
+    return await _secureRead(_pendingRecoveryPhraseKey);
+  }
+
+  Future<void> clearPendingRecoveryPhrase() async {
+    await _secureDelete(_pendingRecoveryPhraseKey);
+  }
 
   Future<void> storeCacheKey(String cacheKey) async {
     await _secureWrite(_cacheKeyKey, cacheKey);

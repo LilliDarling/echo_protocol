@@ -20,7 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
       const MessagesTab(),
       _buildPlaceholderTab(context, 'Express', Icons.favorite),
       _buildPlaceholderTab(context, 'Plans', Icons.calendar_today),
-      ProfileTab(),
+      const ProfileTab(),
     ];
   }
 

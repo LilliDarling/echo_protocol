@@ -50,10 +50,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final result = await _authService.signUpWithEmail(
-        email: _emailController.text.trim(),
+      final email = _emailController.text.trim();
+      final result = await _authService.signUp(
+        username: _displayNameController.text.trim(),
         password: _passwordController.text,
-        displayName: _displayNameController.text.trim(),
+        email: email.isNotEmpty ? email : null,
       );
 
       if (mounted) {
@@ -182,19 +183,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                   CustomTextField(
                     controller: _displayNameController,
-                    label: 'Name',
-                    hint: 'Your name',
-                    validator: (value) => Validators.validateRequired(value, 'Name'),
+                    label: 'Username',
+                    hint: 'Letters, numbers, dots, underscores',
+                    validator: Validators.validateUsername,
                     prefixIcon: const Icon(Icons.person),
                   ),
                   const SizedBox(height: 16),
 
                   CustomTextField(
                     controller: _emailController,
-                    label: 'Email',
-                    hint: 'your@email.com',
+                    label: 'Email (Optional)',
+                    hint: 'For account recovery',
                     keyboardType: TextInputType.emailAddress,
-                    validator: Validators.validateEmail,
+                    validator: Validators.validateOptionalEmail,
                     prefixIcon: const Icon(Icons.email),
                   ),
                   const SizedBox(height: 16),
