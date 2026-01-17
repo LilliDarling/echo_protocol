@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'features/auth/login.dart';
@@ -16,6 +18,10 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  if (!kIsWeb) {
+    await GoogleSignIn.instance.initialize();
+  }
 
   runApp(const EchoProtocolApp());
 }

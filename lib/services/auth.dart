@@ -124,7 +124,8 @@ class AuthService {
         final GoogleAuthProvider googleProvider = GoogleAuthProvider();
         userCredential = await _auth.signInWithPopup(googleProvider);
       } else {
-        final GoogleSignInAccount googleUser = await GoogleSignIn.instance.authenticate();
+        final GoogleSignInAccount googleUser =
+            await GoogleSignIn.instance.authenticate();
         final GoogleSignInAuthentication googleAuth = googleUser.authentication;
 
         if (googleAuth.idToken == null) {
