@@ -18,6 +18,7 @@ enum NotificationPreview {
 
 class UserModel {
   final String id;
+  final String username;
   final String name;
   final String avatar;
   final DateTime createdAt;
@@ -25,6 +26,7 @@ class UserModel {
 
   UserModel({
     required this.id,
+    required this.username,
     required this.name,
     required this.avatar,
     required this.createdAt,
@@ -34,6 +36,7 @@ class UserModel {
   factory UserModel.fromJson(String id, Map<String, dynamic> json) {
     return UserModel(
       id: id,
+      username: json['username'] as String? ?? '',
       name: json['name'] as String,
       avatar: json['avatar'] as String,
       createdAt: (json['createdAt'] as Timestamp).toDate(),
@@ -48,6 +51,7 @@ class UserModel {
 
   Map<String, dynamic> toJson() {
     return {
+      'username': username,
       'name': name,
       'avatar': avatar,
       'createdAt': Timestamp.fromDate(createdAt),
@@ -57,6 +61,7 @@ class UserModel {
 
   UserModel copyWith({
     String? id,
+    String? username,
     String? name,
     String? avatar,
     DateTime? createdAt,
@@ -64,6 +69,7 @@ class UserModel {
   }) {
     return UserModel(
       id: id ?? this.id,
+      username: username ?? this.username,
       name: name ?? this.name,
       avatar: avatar ?? this.avatar,
       createdAt: createdAt ?? this.createdAt,

@@ -178,7 +178,7 @@ class PreferencesScreen extends StatelessWidget {
   String _formatNotificationPreview(NotificationPreview preview) {
     switch (preview) {
       case NotificationPreview.full:
-        return 'Show sender name';
+        return 'Show name and message';
       case NotificationPreview.senderOnly:
         return 'Show sender name';
       case NotificationPreview.hidden:

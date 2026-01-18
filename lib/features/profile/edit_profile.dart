@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/auth.dart';
 import '../../services/media_upload.dart';
@@ -23,6 +24,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isUploadingPhoto = false;
   String? _currentPhotoUrl;
   String? _pendingPhotoUrl;
+  String _originalName = '';
 
   @override
   void initState() {
@@ -30,11 +32,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _loadCurrentProfile();
   }
 
-  void _loadCurrentProfile() {
+  Future<void> _loadCurrentProfile() async {
     final user = _authService.currentUser;
     if (user != null) {
-      _nameController.text = user.displayName ?? '';
-      _currentPhotoUrl = user.photoURL;
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final data = doc.data();
+      if (mounted && data != null) {
+        setState(() {
+          _originalName = data['name'] as String? ?? '';
+          _nameController.text = _originalName;
+          _currentPhotoUrl = data['avatar'] as String?;
+        });
+      }
     }
   }
 
@@ -133,9 +145,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     try {
       final newName = _nameController.text.trim();
-      final currentName = _authService.currentUser?.displayName ?? '';
-
-      final nameChanged = newName != currentName;
+      final nameChanged = newName != _originalName;
       final photoChanged = _pendingPhotoUrl != null;
 
       if (!nameChanged && !photoChanged) {
@@ -243,8 +253,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                 CustomTextField(
                   controller: _nameController,
-                  label: 'Username',
-                  hint: 'Your username',
+                  label: 'Display Name',
+                  hint: 'How others see you',
                   validator: Validators.validateDisplayName,
                   prefixIcon: const Icon(Icons.person),
                 ),

@@ -106,6 +106,7 @@ class AuthService {
       await _createUserDocument(
         userId: credential.user!.uid,
         email: hasRealEmail ? authEmail : '',
+        username: username,
         displayName: username,
         photoUrl: null,
         publicKey: publicKey ?? '',
@@ -186,10 +187,14 @@ class AuthService {
           await _secureStorage.storePublicKey(publicKey);
         }
 
+        final email = userCredential.user!.email!;
+        final generatedUsername = email.split('@').first;
+
         await _createUserDocument(
           userId: userCredential.user!.uid,
-          email: userCredential.user!.email!,
-          displayName: 'User',
+          email: email,
+          username: generatedUsername,
+          displayName: generatedUsername,
           photoUrl: null,
           publicKey: publicKey ?? '',
           fingerprint: fingerprint ?? '',
@@ -452,6 +457,7 @@ class AuthService {
   Future<void> _createUserDocument({
     required String userId,
     required String email,
+    required String username,
     required String displayName,
     String? photoUrl,
     required String publicKey,
@@ -463,6 +469,7 @@ class AuthService {
 
     final userModel = UserModel(
       id: userId,
+      username: username,
       name: displayName,
       avatar: photoUrl ?? '',
       createdAt: dayOnly,

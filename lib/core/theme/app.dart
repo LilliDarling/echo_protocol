@@ -35,6 +35,9 @@ class AppTheme {
         borderSide: BorderSide.none,
       ),
     ),
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      type: BottomNavigationBarType.fixed,
+    ),
   );
 
   static ThemeData darkTheme = ThemeData(
@@ -70,6 +73,9 @@ class AppTheme {
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
       ),
+    ),
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      type: BottomNavigationBarType.fixed,
     ),
   );
 }
