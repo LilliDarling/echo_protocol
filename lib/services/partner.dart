@@ -13,16 +13,19 @@ import '../models/key_change_event.dart';
 class PartnerService {
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
+  final FirebaseFunctions _functions;
   final SecureStorageService _secureStorage;
   final ProtocolService _protocolService;
 
   PartnerService({
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
+    FirebaseFunctions? functions,
     SecureStorageService? secureStorage,
     ProtocolService? protocolService,
   })  : _db = firestore ?? FirebaseFirestore.instance,
         _auth = auth ?? FirebaseAuth.instance,
+        _functions = functions ?? FirebaseFunctions.instance,
         _secureStorage = secureStorage ?? SecureStorageService(),
         _protocolService = protocolService ?? ProtocolService();
 
@@ -288,8 +291,7 @@ class PartnerService {
       timestamp: timestamp,
     );
 
-    final functions = FirebaseFunctions.instance;
-    final callable = functions.httpsCallable('acceptPartnerInvite');
+    final callable = _functions.httpsCallable('acceptPartnerInvite');
 
     try {
       final result = await callable.call<Map<String, dynamic>>({

@@ -1,8 +1,10 @@
+import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:echo_protocol/services/partner.dart';
 import 'package:echo_protocol/services/crypto/protocol_service.dart';
 import 'package:echo_protocol/services/secure_storage.dart';
@@ -10,10 +12,12 @@ import 'package:echo_protocol/services/secure_storage.dart';
 @GenerateMocks([
   FirebaseAuth,
   FirebaseFirestore,
+  FirebaseFunctions,
   User,
   ProtocolService,
   SecureStorageService,
   Transaction,
+  HttpsCallable,
 ], customMocks: [
   MockSpec<CollectionReference<Map<String, dynamic>>>(
     as: #MockCollectionReference,
@@ -44,6 +48,7 @@ void main() {
     late PartnerService partnerService;
     late MockFirebaseAuth mockAuth;
     late MockFirebaseFirestore mockFirestore;
+    late MockFirebaseFunctions mockFunctions;
     late MockProtocolService mockProtocol;
     late MockSecureStorageService mockSecureStorage;
     late MockUser mockUser;
@@ -58,6 +63,7 @@ void main() {
     setUp(() {
       mockAuth = MockFirebaseAuth();
       mockFirestore = MockFirebaseFirestore();
+      mockFunctions = MockFirebaseFunctions();
       mockProtocol = MockProtocolService();
       mockSecureStorage = MockSecureStorageService();
       mockUser = MockUser();
@@ -72,6 +78,7 @@ void main() {
       partnerService = PartnerService(
         firestore: mockFirestore,
         auth: mockAuth,
+        functions: mockFunctions,
         secureStorage: mockSecureStorage,
         protocolService: mockProtocol,
       );
@@ -115,25 +122,37 @@ void main() {
 
     group('acceptInvite', () {
       late MockDocumentSnapshot mockInviteSnapshot;
+      late MockHttpsCallable mockCallable;
 
       setUp(() {
         mockInviteSnapshot = MockDocumentSnapshot();
+        mockCallable = MockHttpsCallable();
 
         when(mockCollection.doc('user123')).thenReturn(mockUserDoc);
         when(mockUserDoc.get()).thenAnswer((_) async => mockSnapshot);
         when(mockSnapshot.data()).thenReturn({
           'name': 'Test User',
           'publicKey': 'test-public-key',
+          'publicKeyVersion': 1,
+          'identityKey': {'ed25519': 'test-ed25519-key'},
         });
 
         // Mock ProtocolService methods
         when(mockProtocol.getFingerprint()).thenAnswer((_) async => 'test-fingerprint');
         when(mockProtocol.isInitialized).thenReturn(true);
+        when(mockProtocol.sign(any)).thenAnswer((_) async => (
+          signature: Uint8List.fromList([1, 2, 3, 4]),
+          publicKey: Uint8List.fromList([5, 6, 7, 8]),
+        ));
 
         // Mock SecureStorage methods
         when(mockSecureStorage.getPublicKey()).thenAnswer((_) async => 'my-public-key');
         when(mockSecureStorage.getCurrentKeyVersion()).thenAnswer((_) async => 1);
         when(mockSecureStorage.storePartnerPublicKey(any)).thenAnswer((_) async {});
+        when(mockSecureStorage.storeCurrentKeyVersion(any)).thenAnswer((_) async {});
+
+        // Mock FirebaseFunctions
+        when(mockFunctions.httpsCallable('acceptPartnerInvite')).thenReturn(mockCallable);
       });
 
       test('throws when invite code is invalid format', () async {
@@ -143,71 +162,88 @@ void main() {
         );
       });
 
-      // Skip: Requires full Firebase mocking - validation works in integration
-      test('throws when invite does not exist', skip: 'Requires Firebase Cloud Functions mock', () async {
-        final inviteCode = 'ABCD1234';
+      test('throws when invite does not exist (Cloud Function error)', () async {
+        final inviteCode = 'ABCD12345678';
 
-        when(mockCollection.doc(inviteCode)).thenReturn(mockInviteDoc);
-        when(mockInviteDoc.get()).thenAnswer((_) async => mockInviteSnapshot);
-        when(mockInviteSnapshot.exists).thenReturn(false);
+        // Create a PartnerService with injected functions mock
+        final service = PartnerService(
+          firestore: mockFirestore,
+          auth: mockAuth,
+          secureStorage: mockSecureStorage,
+          protocolService: mockProtocol,
+          functions: mockFunctions,
+        );
+
+        when(mockCallable.call<Map<String, dynamic>>(any)).thenThrow(
+          FirebaseFunctionsException(code: 'not-found', message: 'Invite not found or invalid'),
+        );
 
         expect(
-          () => partnerService.acceptInvite(inviteCode),
-          throwsA(predicate((e) => e.toString().contains('Invalid'))),
+          () => service.acceptInvite(inviteCode),
+          throwsA(predicate((e) => e.toString().contains('Invite not found or invalid'))),
         );
       });
 
-      test('throws when invite is already used', skip: 'Requires Firebase Cloud Functions mock', () async {
-        final inviteCode = 'ABCD1234';
+      test('throws when invite is already used (Cloud Function error)', () async {
+        final inviteCode = 'ABCD12345678';
 
-        when(mockCollection.doc(inviteCode)).thenReturn(mockInviteDoc);
-        when(mockInviteDoc.get()).thenAnswer((_) async => mockInviteSnapshot);
-        when(mockInviteSnapshot.exists).thenReturn(true);
-        when(mockInviteSnapshot.data()).thenReturn({
-          'used': true,
-          'expiresAt': Timestamp.fromDate(DateTime.now().add(const Duration(hours: 1))),
-        });
+        final service = PartnerService(
+          firestore: mockFirestore,
+          auth: mockAuth,
+          secureStorage: mockSecureStorage,
+          protocolService: mockProtocol,
+          functions: mockFunctions,
+        );
+
+        when(mockCallable.call<Map<String, dynamic>>(any)).thenThrow(
+          FirebaseFunctionsException(code: 'failed-precondition', message: 'Invite is no longer valid'),
+        );
 
         expect(
-          () => partnerService.acceptInvite(inviteCode),
+          () => service.acceptInvite(inviteCode),
           throwsA(predicate((e) => e.toString().contains('no longer valid'))),
         );
       });
 
-      test('throws when invite has expired', skip: 'Requires Firebase Cloud Functions mock', () async {
-        final inviteCode = 'ABCD1234';
-        final expiredTime = DateTime.now().subtract(const Duration(hours: 1));
+      test('throws when invite has expired (Cloud Function error)', () async {
+        final inviteCode = 'ABCD12345678';
 
-        when(mockCollection.doc(inviteCode)).thenReturn(mockInviteDoc);
-        when(mockInviteDoc.get()).thenAnswer((_) async => mockInviteSnapshot);
-        when(mockInviteSnapshot.exists).thenReturn(true);
-        when(mockInviteSnapshot.data()).thenReturn({
-          'used': false,
-          'expiresAt': Timestamp.fromDate(expiredTime),
-        });
+        final service = PartnerService(
+          firestore: mockFirestore,
+          auth: mockAuth,
+          secureStorage: mockSecureStorage,
+          protocolService: mockProtocol,
+          functions: mockFunctions,
+        );
+
+        when(mockCallable.call<Map<String, dynamic>>(any)).thenThrow(
+          FirebaseFunctionsException(code: 'failed-precondition', message: 'Invite has expired'),
+        );
 
         expect(
-          () => partnerService.acceptInvite(inviteCode),
-          throwsA(predicate((e) => e.toString().contains('no longer valid'))),
+          () => service.acceptInvite(inviteCode),
+          throwsA(predicate((e) => e.toString().contains('Invite has expired'))),
         );
       });
 
-      test('throws when trying to link with self', skip: 'Requires Firebase Cloud Functions mock', () async {
-        final inviteCode = 'ABCD1234';
-        final expiresAt = DateTime.now().add(const Duration(hours: 1));
+      test('throws when trying to link with self (Cloud Function error)', () async {
+        final inviteCode = 'ABCD12345678';
 
-        when(mockCollection.doc(inviteCode)).thenReturn(mockInviteDoc);
-        when(mockInviteDoc.get()).thenAnswer((_) async => mockInviteSnapshot);
-        when(mockInviteSnapshot.exists).thenReturn(true);
-        when(mockInviteSnapshot.data()).thenReturn({
-          'userId': 'user123',
-          'used': false,
-          'expiresAt': Timestamp.fromDate(expiresAt),
-        });
+        final service = PartnerService(
+          firestore: mockFirestore,
+          auth: mockAuth,
+          secureStorage: mockSecureStorage,
+          protocolService: mockProtocol,
+          functions: mockFunctions,
+        );
+
+        when(mockCallable.call<Map<String, dynamic>>(any)).thenThrow(
+          FirebaseFunctionsException(code: 'invalid-argument', message: 'Cannot link with yourself'),
+        );
 
         expect(
-          () => partnerService.acceptInvite(inviteCode),
-          throwsA(predicate((e) => e.toString().contains('Invalid'))),
+          () => service.acceptInvite(inviteCode),
+          throwsA(predicate((e) => e.toString().contains('Cannot link with yourself'))),
         );
       });
 

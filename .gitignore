@@ -72,6 +72,5 @@ fastlane/report.xml
 .packages
 
 # Unused Platform Folders
-ios/
 macos/
 linux/

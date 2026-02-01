@@ -2,8 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:mockito/mockito.dart';
+import 'package:mockito/annotations.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:echo_protocol/utils/decrypted_content_cache.dart';
 import 'package:echo_protocol/services/secure_storage.dart';
+
+@GenerateMocks([FirebaseAuth, User])
+import 'decrypted_content_cache_test.mocks.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +18,8 @@ void main() {
     late DecryptedContentCacheService cacheService;
     late SecureStorageService secureStorage;
     late Directory tempDir;
+    late MockFirebaseAuth mockAuth;
+    late MockUser mockUser;
 
     setUp(() async {
       // Set up mock secure storage
@@ -20,7 +28,13 @@ void main() {
       // Create temp directory for tests
       tempDir = await Directory.systemTemp.createTemp('cache_test_');
 
-      secureStorage = SecureStorageService();
+      // Set up Firebase Auth mock
+      mockAuth = MockFirebaseAuth();
+      mockUser = MockUser();
+      when(mockAuth.currentUser).thenReturn(mockUser);
+      when(mockUser.uid).thenReturn('test-user-id');
+
+      secureStorage = SecureStorageService(auth: mockAuth);
       cacheService = DecryptedContentCacheService(secureStorage: secureStorage);
     });
 
@@ -165,51 +179,55 @@ void main() {
   });
 
   group('SecureStorageService cache key methods', () {
+    late MockFirebaseAuth mockAuth;
+    late MockUser mockUser;
+
     setUp(() {
       FlutterSecureStorage.setMockInitialValues({});
+      mockAuth = MockFirebaseAuth();
+      mockUser = MockUser();
+      when(mockAuth.currentUser).thenReturn(mockUser);
+      when(mockUser.uid).thenReturn('test-user-id');
     });
 
-    // These tests require Firebase Auth to be initialized because
-    // SecureStorageService uses FirebaseAuth.instance internally.
-    // Skip until proper Firebase mocking is added.
     test('storeCacheKey and getCacheKey work correctly', () async {
-      final secureStorage = SecureStorageService();
+      final secureStorage = SecureStorageService(auth: mockAuth);
 
       await secureStorage.storeCacheKey('test-key-base64');
       final retrieved = await secureStorage.getCacheKey();
 
       expect(retrieved, equals('test-key-base64'));
-    }, skip: 'Requires Firebase Auth mock');
+    });
 
     test('deleteCacheKey removes the key', () async {
-      final secureStorage = SecureStorageService();
+      final secureStorage = SecureStorageService(auth: mockAuth);
 
       await secureStorage.storeCacheKey('test-key-base64');
       expect(await secureStorage.getCacheKey(), isNotNull);
 
       await secureStorage.deleteCacheKey();
       expect(await secureStorage.getCacheKey(), isNull);
-    }, skip: 'Requires Firebase Auth mock');
+    });
 
     test('getCacheKey returns null when no key stored', () async {
-      final secureStorage = SecureStorageService();
+      final secureStorage = SecureStorageService(auth: mockAuth);
 
       final key = await secureStorage.getCacheKey();
       expect(key, isNull);
-    }, skip: 'Requires Firebase Auth mock');
+    });
 
     test('storeCacheKey overwrites existing key', () async {
-      final secureStorage = SecureStorageService();
+      final secureStorage = SecureStorageService(auth: mockAuth);
 
       await secureStorage.storeCacheKey('first-key');
       expect(await secureStorage.getCacheKey(), equals('first-key'));
 
       await secureStorage.storeCacheKey('second-key');
       expect(await secureStorage.getCacheKey(), equals('second-key'));
-    }, skip: 'Requires Firebase Auth mock');
+    });
 
     test('handles base64 encoded keys correctly', () async {
-      final secureStorage = SecureStorageService();
+      final secureStorage = SecureStorageService(auth: mockAuth);
 
       // Generate a valid base64 key (32 bytes = 256 bits)
       final keyBytes = List.generate(32, (i) => i);
@@ -223,16 +241,23 @@ void main() {
       // Verify it decodes back correctly
       final decodedBytes = base64.decode(retrieved!);
       expect(decodedBytes.length, equals(32));
-    }, skip: 'Requires Firebase Auth mock');
+    });
   });
 
   group('Cache service initialization', () {
+    late MockFirebaseAuth mockAuth;
+    late MockUser mockUser;
+
     setUp(() {
       FlutterSecureStorage.setMockInitialValues({});
+      mockAuth = MockFirebaseAuth();
+      mockUser = MockUser();
+      when(mockAuth.currentUser).thenReturn(mockUser);
+      when(mockUser.uid).thenReturn('test-user-id');
     });
 
     test('new instance starts with empty cache', () {
-      final secureStorage = SecureStorageService();
+      final secureStorage = SecureStorageService(auth: mockAuth);
       final cacheService = DecryptedContentCacheService(
         secureStorage: secureStorage,
       );
@@ -241,7 +266,7 @@ void main() {
     });
 
     test('multiple instances share same secure storage', () async {
-      final secureStorage = SecureStorageService();
+      final secureStorage = SecureStorageService(auth: mockAuth);
 
       final cache1 = DecryptedContentCacheService(secureStorage: secureStorage);
       final cache2 = DecryptedContentCacheService(secureStorage: secureStorage);
@@ -255,16 +280,23 @@ void main() {
       // But they share the same secure storage for the encryption key
       await secureStorage.storeCacheKey('shared-key');
       expect(await secureStorage.getCacheKey(), equals('shared-key'));
-    }, skip: 'Requires Firebase Auth mock');
+    });
   });
 
   group('Edge cases', () {
+    late MockFirebaseAuth mockAuth;
+    late MockUser mockUser;
+
     setUp(() {
       FlutterSecureStorage.setMockInitialValues({});
+      mockAuth = MockFirebaseAuth();
+      mockUser = MockUser();
+      when(mockAuth.currentUser).thenReturn(mockUser);
+      when(mockUser.uid).thenReturn('test-user-id');
     });
 
     test('handles message IDs with special characters', () {
-      final secureStorage = SecureStorageService();
+      final secureStorage = SecureStorageService(auth: mockAuth);
       final cacheService = DecryptedContentCacheService(
         secureStorage: secureStorage,
       );
@@ -281,7 +313,7 @@ void main() {
     });
 
     test('handles null-like string values', () {
-      final secureStorage = SecureStorageService();
+      final secureStorage = SecureStorageService(auth: mockAuth);
       final cacheService = DecryptedContentCacheService(
         secureStorage: secureStorage,
       );
@@ -296,7 +328,7 @@ void main() {
     });
 
     test('remove non-existent key does not throw', () {
-      final secureStorage = SecureStorageService();
+      final secureStorage = SecureStorageService(auth: mockAuth);
       final cacheService = DecryptedContentCacheService(
         secureStorage: secureStorage,
       );
