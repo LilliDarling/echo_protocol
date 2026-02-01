@@ -16,6 +16,7 @@ import '../../../utils/decrypted_content_cache.dart';
 import '../../../services/read_receipt.dart';
 import '../../../services/offline_queue.dart';
 import '../../../services/typing_indicator.dart';
+import '../../../services/auto_delete.dart';
 
 class ConversationController extends ChangeNotifier {
   final PartnerInfo partner;
@@ -83,6 +84,29 @@ class ConversationController extends ChangeNotifier {
   MediaEncryptionService? get mediaEncryptionService => _mediaEncryptionService;
   OfflineQueueService get offlineQueue => _offlineQueue;
   TypingIndicatorService get typingService => _typingService;
+
+  void setTypingIndicatorEnabled(bool enabled) {
+    _typingService.enabled = enabled;
+  }
+
+  Future<void> runAutoDelete(int autoDeleteDays) async {
+    if (autoDeleteDays <= 0) return;
+
+    final service = AutoDeleteService();
+    final deleted = await service.deleteOldMessages(
+      conversationId: conversationId,
+      userId: currentUserId,
+      autoDeleteDays: autoDeleteDays,
+    );
+
+    if (deleted > 0) {
+      _messages.removeWhere((m) {
+        final cutoff = DateTime.now().subtract(Duration(days: autoDeleteDays));
+        return m.timestamp.isBefore(cutoff);
+      });
+      notifyListeners();
+    }
+  }
   DecryptedContentCacheService get contentCache => _contentCache;
   KeyChangeResult? get keyChangeResult => _keyChangeResult;
   KeyChangeEvent? get pendingKeyChangeEvent => _pendingKeyChangeEvent;

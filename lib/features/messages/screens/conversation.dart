@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/theme_provider.dart';
 import '../../../models/echo.dart';
 import '../../../services/partner.dart';
 import '../../settings/fingerprint_verification.dart';
@@ -28,6 +30,8 @@ class _ConversationScreenState extends State<ConversationScreen>
   late final ConversationController _controller;
   final ScrollController _scrollController = ScrollController();
 
+  bool _preferencesApplied = false;
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +43,17 @@ class _ConversationScreenState extends State<ConversationScreen>
     _scrollController.addListener(_onScroll);
     _controller.addListener(_onControllerUpdate);
     _controller.initialize();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_preferencesApplied) {
+      final prefs = Provider.of<ThemeProvider>(context, listen: false).preferences;
+      _controller.setTypingIndicatorEnabled(prefs.showTypingIndicator);
+      _controller.runAutoDelete(prefs.autoDeleteDays);
+      _preferencesApplied = true;
+    }
   }
 
   @override

@@ -40,9 +40,9 @@ class EchoProtocolApp extends StatelessWidget {
           return MaterialApp(
             title: 'Echo Protocol',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
+            theme: AppTheme.darkTheme,
             darkTheme: AppTheme.darkTheme,
-            themeMode: themeProvider.themeMode,
+            themeMode: ThemeMode.dark,
             home: const AuthWrapper(),
           );
         },

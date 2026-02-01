@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/user.dart';
 import '../utils/validators.dart';
@@ -360,23 +361,29 @@ class AuthService {
   Future<void> updateProfile({
     String? displayName,
     String? photoURL,
+    String? oldPhotoURL,
   }) async {
     final user = currentUser;
     if (user == null) throw Exception('No user signed in');
 
-    if (displayName != null) {
-      await user.updateDisplayName(displayName);
-      await _db.collection('users').doc(user.uid).update({
-        'name': displayName,
-      });
+    final updates = <String, dynamic>{};
+    if (displayName != null) updates['name'] = displayName;
+    if (photoURL != null) updates['avatar'] = photoURL;
+
+    if (updates.isEmpty) return;
+
+    await _db.collection('users').doc(user.uid).update(updates);
+
+    if (photoURL != null && oldPhotoURL != null && oldPhotoURL.isNotEmpty) {
+      try {
+        await FirebaseStorage.instance.refFromURL(oldPhotoURL).delete();
+      } catch (_) {}
     }
 
-    if (photoURL != null) {
-      await user.updatePhotoURL(photoURL);
-      await _db.collection('users').doc(user.uid).update({
-        'avatar': photoURL,
-      });
-    }
+    try {
+      if (displayName != null) await user.updateDisplayName(displayName);
+      if (photoURL != null) await user.updatePhotoURL(photoURL);
+    } catch (_) {}
   }
 
   Future<void> deleteAccount({String? password, bool useGoogle = false}) async {
@@ -402,6 +409,20 @@ class AuthService {
       LoggerService.error('Account deletion failed');
       throw _handleAuthException(e);
     }
+  }
+
+  Future<bool> isProfileComplete() async {
+    final user = currentUser;
+    if (user == null) return false;
+
+    final doc = await _db.collection('users').doc(user.uid).get();
+    final data = doc.data();
+    if (data == null) return false;
+
+    final username = data['username'] as String? ?? '';
+    final name = data['name'] as String? ?? '';
+
+    return name.isNotEmpty && name != username;
   }
 
   Future<String?> getMyPublicKeyFingerprint() async {
