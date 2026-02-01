@@ -6,11 +6,13 @@ import 'package:echo_protocol/services/secure_storage.dart';
 import 'package:echo_protocol/services/crypto/protocol_service.dart';
 import 'package:echo_protocol/models/key_change_event.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 @GenerateMocks([
   FirebaseFirestore,
   FirebaseAuth,
+  FirebaseFunctions,
   SecureStorageService,
   ProtocolService,
   User,
@@ -21,6 +23,7 @@ void main() {
   late PartnerService partnerService;
   late MockFirebaseFirestore mockFirestore;
   late MockFirebaseAuth mockAuth;
+  late MockFirebaseFunctions mockFunctions;
   late MockSecureStorageService mockSecureStorage;
   late MockProtocolService mockProtocol;
   late MockUser mockUser;
@@ -28,6 +31,7 @@ void main() {
   setUp(() {
     mockFirestore = MockFirebaseFirestore();
     mockAuth = MockFirebaseAuth();
+    mockFunctions = MockFirebaseFunctions();
     mockSecureStorage = MockSecureStorageService();
     mockProtocol = MockProtocolService();
     mockUser = MockUser();
@@ -38,6 +42,7 @@ void main() {
     partnerService = PartnerService(
       firestore: mockFirestore,
       auth: mockAuth,
+      functions: mockFunctions,
       secureStorage: mockSecureStorage,
       protocolService: mockProtocol,
     );

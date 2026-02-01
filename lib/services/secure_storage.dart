@@ -120,6 +120,10 @@ class _WebEncryptionLayer {
 }
 
 class SecureStorageService {
+  final FirebaseAuth _auth;
+
+  SecureStorageService({FirebaseAuth? auth}) : _auth = auth ?? FirebaseAuth.instance;
+
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(),
     iOptions: IOSOptions(
@@ -140,7 +144,7 @@ class SecureStorageService {
     return 'hardware';
   }
 
-  String? get _currentUserId => FirebaseAuth.instance.currentUser?.uid;
+  String? get _currentUserId => _auth.currentUser?.uid;
 
   Future<void> _secureWrite(String key, String value) async {
     final encryptedValue = await _WebEncryptionLayer.encrypt(
@@ -386,7 +390,7 @@ class SecureStorageService {
   static const Duration _twoFaSessionTimeout = Duration(hours: 24);
 
   Future<bool> get2FASessionVerified() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     if (user == null) return false;
 
     final idTokenResult = await user.getIdTokenResult();
@@ -403,14 +407,14 @@ class SecureStorageService {
   }
 
   Future<void> refresh2FASession() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     if (user != null) {
       await user.getIdToken(true);
     }
   }
 
   Future<Duration?> get2FASessionTimeRemaining() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     if (user == null) return null;
 
     final idTokenResult = await user.getIdTokenResult();

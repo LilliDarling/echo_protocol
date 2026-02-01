@@ -13,16 +13,19 @@ import '../models/key_change_event.dart';
 class PartnerService {
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
+  final FirebaseFunctions _functions;
   final SecureStorageService _secureStorage;
   final ProtocolService _protocolService;
 
   PartnerService({
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
+    FirebaseFunctions? functions,
     SecureStorageService? secureStorage,
     ProtocolService? protocolService,
   })  : _db = firestore ?? FirebaseFirestore.instance,
         _auth = auth ?? FirebaseAuth.instance,
+        _functions = functions ?? FirebaseFunctions.instance,
         _secureStorage = secureStorage ?? SecureStorageService(),
         _protocolService = protocolService ?? ProtocolService();
 
@@ -84,7 +87,7 @@ class PartnerService {
       throw Exception('Too many invite attempts. Please try again later.');
     }
 
-    final userDoc = await _db.collection('users').doc(user.uid).get();
+    var userDoc = await _db.collection('users').doc(user.uid).get();
     final existingPartnerId = userDoc.data()?['partnerId'] as String?;
     if (existingPartnerId != null) {
       throw Exception('You already have a partner linked');
@@ -96,8 +99,8 @@ class PartnerService {
         throw Exception('Encryption not initialized. Please sign out and sign in again.');
       }
       await _protocolService.uploadPreKeys();
-      final refreshedDoc = await _db.collection('users').doc(user.uid).get();
-      if (refreshedDoc.data()?['identityKey']?['ed25519'] == null) {
+      userDoc = await _db.collection('users').doc(user.uid).get();
+      if (userDoc.data()?['identityKey']?['ed25519'] == null) {
         throw Exception('Failed to register identity key. Please try again.');
       }
     }
@@ -237,8 +240,8 @@ class PartnerService {
       throw Exception('Invalid invite code');
     }
 
-    final userDoc = await _db.collection('users').doc(user.uid).get();
-    final userData = userDoc.data();
+    var userDoc = await _db.collection('users').doc(user.uid).get();
+    var userData = userDoc.data();
 
     final identityKey = userData?['identityKey'];
     if (identityKey == null || identityKey['ed25519'] == null) {
@@ -246,8 +249,9 @@ class PartnerService {
         throw Exception('Encryption not initialized. Please sign out and sign in again.');
       }
       await _protocolService.uploadPreKeys();
-      final refreshedDoc = await _db.collection('users').doc(user.uid).get();
-      if (refreshedDoc.data()?['identityKey']?['ed25519'] == null) {
+      userDoc = await _db.collection('users').doc(user.uid).get();
+      userData = userDoc.data();
+      if (userData?['identityKey']?['ed25519'] == null) {
         throw Exception('Failed to register identity key. Please try again.');
       }
     }
@@ -287,8 +291,7 @@ class PartnerService {
       timestamp: timestamp,
     );
 
-    final functions = FirebaseFunctions.instance;
-    final callable = functions.httpsCallable('acceptPartnerInvite');
+    final callable = _functions.httpsCallable('acceptPartnerInvite');
 
     try {
       final result = await callable.call<Map<String, dynamic>>({

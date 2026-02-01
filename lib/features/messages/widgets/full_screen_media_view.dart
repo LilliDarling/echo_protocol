@@ -139,7 +139,7 @@ class _FullScreenMediaViewState extends State<FullScreenMediaView> {
     if (widget.isVideo) {
       return _decryptedVideoPath != null || !widget.isEncrypted;
     }
-    return _decryptedImageBytes != null || _fullResolutionLoaded;
+    return _decryptedImageBytes != null || !widget.isEncrypted;
   }
 
   Future<void> _saveToGallery() async {

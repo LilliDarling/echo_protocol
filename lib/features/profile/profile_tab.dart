@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/auth.dart';
 import '../settings/fingerprint_verification.dart';
@@ -55,6 +56,38 @@ class _ProfileTabState extends State<ProfileTab> {
     final providers = _authService.getLinkedProviders();
     final hasGoogleLinked = providers.contains('google.com');
 
+    if (user == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+      builder: (context, snapshot) {
+        final userData = snapshot.data?.data() as Map<String, dynamic>?;
+        final username = userData?['username'] as String? ?? '';
+        final displayName = userData?['name'] as String? ?? username;
+        final avatarUrl = userData?['avatar'] as String?;
+
+        return _buildProfileContent(
+          context,
+          user: user,
+          username: username,
+          displayName: displayName,
+          avatarUrl: avatarUrl,
+          hasGoogleLinked: hasGoogleLinked,
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileContent(
+    BuildContext context, {
+    required dynamic user,
+    required String username,
+    required String displayName,
+    String? avatarUrl,
+    required bool hasGoogleLinked,
+  }) {
     return ListView(
       children: [
         Container(
@@ -74,24 +107,39 @@ class _ProfileTabState extends State<ProfileTab> {
               CircleAvatar(
                 radius: 50,
                 backgroundColor: Colors.white,
-                child: Text(
-                  user?.displayName?[0].toUpperCase() ?? 'U',
-                  style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).primaryColor,
-                  ),
-                ),
+                backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                    ? NetworkImage(avatarUrl)
+                    : null,
+                child: avatarUrl == null || avatarUrl.isEmpty
+                    ? Text(
+                        displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
+                        style: TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).primaryColor,
+                        ),
+                      )
+                    : null,
               ),
               const SizedBox(height: 16),
               Text(
-                user?.displayName ?? 'User',
+                displayName,
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
               ),
+              if (username.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '@$username',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
