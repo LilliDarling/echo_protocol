@@ -4,6 +4,7 @@ import * as logger from "firebase-functions/logger";
 import {REPLAY_PROTECTION, RATE_LIMITS} from "../config/constants.js";
 import {db} from "../firebase.js";
 import {SendMessageRequest, SendMessageResponse} from "../types/message.js";
+import {sendPushNotification} from "../services/notification.js";
 
 /**
  * Generate a consistent conversation key from two user IDs
@@ -122,7 +123,7 @@ export const sendMessage = onCall<SendMessageRequest>(
     const rateLimitConfig = RATE_LIMITS.MESSAGE;
 
     try {
-      return await db.runTransaction(async (transaction) => {
+      const result = await db.runTransaction(async (transaction) => {
         const convRef = db.collection("conversations").doc(conversationId);
         const convDoc = await transaction.get(convRef);
 
@@ -378,6 +379,17 @@ export const sendMessage = onCall<SendMessageRequest>(
           ),
         };
       });
+
+      if (result.success) {
+        sendPushNotification({
+          recipientId,
+          senderId,
+          conversationId,
+          messageType: type || "text",
+        }).catch(() => {});
+      }
+
+      return result;
     } catch (error) {
       if (error instanceof HttpsError) {
         throw error;

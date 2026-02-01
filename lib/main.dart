@@ -11,6 +11,7 @@ import 'features/home/home.dart';
 import 'services/auth.dart';
 import 'services/crypto/protocol_service.dart';
 import 'services/secure_storage.dart';
+import 'services/notification.dart';
 import 'core/theme/app.dart';
 import 'core/providers/theme_provider.dart';
 
@@ -62,11 +63,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
   final AuthService _authService = AuthService();
   final SecureStorageService _secureStorage = SecureStorageService();
   final ProtocolService _protocolService = ProtocolService();
+  final NotificationService _notificationService = NotificationService();
 
   bool _keysLoaded = false;
   bool _isLoadingKeys = false;
   String? _pendingRecoveryPhrase;
   bool _checkedPendingPhrase = false;
+  bool _notificationsInitialized = false;
 
   @override
   Widget build(BuildContext context) {
@@ -122,6 +125,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
         _isLoadingKeys = false;
         _pendingRecoveryPhrase = null;
         _checkedPendingPhrase = false;
+        _notificationsInitialized = false;
+        _notificationService.dispose();
         Provider.of<ThemeProvider>(context, listen: false).reset();
         return const LoginScreen();
       },
@@ -145,6 +150,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
       if (userId != null && mounted) {
         final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
         await themeProvider.loadPreferences(userId);
+
+        if (!_notificationsInitialized) {
+          await _notificationService.initialize(userId);
+          _notificationsInitialized = true;
+        }
       }
 
       _keysLoaded = true;
