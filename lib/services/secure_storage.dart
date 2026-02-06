@@ -360,6 +360,20 @@ class SecureStorageService {
     await _secureDelete(_cacheKeyKey);
   }
 
+  static const String _databaseKeyKey = 'database_encryption_key';
+
+  Future<void> storeDatabaseKey(String key) async {
+    await _secureWrite(_databaseKeyKey, key);
+  }
+
+  Future<String?> getDatabaseKey() async {
+    return await _secureRead(_databaseKeyKey);
+  }
+
+  Future<void> deleteDatabaseKey() async {
+    await _secureDelete(_databaseKeyKey);
+  }
+
   static Map<String, dynamic> getSecurityInfo() {
     return {
       'platform': kIsWeb ? 'web' : 'native',
