@@ -5,21 +5,28 @@ rules_version = '2';
 // =============================================================================
 // Configure these TTL policies in Firebase Console or via gcloud CLI:
 //
+// Legacy (to be removed):
 // 1. message_nonces collection:
 //    Field: expireAt | Deletes documents ~1 hour after message creation
-//
 // 2. message_sequences collection:
 //    Field: expireAt | Deletes documents 30 days after last update
-//
 // 3. message_rate_limits collection:
+//    Field: expireAt | Deletes documents 2 hours after last attempt
+//
+// Sealed Sender Inbox:
+// 4. inboxes/{userId}/pending:
+//    Field: expireAt | Deletes documents 7 days after delivery
+// 5. inbox_nonces collection:
+//    Field: expireAt | Deletes documents 1 hour after creation
+// 6. inbox_sequences collection:
+//    Field: expireAt | Deletes documents 30 days after last update
+// 7. inbox_rate_limits collection:
 //    Field: expireAt | Deletes documents 2 hours after last attempt
 //
 // To create TTL policies via gcloud:
 //   gcloud firestore fields ttls update expireAt \
-//     --collection-group=message_nonces \
+//     --collection-group=pending \
 //     --enable-ttl
-//
-// Repeat for: message_sequences, message_rate_limits
 // =============================================================================
 
 service cloud.firestore {
@@ -168,6 +175,44 @@ service cloud.firestore {
     // Message rate limits collection - Server-side rate limiting
     // Only Cloud Functions can write via Admin SDK
     match /message_rate_limits/{limitId} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // SEALED SENDER INBOX
+    // =========================================================================
+
+    // Inboxes collection - Sealed sender message delivery
+    // Messages are delivered here by Cloud Functions, read by recipient only
+    match /inboxes/{userId} {
+      // No direct access to inbox document
+      allow read, write: if false;
+
+      // Pending messages subcollection
+      match /pending/{messageId} {
+        // Users can only read their own pending messages
+        allow read: if isOwner(userId);
+
+        // Users can delete messages from their own inbox (after processing)
+        allow delete: if isOwner(userId);
+
+        // Only Cloud Functions can write (via Admin SDK)
+        allow create, update: if false;
+      }
+    }
+
+    // Inbox nonces collection - Replay protection for sealed sender
+    match /inbox_nonces/{nonceId} {
+      allow read, write: if false;
+    }
+
+    // Inbox sequences collection - Sequence tracking for sealed sender
+    match /inbox_sequences/{sequenceId} {
+      allow read, write: if false;
+    }
+
+    // Inbox rate limits collection - Rate limiting for sealed sender
+    match /inbox_rate_limits/{userId} {
       allow read, write: if false;
     }
 
