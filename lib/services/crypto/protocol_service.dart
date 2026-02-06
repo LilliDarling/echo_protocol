@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:bip39/bip39.dart' as bip39;
 import '../../models/crypto/identity_key.dart';
+import '../../models/crypto/sealed_envelope.dart';
 import '../secure_storage.dart';
 import 'session_manager.dart';
 import 'media_encryption.dart';
@@ -137,6 +138,56 @@ class ProtocolService {
       'encryptionVersion': 2,
       'senderKeyVersion': senderKeyVersion,
     };
+  }
+
+  Future<SealedEnvelope> sealEnvelope({
+    required String plaintext,
+    required String senderId,
+    required String recipientId,
+    required Uint8List recipientPublicKey,
+  }) async {
+    _ensureInitialized();
+
+    final messageBytes = await _sessionManager.encrypt(
+      recipientId: recipientId,
+      ourUserId: senderId,
+      plaintext: Uint8List.fromList(utf8.encode(plaintext)),
+      ourIdentityKey: _identityKey!,
+    );
+
+    final publicKey = await _identityKey!.toPublicKey();
+
+    return SealedEnvelope.seal(
+      senderId: senderId,
+      recipientId: recipientId,
+      recipientPublicKey: recipientPublicKey,
+      encryptedMessage: messageBytes,
+      senderSigningKey: _identityKey!.ed25519KeyPair,
+      senderPublicKey: publicKey.ed25519PublicKey,
+    );
+  }
+
+  Future<({String senderId, String plaintext})> unsealEnvelope({
+    required SealedEnvelope envelope,
+    required String myUserId,
+  }) async {
+    _ensureInitialized();
+
+    final unsealed = await envelope.unseal(
+      recipientKeyPair: _identityKey!.x25519KeyPair,
+    );
+
+    final plaintext = await _sessionManager.decrypt(
+      senderId: unsealed.senderId,
+      ourUserId: myUserId,
+      messageBytes: unsealed.encryptedMessage,
+      ourIdentityKey: _identityKey!,
+    );
+
+    return (
+      senderId: unsealed.senderId,
+      plaintext: utf8.decode(plaintext),
+    );
   }
 
   Future<bool> hasActiveSession(String recipientId, String ourUserId) async {
