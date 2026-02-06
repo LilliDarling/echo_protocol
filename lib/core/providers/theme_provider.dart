@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/user.dart';
 
 class ThemeProvider extends ChangeNotifier {
-  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode _themeMode = ThemeMode.dark;
   UserPreferences _preferences = UserPreferences.defaultPreferences;
   String? _userId;
 
@@ -19,10 +19,10 @@ class ThemeProvider extends ChangeNotifier {
     switch (theme) {
       case 'dark':
         return ThemeMode.dark;
-      case 'light':
-        return ThemeMode.light;
-      default:
+      case 'system':
         return ThemeMode.system;
+      default:
+        return ThemeMode.dark;
     }
   }
 
@@ -115,7 +115,7 @@ class ThemeProvider extends ChangeNotifier {
   }
 
   void reset() {
-    _themeMode = ThemeMode.system;
+    _themeMode = ThemeMode.dark;
     _preferences = UserPreferences.defaultPreferences;
     _userId = null;
     notifyListeners();

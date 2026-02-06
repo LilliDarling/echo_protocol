@@ -133,11 +133,11 @@ class UserPreferences {
 
   static UserPreferences get defaultPreferences {
     return UserPreferences(
-      theme: 'light',
+      theme: 'dark',
       notifications: true,
       notificationPreview: NotificationPreview.senderOnly,
       showTypingIndicator: false,
-      autoDeleteDays: 30,
+      autoDeleteDays: 0,
     );
   }
 }

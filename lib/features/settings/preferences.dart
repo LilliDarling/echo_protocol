@@ -16,11 +16,6 @@ class PreferencesScreen extends StatelessWidget {
         builder: (context, themeProvider, child) {
           return ListView(
             children: [
-              _buildSectionHeader(context, 'Appearance'),
-              _buildThemeSelector(context, themeProvider),
-
-              const Divider(height: 32),
-
               _buildSectionHeader(context, 'Notifications'),
               SwitchListTile(
                 title: const Text('Push Notifications'),
@@ -94,61 +89,6 @@ class PreferencesScreen extends StatelessWidget {
           color: Colors.grey.shade600,
           letterSpacing: 1.2,
         ),
-      ),
-    );
-  }
-
-  Widget _buildThemeSelector(BuildContext context, ThemeProvider themeProvider) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.purple.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.palette,
-                  color: Colors.purple.shade700,
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Text(
-                'Theme',
-                style: TextStyle(fontSize: 16),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SegmentedButton<ThemeMode>(
-            segments: const [
-              ButtonSegment(
-                value: ThemeMode.light,
-                label: Text('Light'),
-                icon: Icon(Icons.light_mode),
-              ),
-              ButtonSegment(
-                value: ThemeMode.dark,
-                label: Text('Dark'),
-                icon: Icon(Icons.dark_mode),
-              ),
-              ButtonSegment(
-                value: ThemeMode.system,
-                label: Text('System'),
-                icon: Icon(Icons.settings_suggest),
-              ),
-            ],
-            selected: {themeProvider.themeMode},
-            onSelectionChanged: (selection) {
-              themeProvider.setThemeMode(selection.first);
-            },
-          ),
-        ],
       ),
     );
   }
@@ -233,21 +173,27 @@ class PreferencesScreen extends StatelessWidget {
 
   Widget _buildAutoDeleteSelector(BuildContext context, ThemeProvider themeProvider) {
     final autoDeleteDays = themeProvider.preferences.autoDeleteDays;
+    final isEnabled = autoDeleteDays > 0;
 
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.red.shade50,
+          color: isEnabled ? Colors.orange.shade50 : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
           Icons.auto_delete,
-          color: Colors.red.shade700,
+          color: isEnabled ? Colors.orange.shade700 : Colors.grey.shade600,
         ),
       ),
       title: const Text('Auto-Delete Messages'),
-      subtitle: Text(_formatAutoDeleteDays(autoDeleteDays)),
+      subtitle: Text(
+        _formatAutoDeleteDays(autoDeleteDays),
+        style: TextStyle(
+          color: isEnabled ? Colors.orange.shade700 : null,
+        ),
+      ),
       trailing: const Icon(Icons.chevron_right),
       onTap: () => _showAutoDeleteDialog(context, themeProvider, autoDeleteDays),
     );
@@ -273,7 +219,30 @@ class PreferencesScreen extends StatelessWidget {
         title: const Text('Auto-Delete Messages'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Messages older than the selected time will be permanently deleted and cannot be recovered.',
+                      style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             _buildAutoDeleteOption(context, themeProvider, 0, 'Never', currentValue),
             _buildAutoDeleteOption(context, themeProvider, 7, '1 week', currentValue),
             _buildAutoDeleteOption(context, themeProvider, 14, '2 weeks', currentValue),

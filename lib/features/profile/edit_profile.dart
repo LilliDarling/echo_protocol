@@ -158,6 +158,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       await _authService.updateProfile(
         displayName: nameChanged ? newName : null,
         photoURL: photoChanged ? (_pendingPhotoUrl!.isEmpty ? null : _pendingPhotoUrl) : null,
+        oldPhotoURL: photoChanged ? _currentPhotoUrl : null,
       );
 
       if (mounted) {
