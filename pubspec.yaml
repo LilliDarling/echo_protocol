@@ -51,8 +51,10 @@ dependencies:
   base32: ^2.1.3
   bip39: ^1.0.6
 
-  # Local database
-  sqflite_sqlcipher: ^3.1.0+1
+  # Local database (Drift ORM + SQLCipher encryption)
+  drift: ^2.22.0
+  sqlcipher_flutter_libs: ^0.6.5
+  sqlite3: ^2.4.7
 
   # Utilities
   intl: ^0.20.2
@@ -95,6 +97,7 @@ dev_dependencies:
   # Testing
   mockito: ^5.4.4
   build_runner: ^2.4.13
+  drift_dev: ^2.22.0
   fake_cloud_firestore: ^3.0.4
   firebase_auth_mocks: ^0.14.1
 

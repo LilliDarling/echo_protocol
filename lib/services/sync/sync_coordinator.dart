@@ -4,10 +4,10 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/local/message.dart';
 import '../../models/local/conversation.dart';
-import '../../repositories/message.dart';
-import '../../repositories/conversation.dart';
+import '../../repositories/message_dao.dart';
+import '../../repositories/conversation_dao.dart';
 import '../crypto/protocol_service.dart';
-import '../database/database_service.dart';
+import '../database/app_database.dart';
 import 'inbox_listener.dart';
 import 'message_processor.dart';
 
@@ -16,12 +16,12 @@ enum SyncState { idle, initializing, syncing, ready, error }
 class SyncCoordinator {
   final FirebaseAuth _auth;
   final FirebaseFunctions _functions;
-  final DatabaseService _database;
   final ProtocolService _protocol;
 
+  AppDatabase? _database;
   late final InboxListener _inboxListener;
-  late final MessageRepository _messageRepo;
-  late final ConversationRepository _conversationRepo;
+  late MessageDao _messageDao;
+  late ConversationDao _conversationDao;
   MessageProcessor? _processor;
 
   StreamSubscription? _inboxSubscription;
@@ -36,16 +36,17 @@ class SyncCoordinator {
   SyncCoordinator({
     FirebaseAuth? auth,
     FirebaseFunctions? functions,
-    DatabaseService? database,
+    AppDatabase? database,
     ProtocolService? protocol,
   })  : _auth = auth ?? FirebaseAuth.instance,
         _functions = functions ?? FirebaseFunctions.instance,
-        _database = database ?? DatabaseService(),
+        _database = database,
         _protocol = protocol ?? ProtocolService() {
     _inboxListener = InboxListener(auth: _auth);
-    _messageRepo = MessageRepository(databaseService: _database);
-    _conversationRepo = ConversationRepository(databaseService: _database);
   }
+
+  MessageDao get messageDao => _messageDao;
+  ConversationDao get conversationDao => _conversationDao;
 
   Stream<SyncState> get stateStream => _stateController.stream;
   Stream<ProcessedMessage> get messageStream => _messageController.stream;
@@ -56,7 +57,9 @@ class SyncCoordinator {
     _setState(SyncState.initializing);
 
     try {
-      await _database.database;
+      _database ??= await AppDatabase.instance();
+      _messageDao = _database!.messageDao;
+      _conversationDao = _database!.conversationDao;
       await _protocol.initializeFromStorage();
 
       _authSubscription = _auth.authStateChanges().listen(_onAuthChanged);
@@ -88,8 +91,8 @@ class SyncCoordinator {
 
     _processor = MessageProcessor(
       protocol: _protocol,
-      messageRepository: _messageRepo,
-      conversationRepository: _conversationRepo,
+      messageDao: _messageDao,
+      conversationDao: _conversationDao,
       myUserId: userId,
     );
 
@@ -151,6 +154,8 @@ class SyncCoordinator {
         recipientPublicKey: recipientPublicKey,
       );
 
+      final senderPayload = await _protocol.encryptForSelf(plaintext: content);
+
       final conversationId = _getConversationId(userId, recipientId);
       final messageId = DateTime.now().millisecondsSinceEpoch.toString();
 
@@ -167,9 +172,9 @@ class SyncCoordinator {
         createdAt: DateTime.now(),
       );
 
-      await _messageRepo.insert(localMessage);
+      await _messageDao.insert(localMessage);
 
-      await _conversationRepo.updateLastMessage(
+      await _conversationDao.updateLastMessage(
         conversationId: conversationId,
         content: content.length > 100 ? '${content.substring(0, 100)}...' : content,
         timestamp: DateTime.now(),
@@ -179,16 +184,17 @@ class SyncCoordinator {
         'messageId': messageId,
         'recipientId': recipientId,
         'sealedEnvelope': envelope.toJson(),
+        'senderPayload': senderPayload,
         'sequenceNumber': await _getNextSequence(conversationId),
       });
 
       final data = Map<String, dynamic>.from(result.data as Map);
 
       if (data['success'] == true) {
-        await _messageRepo.updateStatus(messageId, LocalMessageStatus.sent);
+        await _messageDao.updateStatus(messageId, LocalMessageStatus.sent);
         return true;
       } else {
-        await _messageRepo.updateStatus(messageId, LocalMessageStatus.failed);
+        await _messageDao.updateStatus(messageId, LocalMessageStatus.failed);
         return false;
       }
     } catch (e) {
@@ -209,15 +215,15 @@ class SyncCoordinator {
   }
 
   Future<List<LocalConversation>> getConversations() async {
-    return _conversationRepo.getAll();
+    return _conversationDao.getAll();
   }
 
   Future<List<LocalMessage>> getMessages(String conversationId, {int limit = 50}) async {
-    return _messageRepo.getByConversation(conversationId, limit: limit);
+    return _messageDao.getByConversation(conversationId, limit: limit);
   }
 
   Future<void> markConversationRead(String conversationId) async {
-    await _conversationRepo.resetUnreadCount(conversationId);
+    await _conversationDao.resetUnreadCount(conversationId);
   }
 
   void _setState(SyncState newState) {

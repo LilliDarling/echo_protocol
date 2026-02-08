@@ -5,26 +5,45 @@ import '../../models/crypto/sealed_envelope.dart';
 
 class InboxMessage {
   final String id;
-  final SealedEnvelope envelope;
+  final SealedEnvelope? envelope;
+  final String? senderPayload;
   final DateTime deliveredAt;
+  final bool isOutgoing;
+  final String? recipientId;
 
   InboxMessage({
     required this.id,
-    required this.envelope,
+    this.envelope,
+    this.senderPayload,
     required this.deliveredAt,
+    required this.isOutgoing,
+    this.recipientId,
   });
 
   factory InboxMessage.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    final envelopeData = data['sealedEnvelope'] as Map<String, dynamic>;
+    final isOutgoing = data['isOutgoing'] as bool? ?? false;
+
+    SealedEnvelope? envelope;
+    String? senderPayload;
+
+    if (isOutgoing) {
+      senderPayload = data['senderPayload'] as String?;
+    } else {
+      final envelopeData = data['sealedEnvelope'] as Map<String, dynamic>;
+      envelope = SealedEnvelope.fromJson({
+        'recipientId': '',
+        ...envelopeData,
+      });
+    }
 
     return InboxMessage(
       id: doc.id,
-      envelope: SealedEnvelope.fromJson({
-        'recipientId': '',
-        ...envelopeData,
-      }),
+      envelope: envelope,
+      senderPayload: senderPayload,
       deliveredAt: (data['deliveredAt'] as Timestamp).toDate(),
+      isOutgoing: isOutgoing,
+      recipientId: data['recipientId'] as String?,
     );
   }
 }

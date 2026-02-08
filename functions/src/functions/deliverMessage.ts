@@ -26,7 +26,7 @@ export const deliverMessage = onCall<DeliverMessageRequest>(
     }
 
     const senderId = request.auth.uid;
-    const {messageId, recipientId, sealedEnvelope, sequenceNumber} = request.data;
+    const {messageId, recipientId, sealedEnvelope, senderPayload, sequenceNumber} = request.data;
 
     if (!messageId || typeof messageId !== "string") {
       throw new HttpsError("invalid-argument", "messageId is required");
@@ -185,7 +185,24 @@ export const deliverMessage = onCall<DeliverMessageRequest>(
           },
           deliveredAt: FieldValue.serverTimestamp(),
           expireAt: expireAt,
+          isOutgoing: false,
         });
+
+        if (senderPayload) {
+          const senderInboxRef = db
+            .collection("inboxes")
+            .doc(senderId)
+            .collection("pending")
+            .doc(`${messageId}_out`);
+
+          transaction.set(senderInboxRef, {
+            senderPayload: senderPayload,
+            deliveredAt: FieldValue.serverTimestamp(),
+            expireAt: expireAt,
+            isOutgoing: true,
+            recipientId: recipientId,
+          });
+        }
 
         attempts.push(now);
         transaction.set(

@@ -1,45 +1,38 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import '../../../models/echo.dart';
 import '../../../models/key_change_event.dart';
+import '../../../models/local/message.dart';
 import '../../../services/partner.dart';
 import '../../../services/crypto/protocol_service.dart';
 import '../../../services/crypto/media_encryption.dart';
 import '../../../services/secure_storage.dart';
-import '../../../services/message_encryption_helper.dart';
-import '../../../services/message_rate_limiter.dart';
 import '../../../utils/decrypted_content_cache.dart';
-import '../../../services/read_receipt.dart';
 import '../../../services/offline_queue.dart';
 import '../../../services/typing_indicator.dart';
 import '../../../services/auto_delete.dart';
+import '../../../services/sync/sync_coordinator.dart';
+import '../../../repositories/message_dao.dart';
 
 class ConversationController extends ChangeNotifier {
   final PartnerInfo partner;
   final String conversationId;
 
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   late final ProtocolService _protocolService;
   late final SecureStorageService _secureStorage;
-  late final MessageEncryptionHelper _encryptionHelper;
-  late final MessageRateLimiter _rateLimiter;
   MediaEncryptionService? _mediaEncryptionService;
   late final DecryptedContentCacheService _contentCache;
-  late final ReadReceiptService _readReceiptService;
   late final OfflineQueueService _offlineQueue;
   late final TypingIndicatorService _typingService;
+  late final SyncCoordinator _syncCoordinator;
+  late final MessageDao _messageDao;
 
-  List<EchoModel> _messages = [];
-  StreamSubscription? _messagesSubscription;
-  StreamSubscription? _newMessagesSubscription;
-  StreamSubscription? _modificationsSubscription;
+  List<LocalMessage> _messages = [];
+  StreamSubscription? _syncMessageSubscription;
   StreamSubscription? _offlineQueueSubscription;
   StreamSubscription? _typingSubscription;
 
@@ -49,7 +42,6 @@ class ConversationController extends ChangeNotifier {
   bool _hasMoreMessages = true;
   bool _isServicesInitialized = false;
   bool _isPartnerTyping = false;
-  DocumentSnapshot? _oldestMessageDoc;
   String? _error;
 
   KeyChangeResult? _keyChangeResult;
@@ -62,18 +54,14 @@ class ConversationController extends ChangeNotifier {
     required this.partner,
     required this.conversationId,
   }) {
-    _readReceiptService = ReadReceiptService(
-      conversationId: conversationId,
-      currentUserId: currentUserId,
-    );
     _offlineQueue = OfflineQueueService();
     _typingService = TypingIndicatorService(
-      conversationId: conversationId,
       currentUserId: currentUserId,
+      partnerId: partner.id,
     );
   }
 
-  List<EchoModel> get messages => _messages;
+  List<LocalMessage> get messages => _messages;
   bool get isLoading => _isLoading;
   bool get isSending => _isSending;
   bool get isLoadingMore => _isLoadingMore;
@@ -92,10 +80,9 @@ class ConversationController extends ChangeNotifier {
   Future<void> runAutoDelete(int autoDeleteDays) async {
     if (autoDeleteDays <= 0) return;
 
-    final service = AutoDeleteService();
+    final service = AutoDeleteService(messageDao: _messageDao);
     final deleted = await service.deleteOldMessages(
       conversationId: conversationId,
-      userId: currentUserId,
       autoDeleteDays: autoDeleteDays,
     );
 
@@ -107,6 +94,7 @@ class ConversationController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
   DecryptedContentCacheService get contentCache => _contentCache;
   KeyChangeResult? get keyChangeResult => _keyChangeResult;
   KeyChangeEvent? get pendingKeyChangeEvent => _pendingKeyChangeEvent;
@@ -114,44 +102,20 @@ class ConversationController extends ChangeNotifier {
 
   String get currentUserId => _auth.currentUser?.uid ?? '';
 
-  CollectionReference<Map<String, dynamic>> get _messagesRef =>
-      _db.collection('conversations').doc(conversationId).collection('messages');
-
-  Future<int> _getNextSequenceNumber() async {
-    final sortedIds = [currentUserId, partner.id]..sort();
-    final conversationKey = '${sortedIds[0]}_${sortedIds[1]}';
-    final docRef = _db
-        .collection('users')
-        .doc(currentUserId)
-        .collection('message_sequences')
-        .doc(conversationKey);
-
-    return await _db.runTransaction<int>((transaction) async {
-      final doc = await transaction.get(docRef);
-      final lastSeq = (doc.data()?['lastSequence'] as num?)?.toInt() ?? 0;
-      final nextSeq = lastSeq + 1;
-
-      transaction.set(docRef, {
-        'lastSequence': nextSeq,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      return nextSeq;
-    });
-  }
-
   Future<void> initialize() async {
     await _initializeServices();
     await _loadInitialMessages();
-    _markMessagesAsDelivered();
+    _subscribeToNewMessages();
   }
 
   Future<void> _initializeServices() async {
     try {
       _protocolService = ProtocolService();
       _secureStorage = SecureStorageService();
-      _rateLimiter = MessageRateLimiter();
       _partnerService = PartnerService();
+      _syncCoordinator = SyncCoordinator();
+      await _syncCoordinator.initialize();
+      _messageDao = _syncCoordinator.messageDao;
 
       _contentCache = DecryptedContentCacheService(secureStorage: _secureStorage);
       await _contentCache.loadFromDisk();
@@ -161,11 +125,6 @@ class ConversationController extends ChangeNotifier {
       _subscribeToTypingIndicator();
 
       await _protocolService.initializeFromStorage();
-
-      _encryptionHelper = MessageEncryptionHelper(
-        protocolService: _protocolService,
-        rateLimiter: _rateLimiter,
-      );
 
       _mediaEncryptionService = MediaEncryptionService();
       await _mediaEncryptionService!.clearCache();
@@ -212,30 +171,17 @@ class ConversationController extends ChangeNotifier {
 
   Future<void> _loadInitialMessages() async {
     try {
-      final query = _messagesRef
-          .orderBy('timestamp', descending: true)
-          .limit(_pageSize);
+      final localMessages = await _syncCoordinator.getMessages(
+        conversationId,
+        limit: _pageSize,
+      );
 
-      final snapshot = await query.get();
-      final messages = <EchoModel>[];
-
-      for (final doc in snapshot.docs) {
-        final message = EchoModel.fromFirestore(doc);
-        messages.add(message);
-        await _cacheDecryptedContent(message);
-      }
-
-      if (snapshot.docs.isNotEmpty) {
-        _oldestMessageDoc = snapshot.docs.last;
-      }
-      _hasMoreMessages = snapshot.docs.length >= _pageSize;
-
-      _messages = messages.reversed.toList();
+      _messages = localMessages;
+      _hasMoreMessages = localMessages.length >= _pageSize;
       _isLoading = false;
       notifyListeners();
 
-      _subscribeToNewMessages();
-      markVisibleMessagesAsRead();
+      await _syncCoordinator.markConversationRead(conversationId);
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
@@ -244,33 +190,23 @@ class ConversationController extends ChangeNotifier {
   }
 
   Future<void> loadMoreMessages(double scrollOffset, double maxScrollBefore) async {
-    if (_isLoadingMore || !_hasMoreMessages || _oldestMessageDoc == null) return;
+    if (_isLoadingMore || !_hasMoreMessages || _messages.isEmpty) return;
 
     _isLoadingMore = true;
     notifyListeners();
 
     try {
-      final query = _messagesRef
-          .orderBy('timestamp', descending: true)
-          .startAfterDocument(_oldestMessageDoc!)
-          .limit(_pageSize);
+      final oldestTimestamp = _messages.first.timestamp;
+      final olderMessages = await _messageDao.getMessagesBefore(
+        conversationId,
+        oldestTimestamp,
+        limit: _pageSize,
+      );
 
-      final snapshot = await query.get();
-      final olderMessages = <EchoModel>[];
-
-      for (final doc in snapshot.docs) {
-        final message = EchoModel.fromFirestore(doc);
-        olderMessages.add(message);
-        await _cacheDecryptedContent(message);
-      }
-
-      if (snapshot.docs.isNotEmpty) {
-        _oldestMessageDoc = snapshot.docs.last;
-      }
-      _hasMoreMessages = snapshot.docs.length >= _pageSize;
+      _hasMoreMessages = olderMessages.length >= _pageSize;
 
       if (olderMessages.isNotEmpty) {
-        _messages = [...olderMessages.reversed, ..._messages];
+        _messages = [...olderMessages, ..._messages];
       }
     } catch (e) {
       _error = 'Failed to load older messages';
@@ -290,7 +226,9 @@ class ConversationController extends ChangeNotifier {
 
         final index = _messages.indexWhere((m) => m.id == messageId);
         if (index != -1) {
-          _messages[index] = pending.toEchoModel();
+          _messages[index] = _messages[index].copyWith(
+            status: pending.status,
+          );
           notifyListeners();
         }
       }
@@ -306,29 +244,31 @@ class ConversationController extends ChangeNotifier {
   }
 
   void _subscribeToNewMessages() {
-    final newestTimestamp = _messages.isNotEmpty
-        ? _messages.last.timestamp
-        : DateTime.now();
+    _syncMessageSubscription = _syncCoordinator.messageStream.listen(
+      (processed) {
+        if (processed.conversationId != conversationId) return;
 
-    final query = _messagesRef
-        .where('timestamp', isGreaterThan: Timestamp.fromDate(newestTimestamp))
-        .orderBy('timestamp', descending: false);
+        final existingIndex = _messages.indexWhere((m) => m.id == processed.messageId);
+        if (existingIndex != -1) return;
 
-    _newMessagesSubscription = query.snapshots().listen(
-      (snapshot) async {
-        for (final change in snapshot.docChanges) {
-          if (change.type == DocumentChangeType.added) {
-            final message = EchoModel.fromFirestore(change.doc);
-            if (!_messages.any((m) => m.id == message.id)) {
-              await _cacheDecryptedContent(message);
-              _messages = [..._messages, message];
-              notifyListeners();
-              markVisibleMessagesAsRead();
-            }
-          } else if (change.type == DocumentChangeType.modified) {
-            final message = EchoModel.fromFirestore(change.doc);
-            await _handleMessageModification(message);
-          }
+        final newMessage = LocalMessage(
+          id: processed.messageId,
+          conversationId: processed.conversationId,
+          senderId: processed.senderId,
+          senderUsername: '',
+          content: processed.content,
+          timestamp: processed.timestamp,
+          type: _convertProcessedType(processed.type),
+          status: LocalMessageStatus.delivered,
+          isOutgoing: processed.senderId == currentUserId,
+          createdAt: DateTime.now(),
+        );
+
+        _messages = [..._messages, newMessage];
+        notifyListeners();
+
+        if (processed.senderId != currentUserId) {
+          _syncCoordinator.markConversationRead(conversationId);
         }
       },
       onError: (error) {
@@ -336,98 +276,10 @@ class ConversationController extends ChangeNotifier {
         notifyListeners();
       },
     );
-
-    _subscribeToModifications();
   }
 
-  void _subscribeToModifications() {
-    _modificationsSubscription = _messagesRef.snapshots().listen(
-      (snapshot) async {
-        for (final change in snapshot.docChanges) {
-          if (change.type == DocumentChangeType.modified) {
-            final message = EchoModel.fromFirestore(change.doc);
-            await _handleMessageModification(message);
-          }
-        }
-      },
-    );
-  }
-
-  Future<void> _handleMessageModification(EchoModel message) async {
-    final index = _messages.indexWhere((m) => m.id == message.id);
-    if (index == -1) return;
-
-    final existingMessage = _messages[index];
-
-    if (existingMessage.isEdited == message.isEdited &&
-        existingMessage.isDeleted == message.isDeleted &&
-        existingMessage.content == message.content &&
-        existingMessage.status == message.status) {
-      return;
-    }
-
-    if (message.isEdited && !message.isDeleted &&
-        existingMessage.content != message.content) {
-      _contentCache.remove(message.id);
-      await _cacheDecryptedContent(message);
-    } else if (message.isDeleted && !existingMessage.isDeleted) {
-      _contentCache.remove(message.id);
-    }
-
-    _messages[index] = message;
-    notifyListeners();
-  }
-
-  Future<void> _cacheDecryptedContent(EchoModel message) async {
-    final cached = _contentCache.get(message.id);
-    if (cached != null && cached != '[Unable to decrypt message]') {
-      return;
-    }
-
-    try {
-      final decrypted = await _decryptMessage(message);
-      _contentCache.put(message.id, decrypted);
-    } catch (_) {
-      // Don't cache failures - allow retry on next load
-    }
-  }
-
-  Future<String> _decryptMessage(EchoModel message) async {
-    return await _encryptionHelper.decryptMessage(
-      message: message,
-      myUserId: currentUserId,
-      partnerId: partner.id,
-    );
-  }
-
-  Future<void> _markMessagesAsDelivered() async {
-    final undelivered = await _messagesRef
-        .where('recipientId', isEqualTo: currentUserId)
-        .where('status', isEqualTo: 'sent')
-        .get();
-
-    if (undelivered.docs.isEmpty) return;
-
-    final batch = _db.batch();
-    for (final doc in undelivered.docs) {
-      batch.update(doc.reference, {
-        'status': 'delivered',
-      });
-    }
-    await batch.commit();
-  }
-
-  void markVisibleMessagesAsRead() {
-    final unreadIds = _messages
-        .where((m) =>
-            m.recipientId == currentUserId &&
-            m.status != EchoStatus.read)
-        .map((m) => m.id)
-        .toList();
-
-    if (unreadIds.isNotEmpty) {
-      _readReceiptService.markMultipleAsRead(unreadIds);
-    }
+  LocalMessageType _convertProcessedType(LocalMessageType type) {
+    return type;
   }
 
   Future<void> sendMessage(String text, {EchoType type = EchoType.text, EchoMetadata? metadata}) async {
@@ -446,88 +298,65 @@ class ConversationController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final encryptionResult = await _encryptionHelper.encryptMessage(
-        plaintext: text,
-        partnerId: partner.id,
-        senderId: currentUserId,
-        recipientKeyVersion: partner.keyVersion,
-      );
-
-      final messageId = _messagesRef.doc().id;
+      final messageId = DateTime.now().millisecondsSinceEpoch.toString();
       final timestamp = DateTime.now();
-      final sequenceNumber = await _getNextSequenceNumber();
 
-      final message = EchoModel(
+      final optimisticMessage = LocalMessage(
         id: messageId,
-        senderId: currentUserId,
-        recipientId: partner.id,
-        content: encryptionResult['content'] as String,
-        timestamp: timestamp,
-        type: type,
-        status: EchoStatus.pending,
-        metadata: metadata ?? EchoMetadata.empty(),
-        senderKeyVersion: encryptionResult['senderKeyVersion'] as int,
-        recipientKeyVersion: encryptionResult['recipientKeyVersion'] as int,
-        sequenceNumber: sequenceNumber,
         conversationId: conversationId,
+        senderId: currentUserId,
+        senderUsername: '',
+        content: text,
+        timestamp: timestamp,
+        type: _convertEchoType(type),
+        status: LocalMessageStatus.pending,
+        isOutgoing: true,
+        createdAt: timestamp,
       );
 
-      _contentCache.put(messageId, text);
-      _messages = [..._messages, message];
+      _messages = [..._messages, optimisticMessage];
       notifyListeners();
 
       if (!_offlineQueue.isOnline) {
+        final recipientPubKey = base64Decode(partner.publicKey);
+        final envelope = await _protocolService.sealEnvelope(
+          plaintext: text,
+          senderId: currentUserId,
+          recipientId: partner.id,
+          recipientPublicKey: recipientPubKey,
+        );
+        final senderPayload = await _protocolService.encryptForSelf(plaintext: text);
+
         await _offlineQueue.enqueue(
           messageId: messageId,
           conversationId: conversationId,
-          senderId: currentUserId,
           recipientId: partner.id,
-          plaintext: text,
-          encryptedContent: encryptionResult['content'] as String,
-          type: type,
-          metadata: metadata ?? EchoMetadata.empty(),
-          senderKeyVersion: encryptionResult['senderKeyVersion'] as int,
-          recipientKeyVersion: encryptionResult['recipientKeyVersion'] as int,
-          sequenceNumber: sequenceNumber,
+          sealedEnvelope: envelope.toJson(),
+          senderPayload: senderPayload,
+          sequenceNumber: 0,
         );
         return;
       }
 
-      final result = await _functions.httpsCallable('sendMessage').call({
-        'messageId': messageId,
-        'conversationId': conversationId,
-        'recipientId': partner.id,
-        'content': encryptionResult['content'] as String,
-        'sequenceNumber': sequenceNumber,
-        'timestamp': timestamp.millisecondsSinceEpoch,
-        'senderKeyVersion': encryptionResult['senderKeyVersion'] as int,
-        'recipientKeyVersion': encryptionResult['recipientKeyVersion'] as int,
-        'type': type.value,
-        'metadata': (metadata ?? EchoMetadata.empty()).toJson(),
-        if (type == EchoType.image || type == EchoType.video)
-          'mediaType': type.name,
-        if (metadata?.fileUrl != null) 'mediaUrl': metadata!.fileUrl,
-        if (metadata?.thumbnailUrl != null) 'thumbnailUrl': metadata!.thumbnailUrl,
-      });
+      final recipientPublicKey = base64Decode(partner.publicKey);
 
-      final data = Map<String, dynamic>.from(result.data as Map);
-
-      if (data['success'] != true) {
-        final error = data['error'] as String?;
-        if (data['retryAfterMs'] != null) {
-          final retryMs = (data['retryAfterMs'] as num).toInt();
-          final retrySeconds = (retryMs / 1000).ceil();
-          throw Exception(
-            'Message rate limit exceeded. Please wait ${retrySeconds > 60 ? '${(retrySeconds / 60).ceil()} minutes' : '$retrySeconds seconds'}.',
-          );
-        }
-        throw Exception(error ?? 'Failed to send message');
-      }
+      final success = await _syncCoordinator.sendMessage(
+        content: text,
+        recipientId: partner.id,
+        recipientPublicKey: recipientPublicKey,
+        type: _convertEchoType(type),
+      );
 
       final index = _messages.indexWhere((m) => m.id == messageId);
       if (index != -1) {
-        _messages[index] = _messages[index].copyWith(status: EchoStatus.sent);
+        _messages[index] = _messages[index].copyWith(
+          status: success ? LocalMessageStatus.sent : LocalMessageStatus.failed,
+        );
         notifyListeners();
+      }
+
+      if (!success) {
+        throw Exception('Failed to send message');
       }
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
@@ -539,75 +368,41 @@ class ConversationController extends ChangeNotifier {
     }
   }
 
-  Future<void> editMessage(EchoModel message, String newText) async {
-    if (newText.trim().isEmpty) return;
-    if (message.senderId != currentUserId) return;
-    if (message.isDeleted) return;
-
-    try {
-      final encryptionResult = await _encryptionHelper.encryptMessage(
-        plaintext: newText,
-        partnerId: partner.id,
-        senderId: currentUserId,
-        recipientKeyVersion: partner.keyVersion,
-      );
-
-      _contentCache.put(message.id, newText);
-      final index = _messages.indexWhere((m) => m.id == message.id);
-      if (index != -1) {
-        _messages[index] = _messages[index].copyWith(
-          content: encryptionResult['content'] as String,
-          isEdited: true,
-        );
-        notifyListeners();
-      }
-
-      await _messagesRef.doc(message.id).update({
-        'content': encryptionResult['content'],
-        'isEdited': true,
-      });
-    } catch (e) {
-      rethrow;
+  LocalMessageType _convertEchoType(EchoType type) {
+    switch (type) {
+      case EchoType.text:
+        return LocalMessageType.text;
+      case EchoType.image:
+        return LocalMessageType.image;
+      case EchoType.video:
+        return LocalMessageType.video;
+      case EchoType.voice:
+        return LocalMessageType.voice;
+      case EchoType.link:
+        return LocalMessageType.link;
+      case EchoType.gif:
+        return LocalMessageType.gif;
     }
+  }
+
+  Future<void> editMessage(EchoModel message, String newText) async {
+    _error = 'Edit is not supported with sealed sender messaging';
+    notifyListeners();
   }
 
   Future<void> deleteMessage(EchoModel message) async {
     if (message.senderId != currentUserId) return;
-    if (message.isDeleted) return;
 
     try {
-      _contentCache.remove(message.id);
       final index = _messages.indexWhere((m) => m.id == message.id);
       if (index != -1) {
-        _messages[index] = _messages[index].copyWith(
-          isDeleted: true,
-          content: '',
-        );
+        _messages.removeAt(index);
+        await _messageDao.deleteMessage(message.id);
         notifyListeners();
       }
-
-      await _deleteMediaFromStorage(message.metadata);
-
-      await _messagesRef.doc(message.id).update({
-        'isDeleted': true,
-        'content': '',
-        'metadata': {},
-      });
     } catch (e) {
-      rethrow;
-    }
-  }
-
-  Future<void> _deleteMediaFromStorage(EchoMetadata metadata) async {
-    final storage = FirebaseStorage.instance;
-    final urls = [metadata.fileUrl, metadata.thumbnailUrl]
-        .whereType<String>()
-        .where((url) => url.isNotEmpty);
-
-    for (final url in urls) {
-      try {
-        await storage.refFromURL(url).delete();
-      } catch (_) {}
+      _error = 'Failed to delete message';
+      notifyListeners();
     }
   }
 
@@ -622,13 +417,10 @@ class ConversationController extends ChangeNotifier {
 
   @override
   void dispose() {
-    _messagesSubscription?.cancel();
-    _newMessagesSubscription?.cancel();
-    _modificationsSubscription?.cancel();
+    _syncMessageSubscription?.cancel();
     _offlineQueueSubscription?.cancel();
     _typingSubscription?.cancel();
     _contentCache.saveToDisk();
-    _readReceiptService.dispose();
     _offlineQueue.dispose();
     _typingService.dispose();
     super.dispose();

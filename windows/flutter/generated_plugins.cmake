@@ -11,6 +11,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   firebase_storage
   flutter_secure_storage_windows
   gal
+  sqlcipher_flutter_libs
   url_launcher_windows
 )
 

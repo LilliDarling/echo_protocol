@@ -4,7 +4,7 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'dart:async' as _i5;
-import 'dart:typed_data' as _i11;
+import 'dart:typed_data' as _i12;
 
 import 'package:cloud_firestore/cloud_firestore.dart' as _i4;
 import 'package:cloud_firestore_platform_interface/cloud_firestore_platform_interface.dart'
@@ -12,14 +12,15 @@ import 'package:cloud_firestore_platform_interface/cloud_firestore_platform_inte
 import 'package:cloud_functions/cloud_functions.dart' as _i9;
 import 'package:cloud_functions_platform_interface/cloud_functions_platform_interface.dart'
     as _i8;
-import 'package:echo_protocol/services/crypto/protocol_service.dart' as _i13;
-import 'package:echo_protocol/services/secure_storage.dart' as _i12;
+import 'package:echo_protocol/models/crypto/sealed_envelope.dart' as _i10;
+import 'package:echo_protocol/services/crypto/protocol_service.dart' as _i14;
+import 'package:echo_protocol/services/secure_storage.dart' as _i13;
 import 'package:firebase_auth/firebase_auth.dart' as _i7;
 import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart'
     as _i6;
 import 'package:firebase_core/firebase_core.dart' as _i2;
 import 'package:mockito/mockito.dart' as _i1;
-import 'package:mockito/src/dummies.dart' as _i10;
+import 'package:mockito/src/dummies.dart' as _i11;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -115,23 +116,29 @@ class _FakeHttpsCallable_13 extends _i1.SmartFake implements _i9.HttpsCallable {
     : super(parent, parentInvocation);
 }
 
-class _FakeUserMetadata_14 extends _i1.SmartFake implements _i6.UserMetadata {
-  _FakeUserMetadata_14(Object parent, Invocation parentInvocation)
+class _FakeSealedEnvelope_14 extends _i1.SmartFake
+    implements _i10.SealedEnvelope {
+  _FakeSealedEnvelope_14(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeMultiFactor_15 extends _i1.SmartFake implements _i7.MultiFactor {
-  _FakeMultiFactor_15(Object parent, Invocation parentInvocation)
+class _FakeUserMetadata_15 extends _i1.SmartFake implements _i6.UserMetadata {
+  _FakeUserMetadata_15(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeIdTokenResult_16 extends _i1.SmartFake implements _i6.IdTokenResult {
-  _FakeIdTokenResult_16(Object parent, Invocation parentInvocation)
+class _FakeMultiFactor_16 extends _i1.SmartFake implements _i7.MultiFactor {
+  _FakeMultiFactor_16(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeUser_17 extends _i1.SmartFake implements _i7.User {
-  _FakeUser_17(Object parent, Invocation parentInvocation)
+class _FakeIdTokenResult_17 extends _i1.SmartFake implements _i6.IdTokenResult {
+  _FakeIdTokenResult_17(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeUser_18 extends _i1.SmartFake implements _i7.User {
+  _FakeUser_18(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
@@ -155,7 +162,7 @@ class MockFirebaseFirestore extends _i1.Mock implements _i4.FirebaseFirestore {
   String get databaseURL =>
       (super.noSuchMethod(
             Invocation.getter(#databaseURL),
-            returnValue: _i10.dummyValue<String>(
+            returnValue: _i11.dummyValue<String>(
               this,
               Invocation.getter(#databaseURL),
             ),
@@ -166,7 +173,7 @@ class MockFirebaseFirestore extends _i1.Mock implements _i4.FirebaseFirestore {
   String get databaseId =>
       (super.noSuchMethod(
             Invocation.getter(#databaseId),
-            returnValue: _i10.dummyValue<String>(
+            returnValue: _i11.dummyValue<String>(
               this,
               Invocation.getter(#databaseId),
             ),
@@ -255,7 +262,7 @@ class MockFirebaseFirestore extends _i1.Mock implements _i4.FirebaseFirestore {
           as _i5.Future<void>);
 
   @override
-  _i4.LoadBundleTask loadBundle(_i11.Uint8List? bundle) =>
+  _i4.LoadBundleTask loadBundle(_i12.Uint8List? bundle) =>
       (super.noSuchMethod(
             Invocation.method(#loadBundle, [bundle]),
             returnValue: _FakeLoadBundleTask_4(
@@ -396,8 +403,8 @@ class MockFirebaseFirestore extends _i1.Mock implements _i4.FirebaseFirestore {
               {#timeout: timeout, #maxAttempts: maxAttempts},
             ),
             returnValue:
-                _i10.ifNotNull(
-                  _i10.dummyValueOrNull<T>(
+                _i11.ifNotNull(
+                  _i11.dummyValueOrNull<T>(
                     this,
                     Invocation.method(
                       #runTransaction,
@@ -857,7 +864,7 @@ class MockFirebaseAuth extends _i1.Mock implements _i7.FirebaseAuth {
       (super.noSuchMethod(
             Invocation.method(#verifyPasswordResetCode, [code]),
             returnValue: _i5.Future<String>.value(
-              _i10.dummyValue<String>(
+              _i11.dummyValue<String>(
                 this,
                 Invocation.method(#verifyPasswordResetCode, [code]),
               ),
@@ -1031,7 +1038,7 @@ class MockFirebaseFunctions extends _i1.Mock implements _i9.FirebaseFunctions {
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockSecureStorageService extends _i1.Mock
-    implements _i12.SecureStorageService {
+    implements _i13.SecureStorageService {
   MockSecureStorageService() {
     _i1.throwOnMissingStub(this);
   }
@@ -1369,6 +1376,32 @@ class MockSecureStorageService extends _i1.Mock
           as _i5.Future<void>);
 
   @override
+  _i5.Future<void> storeDatabaseKey(String? key) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeDatabaseKey, [key]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<String?> getDatabaseKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#getDatabaseKey, []),
+            returnValue: _i5.Future<String?>.value(),
+          )
+          as _i5.Future<String?>);
+
+  @override
+  _i5.Future<void> deleteDatabaseKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#deleteDatabaseKey, []),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
   _i5.Future<bool> get2FASessionVerified() =>
       (super.noSuchMethod(
             Invocation.method(#get2FASessionVerified, []),
@@ -1397,7 +1430,7 @@ class MockSecureStorageService extends _i1.Mock
 /// A class which mocks [ProtocolService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockProtocolService extends _i1.Mock implements _i13.ProtocolService {
+class MockProtocolService extends _i1.Mock implements _i14.ProtocolService {
   MockProtocolService() {
     _i1.throwOnMissingStub(this);
   }
@@ -1432,7 +1465,7 @@ class MockProtocolService extends _i1.Mock implements _i13.ProtocolService {
       (super.noSuchMethod(
             Invocation.method(#generateRecoveryPhrase, []),
             returnValue: _i5.Future<String>.value(
-              _i10.dummyValue<String>(
+              _i11.dummyValue<String>(
                 this,
                 Invocation.method(#generateRecoveryPhrase, []),
               ),
@@ -1480,7 +1513,7 @@ class MockProtocolService extends _i1.Mock implements _i13.ProtocolService {
               #senderId: senderId,
             }),
             returnValue: _i5.Future<String>.value(
-              _i10.dummyValue<String>(
+              _i11.dummyValue<String>(
                 this,
                 Invocation.method(#encryptMessage, [], {
                   #plaintext: plaintext,
@@ -1505,7 +1538,7 @@ class MockProtocolService extends _i1.Mock implements _i13.ProtocolService {
               #myUserId: myUserId,
             }),
             returnValue: _i5.Future<String>.value(
-              _i10.dummyValue<String>(
+              _i11.dummyValue<String>(
                 this,
                 Invocation.method(#decryptMessage, [], {
                   #encryptedContent: encryptedContent,
@@ -1536,6 +1569,94 @@ class MockProtocolService extends _i1.Mock implements _i13.ProtocolService {
           as _i5.Future<Map<String, dynamic>>);
 
   @override
+  _i5.Future<_i10.SealedEnvelope> sealEnvelope({
+    required String? plaintext,
+    required String? senderId,
+    required String? recipientId,
+    required _i12.Uint8List? recipientPublicKey,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#sealEnvelope, [], {
+              #plaintext: plaintext,
+              #senderId: senderId,
+              #recipientId: recipientId,
+              #recipientPublicKey: recipientPublicKey,
+            }),
+            returnValue: _i5.Future<_i10.SealedEnvelope>.value(
+              _FakeSealedEnvelope_14(
+                this,
+                Invocation.method(#sealEnvelope, [], {
+                  #plaintext: plaintext,
+                  #senderId: senderId,
+                  #recipientId: recipientId,
+                  #recipientPublicKey: recipientPublicKey,
+                }),
+              ),
+            ),
+          )
+          as _i5.Future<_i10.SealedEnvelope>);
+
+  @override
+  _i5.Future<({String plaintext, String senderId})> unsealEnvelope({
+    required _i10.SealedEnvelope? envelope,
+    required String? myUserId,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#unsealEnvelope, [], {
+              #envelope: envelope,
+              #myUserId: myUserId,
+            }),
+            returnValue:
+                _i5.Future<({String plaintext, String senderId})>.value((
+                  plaintext: _i11.dummyValue<String>(
+                    this,
+                    Invocation.method(#unsealEnvelope, [], {
+                      #envelope: envelope,
+                      #myUserId: myUserId,
+                    }),
+                  ),
+                  senderId: _i11.dummyValue<String>(
+                    this,
+                    Invocation.method(#unsealEnvelope, [], {
+                      #envelope: envelope,
+                      #myUserId: myUserId,
+                    }),
+                  ),
+                )),
+          )
+          as _i5.Future<({String plaintext, String senderId})>);
+
+  @override
+  _i5.Future<String> encryptForSelf({required String? plaintext}) =>
+      (super.noSuchMethod(
+            Invocation.method(#encryptForSelf, [], {#plaintext: plaintext}),
+            returnValue: _i5.Future<String>.value(
+              _i11.dummyValue<String>(
+                this,
+                Invocation.method(#encryptForSelf, [], {#plaintext: plaintext}),
+              ),
+            ),
+          )
+          as _i5.Future<String>);
+
+  @override
+  _i5.Future<String> decryptFromSelf({required String? encryptedPayload}) =>
+      (super.noSuchMethod(
+            Invocation.method(#decryptFromSelf, [], {
+              #encryptedPayload: encryptedPayload,
+            }),
+            returnValue: _i5.Future<String>.value(
+              _i11.dummyValue<String>(
+                this,
+                Invocation.method(#decryptFromSelf, [], {
+                  #encryptedPayload: encryptedPayload,
+                }),
+              ),
+            ),
+          )
+          as _i5.Future<String>);
+
+  @override
   _i5.Future<bool> hasActiveSession(String? recipientId, String? ourUserId) =>
       (super.noSuchMethod(
             Invocation.method(#hasActiveSession, [recipientId, ourUserId]),
@@ -1560,21 +1681,21 @@ class MockProtocolService extends _i1.Mock implements _i13.ProtocolService {
           as _i5.Future<String?>);
 
   @override
-  _i5.Future<({_i11.Uint8List publicKey, _i11.Uint8List signature})> sign(
-    _i11.Uint8List? data,
+  _i5.Future<({_i12.Uint8List publicKey, _i12.Uint8List signature})> sign(
+    _i12.Uint8List? data,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#sign, [data]),
             returnValue:
                 _i5.Future<
-                  ({_i11.Uint8List publicKey, _i11.Uint8List signature})
+                  ({_i12.Uint8List publicKey, _i12.Uint8List signature})
                 >.value((
-                  publicKey: _i11.Uint8List(0),
-                  signature: _i11.Uint8List(0),
+                  publicKey: _i12.Uint8List(0),
+                  signature: _i12.Uint8List(0),
                 )),
           )
           as _i5.Future<
-            ({_i11.Uint8List publicKey, _i11.Uint8List signature})
+            ({_i12.Uint8List publicKey, _i12.Uint8List signature})
           >);
 
   @override
@@ -1605,10 +1726,10 @@ class MockProtocolService extends _i1.Mock implements _i13.ProtocolService {
 
   @override
   _i5.Future<
-    ({_i11.Uint8List encrypted, String mediaId, _i11.Uint8List mediaKey})
+    ({_i12.Uint8List encrypted, String mediaId, _i12.Uint8List mediaKey})
   >
   encryptMedia({
-    required _i11.Uint8List? plainBytes,
+    required _i12.Uint8List? plainBytes,
     required String? recipientId,
     required String? senderId,
   }) =>
@@ -1621,13 +1742,13 @@ class MockProtocolService extends _i1.Mock implements _i13.ProtocolService {
             returnValue:
                 _i5.Future<
                   ({
-                    _i11.Uint8List encrypted,
+                    _i12.Uint8List encrypted,
                     String mediaId,
-                    _i11.Uint8List mediaKey,
+                    _i12.Uint8List mediaKey,
                   })
                 >.value((
-                  encrypted: _i11.Uint8List(0),
-                  mediaId: _i10.dummyValue<String>(
+                  encrypted: _i12.Uint8List(0),
+                  mediaId: _i11.dummyValue<String>(
                     this,
                     Invocation.method(#encryptMedia, [], {
                       #plainBytes: plainBytes,
@@ -1635,22 +1756,22 @@ class MockProtocolService extends _i1.Mock implements _i13.ProtocolService {
                       #senderId: senderId,
                     }),
                   ),
-                  mediaKey: _i11.Uint8List(0),
+                  mediaKey: _i12.Uint8List(0),
                 )),
           )
           as _i5.Future<
             ({
-              _i11.Uint8List encrypted,
+              _i12.Uint8List encrypted,
               String mediaId,
-              _i11.Uint8List mediaKey,
+              _i12.Uint8List mediaKey,
             })
           >);
 
   @override
-  _i5.Future<_i11.Uint8List> decryptMedia({
-    required _i11.Uint8List? encryptedBytes,
+  _i5.Future<_i12.Uint8List> decryptMedia({
+    required _i12.Uint8List? encryptedBytes,
     required String? mediaId,
-    required _i11.Uint8List? mediaKey,
+    required _i12.Uint8List? mediaKey,
   }) =>
       (super.noSuchMethod(
             Invocation.method(#decryptMedia, [], {
@@ -1658,9 +1779,9 @@ class MockProtocolService extends _i1.Mock implements _i13.ProtocolService {
               #mediaId: mediaId,
               #mediaKey: mediaKey,
             }),
-            returnValue: _i5.Future<_i11.Uint8List>.value(_i11.Uint8List(0)),
+            returnValue: _i5.Future<_i12.Uint8List>.value(_i12.Uint8List(0)),
           )
-          as _i5.Future<_i11.Uint8List>);
+          as _i5.Future<_i12.Uint8List>);
 
   @override
   _i5.Future<void> deleteMedia({required String? mediaId}) =>
@@ -1675,7 +1796,7 @@ class MockProtocolService extends _i1.Mock implements _i13.ProtocolService {
   _i5.Future<String> downloadAndDecryptMedia({
     required String? encryptedUrl,
     required String? mediaId,
-    required _i11.Uint8List? mediaKey,
+    required _i12.Uint8List? mediaKey,
     required bool? isVideo,
   }) =>
       (super.noSuchMethod(
@@ -1686,7 +1807,7 @@ class MockProtocolService extends _i1.Mock implements _i13.ProtocolService {
               #isVideo: isVideo,
             }),
             returnValue: _i5.Future<String>.value(
-              _i10.dummyValue<String>(
+              _i11.dummyValue<String>(
                 this,
                 Invocation.method(#downloadAndDecryptMedia, [], {
                   #encryptedUrl: encryptedUrl,
@@ -1745,7 +1866,7 @@ class MockUser extends _i1.Mock implements _i7.User {
   _i6.UserMetadata get metadata =>
       (super.noSuchMethod(
             Invocation.getter(#metadata),
-            returnValue: _FakeUserMetadata_14(
+            returnValue: _FakeUserMetadata_15(
               this,
               Invocation.getter(#metadata),
             ),
@@ -1764,7 +1885,7 @@ class MockUser extends _i1.Mock implements _i7.User {
   String get uid =>
       (super.noSuchMethod(
             Invocation.getter(#uid),
-            returnValue: _i10.dummyValue<String>(this, Invocation.getter(#uid)),
+            returnValue: _i11.dummyValue<String>(this, Invocation.getter(#uid)),
           )
           as String);
 
@@ -1772,7 +1893,7 @@ class MockUser extends _i1.Mock implements _i7.User {
   _i7.MultiFactor get multiFactor =>
       (super.noSuchMethod(
             Invocation.getter(#multiFactor),
-            returnValue: _FakeMultiFactor_15(
+            returnValue: _FakeMultiFactor_16(
               this,
               Invocation.getter(#multiFactor),
             ),
@@ -1803,7 +1924,7 @@ class MockUser extends _i1.Mock implements _i7.User {
       (super.noSuchMethod(
             Invocation.method(#getIdTokenResult, [forceRefresh]),
             returnValue: _i5.Future<_i6.IdTokenResult>.value(
-              _FakeIdTokenResult_16(
+              _FakeIdTokenResult_17(
                 this,
                 Invocation.method(#getIdTokenResult, [forceRefresh]),
               ),
@@ -1959,7 +2080,7 @@ class MockUser extends _i1.Mock implements _i7.User {
       (super.noSuchMethod(
             Invocation.method(#unlink, [providerId]),
             returnValue: _i5.Future<_i7.User>.value(
-              _FakeUser_17(this, Invocation.method(#unlink, [providerId])),
+              _FakeUser_18(this, Invocation.method(#unlink, [providerId])),
             ),
           )
           as _i5.Future<_i7.User>);

@@ -1,165 +1,400 @@
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
+import 'package:mockito/annotations.dart';
 import 'package:echo_protocol/models/crypto/sealed_envelope.dart';
+import 'package:echo_protocol/models/local/message.dart';
+import 'package:echo_protocol/models/local/conversation.dart';
+import 'package:echo_protocol/repositories/message_dao.dart';
+import 'package:echo_protocol/repositories/conversation_dao.dart';
+import 'package:echo_protocol/services/crypto/protocol_service.dart';
+import 'package:echo_protocol/services/sync/inbox_listener.dart';
+import 'package:echo_protocol/services/sync/message_processor.dart';
+
+@GenerateMocks([
+  ProtocolService,
+  MessageDao,
+  ConversationDao,
+])
+import 'message_processor_test.mocks.dart';
 
 void main() {
-  group('InboxMessage', () {
-    test('correctly parses envelope from data', () {
-      final now = DateTime.now();
-      final payload = Uint8List.fromList(List.generate(100, (i) => i));
-      final ephemeralKey = Uint8List.fromList(List.generate(32, (i) => i));
+  group('MessageProcessor', () {
+    late MessageProcessor processor;
+    late MockProtocolService mockProtocol;
+    late MockMessageDao mockMessageDao;
+    late MockConversationDao mockConversationDao;
+    const myUserId = 'my_user_id';
 
-      final envelope = SealedEnvelope(
-        recipientId: 'bob',
-        encryptedPayload: payload,
-        ephemeralPublicKey: ephemeralKey,
-        timestamp: now.millisecondsSinceEpoch,
-        expireAt: now.add(const Duration(hours: 24)).millisecondsSinceEpoch,
+    setUp(() {
+      mockProtocol = MockProtocolService();
+      mockMessageDao = MockMessageDao();
+      mockConversationDao = MockConversationDao();
+
+      processor = MessageProcessor(
+        protocol: mockProtocol,
+        messageDao: mockMessageDao,
+        conversationDao: mockConversationDao,
+        myUserId: myUserId,
       );
-
-      expect(envelope.recipientId, 'bob');
-      expect(envelope.encryptedPayload.length, 100);
-      expect(envelope.ephemeralPublicKey.length, 32);
-      expect(envelope.isExpired, false);
     });
 
-    test('detects expired envelope', () {
-      final past = DateTime.now().subtract(const Duration(hours: 1));
+    group('processInboxMessage - incoming messages', () {
+      test('unseals envelope and stores message', () async {
+        final envelope = SealedEnvelope(
+          recipientId: myUserId,
+          encryptedPayload: Uint8List.fromList(List.generate(100, (i) => i)),
+          ephemeralPublicKey: Uint8List(32),
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+          expireAt: DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
+        );
 
-      final envelope = SealedEnvelope(
+        final inboxMessage = InboxMessage(
+          id: 'msg_123',
+          envelope: envelope,
+          deliveredAt: DateTime.now(),
+          isOutgoing: false,
+        );
+
+        when(mockProtocol.unsealEnvelope(
+          envelope: anyNamed('envelope'),
+          myUserId: anyNamed('myUserId'),
+        )).thenAnswer((_) async => (senderId: 'alice', plaintext: 'Hello, World!'));
+
+        when(mockMessageDao.insert(any)).thenAnswer((_) async {});
+        when(mockConversationDao.getById(any)).thenAnswer((_) async => LocalConversation(
+          id: 'alice_my_user_id',
+          recipientId: 'alice',
+          recipientUsername: 'Alice',
+          recipientPublicKey: 'key',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ));
+        when(mockConversationDao.updateLastMessage(
+          conversationId: anyNamed('conversationId'),
+          content: anyNamed('content'),
+          timestamp: anyNamed('timestamp'),
+        )).thenAnswer((_) async {});
+        when(mockConversationDao.incrementUnreadCount(any)).thenAnswer((_) async {});
+
+        final result = await processor.processInboxMessage(inboxMessage);
+
+        expect(result, isNotNull);
+        expect(result!.messageId, 'msg_123');
+        expect(result.senderId, 'alice');
+        expect(result.content, 'Hello, World!');
+
+        verify(mockProtocol.unsealEnvelope(
+          envelope: anyNamed('envelope'),
+          myUserId: myUserId,
+        )).called(1);
+
+        verify(mockMessageDao.insert(argThat(
+          predicate<LocalMessage>((m) =>
+            m.id == 'msg_123' &&
+            m.senderId == 'alice' &&
+            m.content == 'Hello, World!' &&
+            m.isOutgoing == false
+          ),
+        ))).called(1);
+      });
+
+      test('returns null on decryption failure', () async {
+        final envelope = SealedEnvelope(
+          recipientId: myUserId,
+          encryptedPayload: Uint8List(10),
+          ephemeralPublicKey: Uint8List(32),
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+          expireAt: DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
+        );
+
+        final inboxMessage = InboxMessage(
+          id: 'msg_bad',
+          envelope: envelope,
+          deliveredAt: DateTime.now(),
+          isOutgoing: false,
+        );
+
+        when(mockProtocol.unsealEnvelope(
+          envelope: anyNamed('envelope'),
+          myUserId: anyNamed('myUserId'),
+        )).thenThrow(Exception('Decryption failed'));
+
+        final result = await processor.processInboxMessage(inboxMessage);
+
+        expect(result, isNull);
+        verifyNever(mockMessageDao.insert(any));
+      });
+
+      test('increments unread count for incoming messages', () async {
+        final envelope = SealedEnvelope(
+          recipientId: myUserId,
+          encryptedPayload: Uint8List(50),
+          ephemeralPublicKey: Uint8List(32),
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+          expireAt: DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
+        );
+
+        final inboxMessage = InboxMessage(
+          id: 'msg_inc',
+          envelope: envelope,
+          deliveredAt: DateTime.now(),
+          isOutgoing: false,
+        );
+
+        when(mockProtocol.unsealEnvelope(
+          envelope: anyNamed('envelope'),
+          myUserId: anyNamed('myUserId'),
+        )).thenAnswer((_) async => (senderId: 'bob', plaintext: 'New message'));
+
+        when(mockMessageDao.insert(any)).thenAnswer((_) async {});
+        when(mockConversationDao.getById(any)).thenAnswer((_) async => LocalConversation(
+          id: 'bob_my_user_id',
+          recipientId: 'bob',
+          recipientUsername: 'Bob',
+          recipientPublicKey: 'key',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ));
+        when(mockConversationDao.updateLastMessage(
+          conversationId: anyNamed('conversationId'),
+          content: anyNamed('content'),
+          timestamp: anyNamed('timestamp'),
+        )).thenAnswer((_) async {});
+        when(mockConversationDao.incrementUnreadCount(any)).thenAnswer((_) async {});
+
+        await processor.processInboxMessage(inboxMessage);
+
+        verify(mockConversationDao.incrementUnreadCount(any)).called(1);
+      });
+    });
+
+    group('processInboxMessage - outgoing messages (multi-device)', () {
+      test('decrypts self-encrypted payload for outgoing message', () async {
+        final inboxMessage = InboxMessage(
+          id: 'msg_456_out',
+          deliveredAt: DateTime.now(),
+          isOutgoing: true,
+          senderPayload: '{"encrypted": "self_sealed_content"}',
+          recipientId: 'bob',
+        );
+
+        when(mockProtocol.decryptFromSelf(
+          encryptedPayload: anyNamed('encryptedPayload'),
+        )).thenAnswer((_) async => 'Synced message content');
+
+        when(mockMessageDao.getById('msg_456')).thenAnswer((_) async => null);
+        when(mockMessageDao.insert(any)).thenAnswer((_) async {});
+        when(mockConversationDao.getById(any)).thenAnswer((_) async => LocalConversation(
+          id: 'bob_my_user_id',
+          recipientId: 'bob',
+          recipientUsername: 'Bob',
+          recipientPublicKey: 'key',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ));
+        when(mockConversationDao.updateLastMessage(
+          conversationId: anyNamed('conversationId'),
+          content: anyNamed('content'),
+          timestamp: anyNamed('timestamp'),
+        )).thenAnswer((_) async {});
+
+        final result = await processor.processInboxMessage(inboxMessage);
+
+        expect(result, isNotNull);
+        expect(result!.messageId, 'msg_456');
+        expect(result.senderId, myUserId);
+        expect(result.content, 'Synced message content');
+
+        verify(mockProtocol.decryptFromSelf(
+          encryptedPayload: '{"encrypted": "self_sealed_content"}',
+        )).called(1);
+
+        verify(mockMessageDao.insert(argThat(
+          predicate<LocalMessage>((m) =>
+            m.id == 'msg_456' &&
+            m.isOutgoing == true &&
+            m.status == LocalMessageStatus.sent
+          ),
+        ))).called(1);
+      });
+
+      test('skips duplicate outgoing message', () async {
+        final inboxMessage = InboxMessage(
+          id: 'msg_existing_out',
+          deliveredAt: DateTime.now(),
+          isOutgoing: true,
+          senderPayload: '{"encrypted": "content"}',
+          recipientId: 'bob',
+        );
+
+        when(mockProtocol.decryptFromSelf(
+          encryptedPayload: anyNamed('encryptedPayload'),
+        )).thenAnswer((_) async => 'Content');
+
+        when(mockMessageDao.getById('msg_existing')).thenAnswer((_) async => LocalMessage(
+          id: 'msg_existing',
+          conversationId: 'conv1',
+          senderId: myUserId,
+          senderUsername: '',
+          content: 'Already exists',
+          timestamp: DateTime.now(),
+          isOutgoing: true,
+          createdAt: DateTime.now(),
+        ));
+
+        final result = await processor.processInboxMessage(inboxMessage);
+
+        expect(result, isNull);
+        verifyNever(mockMessageDao.insert(any));
+      });
+
+      test('does not increment unread for outgoing messages', () async {
+        final inboxMessage = InboxMessage(
+          id: 'msg_unread_out',
+          deliveredAt: DateTime.now(),
+          isOutgoing: true,
+          senderPayload: '{"encrypted": "content"}',
+          recipientId: 'carol',
+        );
+
+        when(mockProtocol.decryptFromSelf(
+          encryptedPayload: anyNamed('encryptedPayload'),
+        )).thenAnswer((_) async => 'Outgoing content');
+
+        when(mockMessageDao.getById('msg_unread')).thenAnswer((_) async => null);
+        when(mockMessageDao.insert(any)).thenAnswer((_) async {});
+        when(mockConversationDao.getById(any)).thenAnswer((_) async => LocalConversation(
+          id: 'carol_my_user_id',
+          recipientId: 'carol',
+          recipientUsername: 'Carol',
+          recipientPublicKey: 'key',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ));
+        when(mockConversationDao.updateLastMessage(
+          conversationId: anyNamed('conversationId'),
+          content: anyNamed('content'),
+          timestamp: anyNamed('timestamp'),
+        )).thenAnswer((_) async {});
+
+        await processor.processInboxMessage(inboxMessage);
+
+        verifyNever(mockConversationDao.incrementUnreadCount(any));
+      });
+
+      test('returns null when senderPayload missing', () async {
+        final inboxMessage = InboxMessage(
+          id: 'msg_no_payload_out',
+          deliveredAt: DateTime.now(),
+          isOutgoing: true,
+          recipientId: 'bob',
+        );
+
+        final result = await processor.processInboxMessage(inboxMessage);
+
+        expect(result, isNull);
+        verifyNever(mockProtocol.decryptFromSelf(encryptedPayload: anyNamed('encryptedPayload')));
+      });
+
+      test('returns null when recipientId missing', () async {
+        final inboxMessage = InboxMessage(
+          id: 'msg_no_recipient_out',
+          deliveredAt: DateTime.now(),
+          isOutgoing: true,
+          senderPayload: '{"encrypted": "content"}',
+        );
+
+        final result = await processor.processInboxMessage(inboxMessage);
+
+        expect(result, isNull);
+      });
+    });
+
+    group('conversation ID generation', () {
+      test('generates consistent ID regardless of order', () {
+        String getConversationId(String myId, String partnerId) {
+          final ids = [myId, partnerId]..sort();
+          return '${ids[0]}_${ids[1]}';
+        }
+
+        expect(getConversationId('alice', 'bob'), 'alice_bob');
+        expect(getConversationId('bob', 'alice'), 'alice_bob');
+        expect(getConversationId('zebra', 'apple'), 'apple_zebra');
+      });
+    });
+
+    group('message preview truncation', () {
+      test('truncates long content correctly', () {
+        String truncatePreview(String content, {int maxLength = 100}) {
+          if (content.length <= maxLength) return content;
+          return '${content.substring(0, maxLength)}...';
+        }
+
+        final short = 'Hello';
+        final exact = 'A' * 100;
+        final long = 'B' * 200;
+
+        expect(truncatePreview(short), 'Hello');
+        expect(truncatePreview(exact).length, 100);
+        expect(truncatePreview(long).length, 103);
+        expect(truncatePreview(long).endsWith('...'), true);
+      });
+    });
+  });
+
+  group('SealedEnvelope', () {
+    test('correctly detects expired envelope', () {
+      final expired = SealedEnvelope(
         recipientId: 'bob',
         encryptedPayload: Uint8List(10),
         ephemeralPublicKey: Uint8List(32),
-        timestamp: past.millisecondsSinceEpoch,
-        expireAt: past.millisecondsSinceEpoch,
+        timestamp: DateTime.now().subtract(const Duration(hours: 2)).millisecondsSinceEpoch,
+        expireAt: DateTime.now().subtract(const Duration(hours: 1)).millisecondsSinceEpoch,
       );
 
-      expect(envelope.isExpired, true);
+      final valid = SealedEnvelope(
+        recipientId: 'bob',
+        encryptedPayload: Uint8List(10),
+        ephemeralPublicKey: Uint8List(32),
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+        expireAt: DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
+      );
+
+      expect(expired.isExpired, true);
+      expect(valid.isExpired, false);
     });
   });
 
-  group('ProcessedMessage Structure', () {
-    test('contains required fields after processing', () {
-      final messageId = 'msg_123';
-      final senderId = 'alice';
-      final conversationId = 'alice_bob';
-      final content = 'Hello, Bob!';
-      final timestamp = DateTime.now();
+  group('InboxMessage', () {
+    test('distinguishes incoming from outgoing', () {
+      final incoming = InboxMessage(
+        id: 'msg_in',
+        envelope: SealedEnvelope(
+          recipientId: 'me',
+          encryptedPayload: Uint8List(10),
+          ephemeralPublicKey: Uint8List(32),
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+          expireAt: DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
+        ),
+        deliveredAt: DateTime.now(),
+        isOutgoing: false,
+      );
 
-      expect(messageId, isNotEmpty);
-      expect(senderId, isNotEmpty);
-      expect(conversationId, contains('_'));
-      expect(content, isNotEmpty);
-      expect(timestamp.isBefore(DateTime.now().add(const Duration(seconds: 1))), true);
-    });
-  });
+      final outgoing = InboxMessage(
+        id: 'msg_out',
+        deliveredAt: DateTime.now(),
+        isOutgoing: true,
+        senderPayload: 'encrypted_self',
+        recipientId: 'partner',
+      );
 
-  group('Conversation ID Generation', () {
-    test('generates consistent ID regardless of order', () {
-      String getConversationId(String userId, String partnerId) {
-        final ids = [userId, partnerId]..sort();
-        return '${ids[0]}_${ids[1]}';
-      }
+      expect(incoming.isOutgoing, false);
+      expect(incoming.envelope, isNotNull);
 
-      final id1 = getConversationId('alice', 'bob');
-      final id2 = getConversationId('bob', 'alice');
-
-      expect(id1, id2);
-      expect(id1, 'alice_bob');
-    });
-
-    test('handles IDs with special characters', () {
-      String getConversationId(String userId, String partnerId) {
-        final ids = [userId, partnerId]..sort();
-        return '${ids[0]}_${ids[1]}';
-      }
-
-      final id = getConversationId('user_123', 'user_456');
-      expect(id, 'user_123_user_456');
-    });
-  });
-
-  group('Message Preview Truncation', () {
-    test('truncates long content for preview', () {
-      String truncatePreview(String content, {int maxLength = 100}) {
-        if (content.length <= maxLength) return content;
-        return '${content.substring(0, maxLength)}...';
-      }
-
-      final shortContent = 'Hello';
-      final longContent = 'A' * 200;
-
-      expect(truncatePreview(shortContent), 'Hello');
-      expect(truncatePreview(longContent).length, 103);
-      expect(truncatePreview(longContent).endsWith('...'), true);
-    });
-
-    test('handles exactly max length content', () {
-      String truncatePreview(String content, {int maxLength = 100}) {
-        if (content.length <= maxLength) return content;
-        return '${content.substring(0, maxLength)}...';
-      }
-
-      final exactContent = 'A' * 100;
-      expect(truncatePreview(exactContent), exactContent);
-      expect(truncatePreview(exactContent).length, 100);
-    });
-  });
-
-  group('Sync State Transitions', () {
-    test('valid state transitions', () {
-      const validTransitions = {
-        'idle': ['initializing'],
-        'initializing': ['syncing', 'error', 'ready'],
-        'syncing': ['ready', 'error'],
-        'ready': ['syncing', 'idle', 'error'],
-        'error': ['initializing', 'idle'],
-      };
-
-      expect(validTransitions['idle']!.contains('initializing'), true);
-      expect(validTransitions['initializing']!.contains('ready'), true);
-      expect(validTransitions['syncing']!.contains('ready'), true);
-    });
-  });
-
-  group('Security: Message Processing', () {
-    test('sender ID comes from unsealed certificate, not external source', () {
-      final claimedSenderId = 'eve_malicious';
-      final actualSenderIdFromCertificate = 'alice_real';
-
-      expect(actualSenderIdFromCertificate, isNot(claimedSenderId));
-    });
-
-    test('message timestamp should be validated', () {
-      final validTimestamp = DateTime.now();
-      final futureTimestamp = DateTime.now().add(const Duration(hours: 1));
-      final oldTimestamp = DateTime.now().subtract(const Duration(days: 2));
-
-      bool isValidTimestamp(DateTime timestamp) {
-        final now = DateTime.now();
-        final age = now.difference(timestamp);
-
-        if (age.isNegative && age.abs() > const Duration(minutes: 5)) {
-          return false;
-        }
-        return age < const Duration(hours: 24);
-      }
-
-      expect(isValidTimestamp(validTimestamp), true);
-      expect(isValidTimestamp(futureTimestamp), false);
-      expect(isValidTimestamp(oldTimestamp), false);
-    });
-
-    test('envelope expiration is checked before processing', () {
-      bool shouldProcess(int expireAtMs) {
-        return DateTime.now().millisecondsSinceEpoch < expireAtMs;
-      }
-
-      final validExpiry = DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch;
-      final expiredExpiry = DateTime.now().subtract(const Duration(hours: 1)).millisecondsSinceEpoch;
-
-      expect(shouldProcess(validExpiry), true);
-      expect(shouldProcess(expiredExpiry), false);
+      expect(outgoing.isOutgoing, true);
+      expect(outgoing.senderPayload, isNotNull);
+      expect(outgoing.recipientId, 'partner');
     });
   });
 }

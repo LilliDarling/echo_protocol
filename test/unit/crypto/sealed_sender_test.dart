@@ -427,4 +427,92 @@ void main() {
       );
     });
   });
+
+  group('Self-Encryption for Multi-Device', () {
+    late SimpleKeyPair aliceSigningKey;
+    late SimpleKeyPair aliceX25519KeyPair;
+    late Uint8List aliceEd25519PublicKey;
+    late Uint8List aliceX25519PublicKey;
+
+    setUp(() async {
+      final ed25519 = Ed25519();
+      final x25519 = X25519();
+
+      aliceSigningKey = await ed25519.newKeyPair();
+      final aliceEdPub = await aliceSigningKey.extractPublicKey();
+      aliceEd25519PublicKey = Uint8List.fromList(aliceEdPub.bytes);
+
+      aliceX25519KeyPair = await x25519.newKeyPair();
+      final aliceX25519Pub = await aliceX25519KeyPair.extractPublicKey();
+      aliceX25519PublicKey = Uint8List.fromList(aliceX25519Pub.bytes);
+    });
+
+    test('self-sealed envelope can be unsealed by same key', () async {
+      final message = Uint8List.fromList(utf8.encode('Multi-device sync test'));
+
+      final selfEnvelope = await SealedEnvelope.seal(
+        senderId: 'self',
+        recipientId: 'self',
+        recipientPublicKey: aliceX25519PublicKey,
+        encryptedMessage: message,
+        senderSigningKey: aliceSigningKey,
+        senderPublicKey: aliceEd25519PublicKey,
+      );
+
+      final unsealed = await selfEnvelope.unseal(
+        recipientKeyPair: aliceX25519KeyPair,
+      );
+
+      expect(
+        SecurityUtils.constantTimeBytesEquals(unsealed.encryptedMessage, message),
+        true,
+      );
+    });
+
+    test('self-sealed envelope cannot be unsealed by different key', () async {
+      final message = Uint8List.fromList(utf8.encode('Private message'));
+
+      final selfEnvelope = await SealedEnvelope.seal(
+        senderId: 'self',
+        recipientId: 'self',
+        recipientPublicKey: aliceX25519PublicKey,
+        encryptedMessage: message,
+        senderSigningKey: aliceSigningKey,
+        senderPublicKey: aliceEd25519PublicKey,
+      );
+
+      final x25519 = X25519();
+      final eveKeyPair = await x25519.newKeyPair();
+
+      expect(
+        () => selfEnvelope.unseal(recipientKeyPair: eveKeyPair),
+        throwsA(anything),
+      );
+    });
+
+    test('serialization preserves self-encrypted content', () async {
+      final message = Uint8List.fromList(utf8.encode('Sync me across devices'));
+
+      final selfEnvelope = await SealedEnvelope.seal(
+        senderId: 'self',
+        recipientId: 'self',
+        recipientPublicKey: aliceX25519PublicKey,
+        encryptedMessage: message,
+        senderSigningKey: aliceSigningKey,
+        senderPublicKey: aliceEd25519PublicKey,
+      );
+
+      final json = selfEnvelope.toJson();
+      final restored = SealedEnvelope.fromJson(json);
+
+      final unsealed = await restored.unseal(
+        recipientKeyPair: aliceX25519KeyPair,
+      );
+
+      expect(
+        SecurityUtils.constantTimeBytesEquals(unsealed.encryptedMessage, message),
+        true,
+      );
+    });
+  });
 }

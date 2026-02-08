@@ -7,6 +7,7 @@ export interface DeliverMessageRequest {
     timestamp: number;
     expireAt: number;
   };
+  senderPayload?: string;
   sequenceNumber: number;
 }
 
@@ -26,4 +27,5 @@ export interface InboxMessage {
   };
   deliveredAt: FirebaseFirestore.Timestamp;
   expireAt: FirebaseFirestore.Timestamp;
+  isOutgoing: boolean;
 }

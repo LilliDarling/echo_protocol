@@ -3,6 +3,9 @@ import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 
 class SenderCertificate {
+  static const Duration defaultMaxAge = Duration(hours: 24);
+  static const Duration defaultMaxClockSkew = Duration(minutes: 5);
+
   final String senderId;
   final Uint8List senderPublicKey;
   final int timestamp;
@@ -47,8 +50,11 @@ class SenderCertificate {
     ]);
   }
 
-  Future<bool> verify() async {
-    if (!_isTimestampValid()) return false;
+  Future<bool> verify({
+    Duration maxAge = defaultMaxAge,
+    Duration maxClockSkew = defaultMaxClockSkew,
+  }) async {
+    if (!_isTimestampValid(maxAge: maxAge, maxClockSkew: maxClockSkew)) return false;
 
     final dataToVerify = _buildSigningData(senderId, senderPublicKey, timestamp);
 
@@ -59,20 +65,24 @@ class SenderCertificate {
         publicKey: SimplePublicKey(senderPublicKey, type: KeyPairType.ed25519),
       );
       return await ed25519.verify(dataToVerify, signature: sig);
-    } catch (_) {
+    } on ArgumentError {
+      // Malformed key/signature bytes or truncated input data
       return false;
     }
   }
 
-  bool _isTimestampValid() {
+  bool _isTimestampValid({
+    required Duration maxAge,
+    required Duration maxClockSkew,
+  }) {
     final certTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
     final now = DateTime.now();
     final age = now.difference(certTime);
 
-    if (age.isNegative && age.abs() > const Duration(minutes: 5)) {
+    if (age.isNegative && age.abs() > maxClockSkew) {
       return false;
     }
-    return age < const Duration(hours: 24);
+    return age < maxAge;
   }
 
   Uint8List toBytes() {
