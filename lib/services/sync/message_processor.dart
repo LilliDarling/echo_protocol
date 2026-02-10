@@ -3,6 +3,7 @@ import '../../models/local/conversation.dart';
 import '../../models/local/message.dart';
 import '../../repositories/message_dao.dart';
 import '../../repositories/conversation_dao.dart';
+import '../../repositories/blocked_user_dao.dart';
 import '../crypto/protocol_service.dart';
 import 'inbox_listener.dart';
 
@@ -28,16 +29,19 @@ class MessageProcessor {
   final ProtocolService _protocol;
   final MessageDao _messageDao;
   final ConversationDao _conversationDao;
+  final BlockedUserDao _blockedUserDao;
   final String _myUserId;
 
   MessageProcessor({
     required ProtocolService protocol,
     required MessageDao messageDao,
     required ConversationDao conversationDao,
+    required BlockedUserDao blockedUserDao,
     required String myUserId,
   })  : _protocol = protocol,
         _messageDao = messageDao,
         _conversationDao = conversationDao,
+        _blockedUserDao = blockedUserDao,
         _myUserId = myUserId;
 
   Future<ProcessedMessage?> processInboxMessage(InboxMessage inboxMessage) async {
@@ -64,6 +68,10 @@ class MessageProcessor {
       envelope: inboxMessage.envelope,
       myUserId: _myUserId,
     );
+
+    if (await _blockedUserDao.isBlocked(result.senderId)) {
+      return null;
+    }
 
     final conversationId = _getConversationId(result.senderId);
 

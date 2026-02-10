@@ -148,6 +148,8 @@ class ProtocolService {
   }) async {
     _ensureInitialized();
 
+    final recipientIdentity = IdentityPublicKey.fromBytes(recipientPublicKey);
+
     final messageBytes = await _sessionManager.encrypt(
       recipientId: recipientId,
       ourUserId: senderId,
@@ -160,7 +162,7 @@ class ProtocolService {
     return SealedEnvelope.seal(
       senderId: senderId,
       recipientId: recipientId,
-      recipientPublicKey: recipientPublicKey,
+      recipientPublicKey: recipientIdentity.x25519PublicKey,
       encryptedMessage: messageBytes,
       senderSigningKey: _identityKey!.ed25519KeyPair,
       senderPublicKey: publicKey.ed25519PublicKey,

@@ -59,6 +59,8 @@ class AppDatabase extends _$AppDatabase {
         File(dbPath),
         setup: (db) {
           db.execute("PRAGMA key = '${_escapeKey(key)}'");
+          db.execute('PRAGMA cipher_memory_security = ON');
+          db.execute('PRAGMA cipher_page_size = 4096');
           db.execute('PRAGMA foreign_keys = ON');
           db.execute('PRAGMA secure_delete = ON');
           db.execute('PRAGMA temp_store = MEMORY');

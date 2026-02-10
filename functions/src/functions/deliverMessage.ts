@@ -185,7 +185,6 @@ export const deliverMessage = onCall<DeliverMessageRequest>(
           },
           deliveredAt: FieldValue.serverTimestamp(),
           expireAt: expireAt,
-          isOutgoing: false,
         });
 
         attempts.push(now);

@@ -4,19 +4,21 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'dart:async' as _i7;
-import 'dart:typed_data' as _i11;
+import 'dart:typed_data' as _i12;
 
 import 'package:drift/drift.dart' as _i4;
 import 'package:drift/src/runtime/executor/stream_queries.dart' as _i5;
 import 'package:echo_protocol/models/crypto/sealed_envelope.dart' as _i2;
-import 'package:echo_protocol/models/local/conversation.dart' as _i13;
-import 'package:echo_protocol/models/local/message.dart' as _i12;
+import 'package:echo_protocol/models/local/blocked_user.dart' as _i15;
+import 'package:echo_protocol/models/local/conversation.dart' as _i14;
+import 'package:echo_protocol/models/local/message.dart' as _i13;
+import 'package:echo_protocol/repositories/blocked_user_dao.dart' as _i9;
 import 'package:echo_protocol/repositories/conversation_dao.dart' as _i8;
 import 'package:echo_protocol/repositories/message_dao.dart' as _i6;
-import 'package:echo_protocol/services/crypto/protocol_service.dart' as _i9;
+import 'package:echo_protocol/services/crypto/protocol_service.dart' as _i10;
 import 'package:echo_protocol/services/database/app_database.dart' as _i3;
 import 'package:mockito/mockito.dart' as _i1;
-import 'package:mockito/src/dummies.dart' as _i10;
+import 'package:mockito/src/dummies.dart' as _i11;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -151,10 +153,22 @@ class _FakeConversationDaoManager_19 extends _i1.SmartFake
     : super(parent, parentInvocation);
 }
 
+class _Fake$BlockedUsersTable_20 extends _i1.SmartFake
+    implements _i3.$BlockedUsersTable {
+  _Fake$BlockedUsersTable_20(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeBlockedUserDaoManager_21 extends _i1.SmartFake
+    implements _i9.BlockedUserDaoManager {
+  _FakeBlockedUserDaoManager_21(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
 /// A class which mocks [ProtocolService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockProtocolService extends _i1.Mock implements _i9.ProtocolService {
+class MockProtocolService extends _i1.Mock implements _i10.ProtocolService {
   MockProtocolService() {
     _i1.throwOnMissingStub(this);
   }
@@ -189,7 +203,7 @@ class MockProtocolService extends _i1.Mock implements _i9.ProtocolService {
       (super.noSuchMethod(
             Invocation.method(#generateRecoveryPhrase, []),
             returnValue: _i7.Future<String>.value(
-              _i10.dummyValue<String>(
+              _i11.dummyValue<String>(
                 this,
                 Invocation.method(#generateRecoveryPhrase, []),
               ),
@@ -237,7 +251,7 @@ class MockProtocolService extends _i1.Mock implements _i9.ProtocolService {
               #senderId: senderId,
             }),
             returnValue: _i7.Future<String>.value(
-              _i10.dummyValue<String>(
+              _i11.dummyValue<String>(
                 this,
                 Invocation.method(#encryptMessage, [], {
                   #plaintext: plaintext,
@@ -262,7 +276,7 @@ class MockProtocolService extends _i1.Mock implements _i9.ProtocolService {
               #myUserId: myUserId,
             }),
             returnValue: _i7.Future<String>.value(
-              _i10.dummyValue<String>(
+              _i11.dummyValue<String>(
                 this,
                 Invocation.method(#decryptMessage, [], {
                   #encryptedContent: encryptedContent,
@@ -297,7 +311,7 @@ class MockProtocolService extends _i1.Mock implements _i9.ProtocolService {
     required String? plaintext,
     required String? senderId,
     required String? recipientId,
-    required _i11.Uint8List? recipientPublicKey,
+    required _i12.Uint8List? recipientPublicKey,
   }) =>
       (super.noSuchMethod(
             Invocation.method(#sealEnvelope, [], {
@@ -332,14 +346,14 @@ class MockProtocolService extends _i1.Mock implements _i9.ProtocolService {
             }),
             returnValue:
                 _i7.Future<({String plaintext, String senderId})>.value((
-                  plaintext: _i10.dummyValue<String>(
+                  plaintext: _i11.dummyValue<String>(
                     this,
                     Invocation.method(#unsealEnvelope, [], {
                       #envelope: envelope,
                       #myUserId: myUserId,
                     }),
                   ),
-                  senderId: _i10.dummyValue<String>(
+                  senderId: _i11.dummyValue<String>(
                     this,
                     Invocation.method(#unsealEnvelope, [], {
                       #envelope: envelope,
@@ -375,21 +389,21 @@ class MockProtocolService extends _i1.Mock implements _i9.ProtocolService {
           as _i7.Future<String?>);
 
   @override
-  _i7.Future<({_i11.Uint8List publicKey, _i11.Uint8List signature})> sign(
-    _i11.Uint8List? data,
+  _i7.Future<({_i12.Uint8List publicKey, _i12.Uint8List signature})> sign(
+    _i12.Uint8List? data,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#sign, [data]),
             returnValue:
                 _i7.Future<
-                  ({_i11.Uint8List publicKey, _i11.Uint8List signature})
+                  ({_i12.Uint8List publicKey, _i12.Uint8List signature})
                 >.value((
-                  publicKey: _i11.Uint8List(0),
-                  signature: _i11.Uint8List(0),
+                  publicKey: _i12.Uint8List(0),
+                  signature: _i12.Uint8List(0),
                 )),
           )
           as _i7.Future<
-            ({_i11.Uint8List publicKey, _i11.Uint8List signature})
+            ({_i12.Uint8List publicKey, _i12.Uint8List signature})
           >);
 
   @override
@@ -420,10 +434,10 @@ class MockProtocolService extends _i1.Mock implements _i9.ProtocolService {
 
   @override
   _i7.Future<
-    ({_i11.Uint8List encrypted, String mediaId, _i11.Uint8List mediaKey})
+    ({_i12.Uint8List encrypted, String mediaId, _i12.Uint8List mediaKey})
   >
   encryptMedia({
-    required _i11.Uint8List? plainBytes,
+    required _i12.Uint8List? plainBytes,
     required String? recipientId,
     required String? senderId,
   }) =>
@@ -436,13 +450,13 @@ class MockProtocolService extends _i1.Mock implements _i9.ProtocolService {
             returnValue:
                 _i7.Future<
                   ({
-                    _i11.Uint8List encrypted,
+                    _i12.Uint8List encrypted,
                     String mediaId,
-                    _i11.Uint8List mediaKey,
+                    _i12.Uint8List mediaKey,
                   })
                 >.value((
-                  encrypted: _i11.Uint8List(0),
-                  mediaId: _i10.dummyValue<String>(
+                  encrypted: _i12.Uint8List(0),
+                  mediaId: _i11.dummyValue<String>(
                     this,
                     Invocation.method(#encryptMedia, [], {
                       #plainBytes: plainBytes,
@@ -450,22 +464,22 @@ class MockProtocolService extends _i1.Mock implements _i9.ProtocolService {
                       #senderId: senderId,
                     }),
                   ),
-                  mediaKey: _i11.Uint8List(0),
+                  mediaKey: _i12.Uint8List(0),
                 )),
           )
           as _i7.Future<
             ({
-              _i11.Uint8List encrypted,
+              _i12.Uint8List encrypted,
               String mediaId,
-              _i11.Uint8List mediaKey,
+              _i12.Uint8List mediaKey,
             })
           >);
 
   @override
-  _i7.Future<_i11.Uint8List> decryptMedia({
-    required _i11.Uint8List? encryptedBytes,
+  _i7.Future<_i12.Uint8List> decryptMedia({
+    required _i12.Uint8List? encryptedBytes,
     required String? mediaId,
-    required _i11.Uint8List? mediaKey,
+    required _i12.Uint8List? mediaKey,
   }) =>
       (super.noSuchMethod(
             Invocation.method(#decryptMedia, [], {
@@ -473,9 +487,9 @@ class MockProtocolService extends _i1.Mock implements _i9.ProtocolService {
               #mediaId: mediaId,
               #mediaKey: mediaKey,
             }),
-            returnValue: _i7.Future<_i11.Uint8List>.value(_i11.Uint8List(0)),
+            returnValue: _i7.Future<_i12.Uint8List>.value(_i12.Uint8List(0)),
           )
-          as _i7.Future<_i11.Uint8List>);
+          as _i7.Future<_i12.Uint8List>);
 
   @override
   _i7.Future<void> deleteMedia({required String? mediaId}) =>
@@ -490,7 +504,7 @@ class MockProtocolService extends _i1.Mock implements _i9.ProtocolService {
   _i7.Future<String> downloadAndDecryptMedia({
     required String? encryptedUrl,
     required String? mediaId,
-    required _i11.Uint8List? mediaKey,
+    required _i12.Uint8List? mediaKey,
     required bool? isVideo,
   }) =>
       (super.noSuchMethod(
@@ -501,7 +515,7 @@ class MockProtocolService extends _i1.Mock implements _i9.ProtocolService {
               #isVideo: isVideo,
             }),
             returnValue: _i7.Future<String>.value(
-              _i10.dummyValue<String>(
+              _i11.dummyValue<String>(
                 this,
                 Invocation.method(#downloadAndDecryptMedia, [], {
                   #encryptedUrl: encryptedUrl,
@@ -583,7 +597,7 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
   _i4.SqlTypes get typeMapping =>
       (super.noSuchMethod(
             Invocation.getter(#typeMapping),
-            returnValue: _i10.dummyValue<_i4.SqlTypes>(
+            returnValue: _i11.dummyValue<_i4.SqlTypes>(
               this,
               Invocation.getter(#typeMapping),
             ),
@@ -657,7 +671,7 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
           as _i6.MessageDaoManager);
 
   @override
-  _i7.Future<void> insert(_i12.LocalMessage? message) =>
+  _i7.Future<void> insert(_i13.LocalMessage? message) =>
       (super.noSuchMethod(
             Invocation.method(#insert, [message]),
             returnValue: _i7.Future<void>.value(),
@@ -666,7 +680,7 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
           as _i7.Future<void>);
 
   @override
-  _i7.Future<void> insertBatch(List<_i12.LocalMessage>? messageList) =>
+  _i7.Future<void> insertBatch(List<_i13.LocalMessage>? messageList) =>
       (super.noSuchMethod(
             Invocation.method(#insertBatch, [messageList]),
             returnValue: _i7.Future<void>.value(),
@@ -675,7 +689,7 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
           as _i7.Future<void>);
 
   @override
-  _i7.Future<void> updateMessage(_i12.LocalMessage? message) =>
+  _i7.Future<void> updateMessage(_i13.LocalMessage? message) =>
       (super.noSuchMethod(
             Invocation.method(#updateMessage, [message]),
             returnValue: _i7.Future<void>.value(),
@@ -702,15 +716,15 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
           as _i7.Future<void>);
 
   @override
-  _i7.Future<_i12.LocalMessage?> getById(String? id) =>
+  _i7.Future<_i13.LocalMessage?> getById(String? id) =>
       (super.noSuchMethod(
             Invocation.method(#getById, [id]),
-            returnValue: _i7.Future<_i12.LocalMessage?>.value(),
+            returnValue: _i7.Future<_i13.LocalMessage?>.value(),
           )
-          as _i7.Future<_i12.LocalMessage?>);
+          as _i7.Future<_i13.LocalMessage?>);
 
   @override
-  _i7.Future<List<_i12.LocalMessage>> getByConversation(
+  _i7.Future<List<_i13.LocalMessage>> getByConversation(
     String? conversationId, {
     int? limit = 50,
     int? offset = 0,
@@ -721,14 +735,14 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
               [conversationId],
               {#limit: limit, #offset: offset},
             ),
-            returnValue: _i7.Future<List<_i12.LocalMessage>>.value(
-              <_i12.LocalMessage>[],
+            returnValue: _i7.Future<List<_i13.LocalMessage>>.value(
+              <_i13.LocalMessage>[],
             ),
           )
-          as _i7.Future<List<_i12.LocalMessage>>);
+          as _i7.Future<List<_i13.LocalMessage>>);
 
   @override
-  _i7.Future<List<_i12.LocalMessage>> getMessagesBefore(
+  _i7.Future<List<_i13.LocalMessage>> getMessagesBefore(
     String? conversationId,
     DateTime? before, {
     int? limit = 50,
@@ -739,35 +753,35 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
               [conversationId, before],
               {#limit: limit},
             ),
-            returnValue: _i7.Future<List<_i12.LocalMessage>>.value(
-              <_i12.LocalMessage>[],
+            returnValue: _i7.Future<List<_i13.LocalMessage>>.value(
+              <_i13.LocalMessage>[],
             ),
           )
-          as _i7.Future<List<_i12.LocalMessage>>);
+          as _i7.Future<List<_i13.LocalMessage>>);
 
   @override
-  _i7.Future<List<_i12.LocalMessage>> getMessagesAfter(
+  _i7.Future<List<_i13.LocalMessage>> getMessagesAfter(
     String? conversationId,
     DateTime? after,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#getMessagesAfter, [conversationId, after]),
-            returnValue: _i7.Future<List<_i12.LocalMessage>>.value(
-              <_i12.LocalMessage>[],
+            returnValue: _i7.Future<List<_i13.LocalMessage>>.value(
+              <_i13.LocalMessage>[],
             ),
           )
-          as _i7.Future<List<_i12.LocalMessage>>);
+          as _i7.Future<List<_i13.LocalMessage>>);
 
   @override
-  _i7.Future<_i12.LocalMessage?> getLatestMessage(String? conversationId) =>
+  _i7.Future<_i13.LocalMessage?> getLatestMessage(String? conversationId) =>
       (super.noSuchMethod(
             Invocation.method(#getLatestMessage, [conversationId]),
-            returnValue: _i7.Future<_i12.LocalMessage?>.value(),
+            returnValue: _i7.Future<_i13.LocalMessage?>.value(),
           )
-          as _i7.Future<_i12.LocalMessage?>);
+          as _i7.Future<_i13.LocalMessage?>);
 
   @override
-  _i7.Future<void> updateStatus(String? id, _i12.LocalMessageStatus? status) =>
+  _i7.Future<void> updateStatus(String? id, _i13.LocalMessageStatus? status) =>
       (super.noSuchMethod(
             Invocation.method(#updateStatus, [id, status]),
             returnValue: _i7.Future<void>.value(),
@@ -785,14 +799,14 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
           as _i7.Future<void>);
 
   @override
-  _i7.Future<List<_i12.LocalMessage>> getUnsyncedMessages({int? limit = 100}) =>
+  _i7.Future<List<_i13.LocalMessage>> getUnsyncedMessages({int? limit = 100}) =>
       (super.noSuchMethod(
             Invocation.method(#getUnsyncedMessages, [], {#limit: limit}),
-            returnValue: _i7.Future<List<_i12.LocalMessage>>.value(
-              <_i12.LocalMessage>[],
+            returnValue: _i7.Future<List<_i13.LocalMessage>>.value(
+              <_i13.LocalMessage>[],
             ),
           )
-          as _i7.Future<List<_i12.LocalMessage>>);
+          as _i7.Future<List<_i13.LocalMessage>>);
 
   @override
   _i7.Future<int> getMessageCount(String? conversationId) =>
@@ -826,14 +840,14 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
           as _i7.Future<int>);
 
   @override
-  _i7.Stream<List<_i12.LocalMessage>> watchConversation(
+  _i7.Stream<List<_i13.LocalMessage>> watchConversation(
     String? conversationId,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#watchConversation, [conversationId]),
-            returnValue: _i7.Stream<List<_i12.LocalMessage>>.empty(),
+            returnValue: _i7.Stream<List<_i13.LocalMessage>>.empty(),
           )
-          as _i7.Stream<List<_i12.LocalMessage>>);
+          as _i7.Stream<List<_i13.LocalMessage>>);
 
   @override
   _i7.Stream<T> createStream<T extends Object>(
@@ -849,7 +863,7 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
   T alias<T, D>(_i4.ResultSetImplementation<T, D>? table, String? alias) =>
       (super.noSuchMethod(
             Invocation.method(#alias, [table, alias]),
-            returnValue: _i10.dummyValue<T>(
+            returnValue: _i11.dummyValue<T>(
               this,
               Invocation.method(#alias, [table, alias]),
             ),
@@ -886,8 +900,8 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
       (super.noSuchMethod(
             Invocation.method(#doWhenOpened, [fn]),
             returnValue:
-                _i10.ifNotNull(
-                  _i10.dummyValueOrNull<T>(
+                _i11.ifNotNull(
+                  _i11.dummyValueOrNull<T>(
                     this,
                     Invocation.method(#doWhenOpened, [fn]),
                   ),
@@ -1102,8 +1116,8 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
               {#requireNew: requireNew},
             ),
             returnValue:
-                _i10.ifNotNull(
-                  _i10.dummyValueOrNull<T>(
+                _i11.ifNotNull(
+                  _i11.dummyValueOrNull<T>(
                     this,
                     Invocation.method(
                       #transaction,
@@ -1129,8 +1143,8 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
       (super.noSuchMethod(
             Invocation.method(#exclusively, [action]),
             returnValue:
-                _i10.ifNotNull(
-                  _i10.dummyValueOrNull<T>(
+                _i11.ifNotNull(
+                  _i11.dummyValueOrNull<T>(
                     this,
                     Invocation.method(#exclusively, [action]),
                   ),
@@ -1164,8 +1178,8 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
               {#interceptor: interceptor},
             ),
             returnValue:
-                _i10.ifNotNull(
-                  _i10.dummyValueOrNull<T>(
+                _i11.ifNotNull(
+                  _i11.dummyValueOrNull<T>(
                     this,
                     Invocation.method(
                       #runWithInterceptor,
@@ -1239,7 +1253,7 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
   String $expandVar(int? start, int? amount) =>
       (super.noSuchMethod(
             Invocation.method(#$expandVar, [start, amount]),
-            returnValue: _i10.dummyValue<String>(
+            returnValue: _i11.dummyValue<String>(
               this,
               Invocation.method(#$expandVar, [start, amount]),
             ),
@@ -1301,7 +1315,7 @@ class MockConversationDao extends _i1.Mock implements _i8.ConversationDao {
   _i4.SqlTypes get typeMapping =>
       (super.noSuchMethod(
             Invocation.getter(#typeMapping),
-            returnValue: _i10.dummyValue<_i4.SqlTypes>(
+            returnValue: _i11.dummyValue<_i4.SqlTypes>(
               this,
               Invocation.getter(#typeMapping),
             ),
@@ -1364,7 +1378,7 @@ class MockConversationDao extends _i1.Mock implements _i8.ConversationDao {
           as _i8.ConversationDaoManager);
 
   @override
-  _i7.Future<void> insert(_i13.LocalConversation? conversation) =>
+  _i7.Future<void> insert(_i14.LocalConversation? conversation) =>
       (super.noSuchMethod(
             Invocation.method(#insert, [conversation]),
             returnValue: _i7.Future<void>.value(),
@@ -1373,7 +1387,7 @@ class MockConversationDao extends _i1.Mock implements _i8.ConversationDao {
           as _i7.Future<void>);
 
   @override
-  _i7.Future<void> updateConversation(_i13.LocalConversation? conversation) =>
+  _i7.Future<void> updateConversation(_i14.LocalConversation? conversation) =>
       (super.noSuchMethod(
             Invocation.method(#updateConversation, [conversation]),
             returnValue: _i7.Future<void>.value(),
@@ -1391,38 +1405,38 @@ class MockConversationDao extends _i1.Mock implements _i8.ConversationDao {
           as _i7.Future<void>);
 
   @override
-  _i7.Future<_i13.LocalConversation?> getById(String? id) =>
+  _i7.Future<_i14.LocalConversation?> getById(String? id) =>
       (super.noSuchMethod(
             Invocation.method(#getById, [id]),
-            returnValue: _i7.Future<_i13.LocalConversation?>.value(),
+            returnValue: _i7.Future<_i14.LocalConversation?>.value(),
           )
-          as _i7.Future<_i13.LocalConversation?>);
+          as _i7.Future<_i14.LocalConversation?>);
 
   @override
-  _i7.Future<_i13.LocalConversation?> getByRecipientId(String? recipientId) =>
+  _i7.Future<_i14.LocalConversation?> getByRecipientId(String? recipientId) =>
       (super.noSuchMethod(
             Invocation.method(#getByRecipientId, [recipientId]),
-            returnValue: _i7.Future<_i13.LocalConversation?>.value(),
+            returnValue: _i7.Future<_i14.LocalConversation?>.value(),
           )
-          as _i7.Future<_i13.LocalConversation?>);
+          as _i7.Future<_i14.LocalConversation?>);
 
   @override
-  _i7.Future<List<_i13.LocalConversation>> getAll() =>
+  _i7.Future<List<_i14.LocalConversation>> getAll() =>
       (super.noSuchMethod(
             Invocation.method(#getAll, []),
-            returnValue: _i7.Future<List<_i13.LocalConversation>>.value(
-              <_i13.LocalConversation>[],
+            returnValue: _i7.Future<List<_i14.LocalConversation>>.value(
+              <_i14.LocalConversation>[],
             ),
           )
-          as _i7.Future<List<_i13.LocalConversation>>);
+          as _i7.Future<List<_i14.LocalConversation>>);
 
   @override
-  _i7.Stream<List<_i13.LocalConversation>> watchAll() =>
+  _i7.Stream<List<_i14.LocalConversation>> watchAll() =>
       (super.noSuchMethod(
             Invocation.method(#watchAll, []),
-            returnValue: _i7.Stream<List<_i13.LocalConversation>>.empty(),
+            returnValue: _i7.Stream<List<_i14.LocalConversation>>.empty(),
           )
-          as _i7.Stream<List<_i13.LocalConversation>>);
+          as _i7.Stream<List<_i14.LocalConversation>>);
 
   @override
   _i7.Future<void> updateLastMessage({
@@ -1481,7 +1495,7 @@ class MockConversationDao extends _i1.Mock implements _i8.ConversationDao {
   T alias<T, D>(_i4.ResultSetImplementation<T, D>? table, String? alias) =>
       (super.noSuchMethod(
             Invocation.method(#alias, [table, alias]),
-            returnValue: _i10.dummyValue<T>(
+            returnValue: _i11.dummyValue<T>(
               this,
               Invocation.method(#alias, [table, alias]),
             ),
@@ -1518,8 +1532,8 @@ class MockConversationDao extends _i1.Mock implements _i8.ConversationDao {
       (super.noSuchMethod(
             Invocation.method(#doWhenOpened, [fn]),
             returnValue:
-                _i10.ifNotNull(
-                  _i10.dummyValueOrNull<T>(
+                _i11.ifNotNull(
+                  _i11.dummyValueOrNull<T>(
                     this,
                     Invocation.method(#doWhenOpened, [fn]),
                   ),
@@ -1734,8 +1748,8 @@ class MockConversationDao extends _i1.Mock implements _i8.ConversationDao {
               {#requireNew: requireNew},
             ),
             returnValue:
-                _i10.ifNotNull(
-                  _i10.dummyValueOrNull<T>(
+                _i11.ifNotNull(
+                  _i11.dummyValueOrNull<T>(
                     this,
                     Invocation.method(
                       #transaction,
@@ -1761,8 +1775,8 @@ class MockConversationDao extends _i1.Mock implements _i8.ConversationDao {
       (super.noSuchMethod(
             Invocation.method(#exclusively, [action]),
             returnValue:
-                _i10.ifNotNull(
-                  _i10.dummyValueOrNull<T>(
+                _i11.ifNotNull(
+                  _i11.dummyValueOrNull<T>(
                     this,
                     Invocation.method(#exclusively, [action]),
                   ),
@@ -1796,8 +1810,8 @@ class MockConversationDao extends _i1.Mock implements _i8.ConversationDao {
               {#interceptor: interceptor},
             ),
             returnValue:
-                _i10.ifNotNull(
-                  _i10.dummyValueOrNull<T>(
+                _i11.ifNotNull(
+                  _i11.dummyValueOrNull<T>(
                     this,
                     Invocation.method(
                       #runWithInterceptor,
@@ -1871,7 +1885,587 @@ class MockConversationDao extends _i1.Mock implements _i8.ConversationDao {
   String $expandVar(int? start, int? amount) =>
       (super.noSuchMethod(
             Invocation.method(#$expandVar, [start, amount]),
-            returnValue: _i10.dummyValue<String>(
+            returnValue: _i11.dummyValue<String>(
+              this,
+              Invocation.method(#$expandVar, [start, amount]),
+            ),
+          )
+          as String);
+
+  @override
+  _i7.Future<void> close() =>
+      (super.noSuchMethod(
+            Invocation.method(#close, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+}
+
+/// A class which mocks [BlockedUserDao].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockBlockedUserDao extends _i1.Mock implements _i9.BlockedUserDao {
+  MockBlockedUserDao() {
+    _i1.throwOnMissingStub(this);
+  }
+
+  @override
+  _i3.AppDatabase get attachedDatabase =>
+      (super.noSuchMethod(
+            Invocation.getter(#attachedDatabase),
+            returnValue: _FakeAppDatabase_1(
+              this,
+              Invocation.getter(#attachedDatabase),
+            ),
+          )
+          as _i3.AppDatabase);
+
+  @override
+  _i4.DatabaseConnection get connection =>
+      (super.noSuchMethod(
+            Invocation.getter(#connection),
+            returnValue: _FakeDatabaseConnection_2(
+              this,
+              Invocation.getter(#connection),
+            ),
+          )
+          as _i4.DatabaseConnection);
+
+  @override
+  _i4.DriftDatabaseOptions get options =>
+      (super.noSuchMethod(
+            Invocation.getter(#options),
+            returnValue: _FakeDriftDatabaseOptions_3(
+              this,
+              Invocation.getter(#options),
+            ),
+          )
+          as _i4.DriftDatabaseOptions);
+
+  @override
+  _i4.SqlTypes get typeMapping =>
+      (super.noSuchMethod(
+            Invocation.getter(#typeMapping),
+            returnValue: _i11.dummyValue<_i4.SqlTypes>(
+              this,
+              Invocation.getter(#typeMapping),
+            ),
+          )
+          as _i4.SqlTypes);
+
+  @override
+  _i4.QueryExecutor get executor =>
+      (super.noSuchMethod(
+            Invocation.getter(#executor),
+            returnValue: _FakeQueryExecutor_4(
+              this,
+              Invocation.getter(#executor),
+            ),
+          )
+          as _i4.QueryExecutor);
+
+  @override
+  _i5.StreamQueryStore get streamQueries =>
+      (super.noSuchMethod(
+            Invocation.getter(#streamQueries),
+            returnValue: _FakeStreamQueryStore_5(
+              this,
+              Invocation.getter(#streamQueries),
+            ),
+          )
+          as _i5.StreamQueryStore);
+
+  @override
+  _i4.DatabaseConnectionUser get resolvedEngine =>
+      (super.noSuchMethod(
+            Invocation.getter(#resolvedEngine),
+            returnValue: _FakeDatabaseConnectionUser_6(
+              this,
+              Invocation.getter(#resolvedEngine),
+            ),
+          )
+          as _i4.DatabaseConnectionUser);
+
+  @override
+  _i3.$BlockedUsersTable get blockedUsers =>
+      (super.noSuchMethod(
+            Invocation.getter(#blockedUsers),
+            returnValue: _Fake$BlockedUsersTable_20(
+              this,
+              Invocation.getter(#blockedUsers),
+            ),
+          )
+          as _i3.$BlockedUsersTable);
+
+  @override
+  _i9.BlockedUserDaoManager get managers =>
+      (super.noSuchMethod(
+            Invocation.getter(#managers),
+            returnValue: _FakeBlockedUserDaoManager_21(
+              this,
+              Invocation.getter(#managers),
+            ),
+          )
+          as _i9.BlockedUserDaoManager);
+
+  @override
+  _i7.Future<void> block(String? userId, {String? reason}) =>
+      (super.noSuchMethod(
+            Invocation.method(#block, [userId], {#reason: reason}),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> unblock(String? userId) =>
+      (super.noSuchMethod(
+            Invocation.method(#unblock, [userId]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<bool> isBlocked(String? userId) =>
+      (super.noSuchMethod(
+            Invocation.method(#isBlocked, [userId]),
+            returnValue: _i7.Future<bool>.value(false),
+          )
+          as _i7.Future<bool>);
+
+  @override
+  _i7.Future<_i15.LocalBlockedUser?> getByUserId(String? userId) =>
+      (super.noSuchMethod(
+            Invocation.method(#getByUserId, [userId]),
+            returnValue: _i7.Future<_i15.LocalBlockedUser?>.value(),
+          )
+          as _i7.Future<_i15.LocalBlockedUser?>);
+
+  @override
+  _i7.Future<List<_i15.LocalBlockedUser>> getAll() =>
+      (super.noSuchMethod(
+            Invocation.method(#getAll, []),
+            returnValue: _i7.Future<List<_i15.LocalBlockedUser>>.value(
+              <_i15.LocalBlockedUser>[],
+            ),
+          )
+          as _i7.Future<List<_i15.LocalBlockedUser>>);
+
+  @override
+  _i7.Future<int> getCount() =>
+      (super.noSuchMethod(
+            Invocation.method(#getCount, []),
+            returnValue: _i7.Future<int>.value(0),
+          )
+          as _i7.Future<int>);
+
+  @override
+  _i7.Stream<T> createStream<T extends Object>(
+    _i5.QueryStreamFetcher<T>? stmt,
+  ) =>
+      (super.noSuchMethod(
+            Invocation.method(#createStream, [stmt]),
+            returnValue: _i7.Stream<T>.empty(),
+          )
+          as _i7.Stream<T>);
+
+  @override
+  T alias<T, D>(_i4.ResultSetImplementation<T, D>? table, String? alias) =>
+      (super.noSuchMethod(
+            Invocation.method(#alias, [table, alias]),
+            returnValue: _i11.dummyValue<T>(
+              this,
+              Invocation.method(#alias, [table, alias]),
+            ),
+          )
+          as T);
+
+  @override
+  void markTablesUpdated(Iterable<_i4.TableInfo<_i4.Table, dynamic>>? tables) =>
+      super.noSuchMethod(
+        Invocation.method(#markTablesUpdated, [tables]),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void notifyUpdates(Set<_i4.TableUpdate>? updates) => super.noSuchMethod(
+    Invocation.method(#notifyUpdates, [updates]),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  _i7.Stream<Set<_i4.TableUpdate>> tableUpdates([
+    _i4.TableUpdateQuery? query = const _i4.TableUpdateQuery.any(),
+  ]) =>
+      (super.noSuchMethod(
+            Invocation.method(#tableUpdates, [query]),
+            returnValue: _i7.Stream<Set<_i4.TableUpdate>>.empty(),
+          )
+          as _i7.Stream<Set<_i4.TableUpdate>>);
+
+  @override
+  _i7.Future<T> doWhenOpened<T>(
+    _i7.FutureOr<T> Function(_i4.QueryExecutor)? fn,
+  ) =>
+      (super.noSuchMethod(
+            Invocation.method(#doWhenOpened, [fn]),
+            returnValue:
+                _i11.ifNotNull(
+                  _i11.dummyValueOrNull<T>(
+                    this,
+                    Invocation.method(#doWhenOpened, [fn]),
+                  ),
+                  (T v) => _i7.Future<T>.value(v),
+                ) ??
+                _FakeFuture_10<T>(this, Invocation.method(#doWhenOpened, [fn])),
+          )
+          as _i7.Future<T>);
+
+  @override
+  _i4.InsertStatement<T, D> into<T extends _i4.Table, D>(
+    _i4.TableInfo<T, D>? table,
+  ) =>
+      (super.noSuchMethod(
+            Invocation.method(#into, [table]),
+            returnValue: _FakeInsertStatement_11<T, D>(
+              this,
+              Invocation.method(#into, [table]),
+            ),
+          )
+          as _i4.InsertStatement<T, D>);
+
+  @override
+  _i4.UpdateStatement<Tbl, R> update<Tbl extends _i4.Table, R>(
+    _i4.TableInfo<Tbl, R>? table,
+  ) =>
+      (super.noSuchMethod(
+            Invocation.method(#update, [table]),
+            returnValue: _FakeUpdateStatement_12<Tbl, R>(
+              this,
+              Invocation.method(#update, [table]),
+            ),
+          )
+          as _i4.UpdateStatement<Tbl, R>);
+
+  @override
+  _i4.SimpleSelectStatement<T, R> select<T extends _i4.HasResultSet, R>(
+    _i4.ResultSetImplementation<T, R>? table, {
+    bool? distinct = false,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#select, [table], {#distinct: distinct}),
+            returnValue: _FakeSimpleSelectStatement_13<T, R>(
+              this,
+              Invocation.method(#select, [table], {#distinct: distinct}),
+            ),
+          )
+          as _i4.SimpleSelectStatement<T, R>);
+
+  @override
+  _i4.JoinedSelectStatement<T, R> selectOnly<T extends _i4.HasResultSet, R>(
+    _i4.ResultSetImplementation<T, R>? table, {
+    bool? distinct = false,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#selectOnly, [table], {#distinct: distinct}),
+            returnValue: _FakeJoinedSelectStatement_14<T, R>(
+              this,
+              Invocation.method(#selectOnly, [table], {#distinct: distinct}),
+            ),
+          )
+          as _i4.JoinedSelectStatement<T, R>);
+
+  @override
+  _i4.BaseSelectStatement<_i4.TypedResult> selectExpressions(
+    Iterable<_i4.Expression<Object>>? columns,
+  ) =>
+      (super.noSuchMethod(
+            Invocation.method(#selectExpressions, [columns]),
+            returnValue: _FakeBaseSelectStatement_15<_i4.TypedResult>(
+              this,
+              Invocation.method(#selectExpressions, [columns]),
+            ),
+          )
+          as _i4.BaseSelectStatement<_i4.TypedResult>);
+
+  @override
+  _i4.DeleteStatement<T, D> delete<T extends _i4.Table, D>(
+    _i4.TableInfo<T, D>? table,
+  ) =>
+      (super.noSuchMethod(
+            Invocation.method(#delete, [table]),
+            returnValue: _FakeDeleteStatement_16<T, D>(
+              this,
+              Invocation.method(#delete, [table]),
+            ),
+          )
+          as _i4.DeleteStatement<T, D>);
+
+  @override
+  _i7.Future<int> customUpdate(
+    String? query, {
+    List<_i4.Variable<Object>>? variables = const [],
+    Set<_i4.ResultSetImplementation<dynamic, dynamic>>? updates,
+    _i4.UpdateKind? updateKind,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #customUpdate,
+              [query],
+              {
+                #variables: variables,
+                #updates: updates,
+                #updateKind: updateKind,
+              },
+            ),
+            returnValue: _i7.Future<int>.value(0),
+          )
+          as _i7.Future<int>);
+
+  @override
+  _i7.Future<int> customInsert(
+    String? query, {
+    List<_i4.Variable<Object>>? variables = const [],
+    Set<_i4.ResultSetImplementation<dynamic, dynamic>>? updates,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #customInsert,
+              [query],
+              {#variables: variables, #updates: updates},
+            ),
+            returnValue: _i7.Future<int>.value(0),
+          )
+          as _i7.Future<int>);
+
+  @override
+  _i7.Future<List<_i4.QueryRow>> customWriteReturning(
+    String? query, {
+    List<_i4.Variable<Object>>? variables = const [],
+    Set<_i4.ResultSetImplementation<dynamic, dynamic>>? updates,
+    _i4.UpdateKind? updateKind,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #customWriteReturning,
+              [query],
+              {
+                #variables: variables,
+                #updates: updates,
+                #updateKind: updateKind,
+              },
+            ),
+            returnValue: _i7.Future<List<_i4.QueryRow>>.value(<_i4.QueryRow>[]),
+          )
+          as _i7.Future<List<_i4.QueryRow>>);
+
+  @override
+  _i4.Selectable<_i4.QueryRow> customSelect(
+    String? query, {
+    List<_i4.Variable<Object>>? variables = const [],
+    Set<_i4.ResultSetImplementation<dynamic, dynamic>>? readsFrom = const {},
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #customSelect,
+              [query],
+              {#variables: variables, #readsFrom: readsFrom},
+            ),
+            returnValue: _FakeSelectable_17<_i4.QueryRow>(
+              this,
+              Invocation.method(
+                #customSelect,
+                [query],
+                {#variables: variables, #readsFrom: readsFrom},
+              ),
+            ),
+          )
+          as _i4.Selectable<_i4.QueryRow>);
+
+  @override
+  _i4.Selectable<_i4.QueryRow> customSelectQuery(
+    String? query, {
+    List<_i4.Variable<Object>>? variables = const [],
+    Set<_i4.ResultSetImplementation<dynamic, dynamic>>? readsFrom = const {},
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #customSelectQuery,
+              [query],
+              {#variables: variables, #readsFrom: readsFrom},
+            ),
+            returnValue: _FakeSelectable_17<_i4.QueryRow>(
+              this,
+              Invocation.method(
+                #customSelectQuery,
+                [query],
+                {#variables: variables, #readsFrom: readsFrom},
+              ),
+            ),
+          )
+          as _i4.Selectable<_i4.QueryRow>);
+
+  @override
+  _i7.Future<void> customStatement(String? statement, [List<dynamic>? args]) =>
+      (super.noSuchMethod(
+            Invocation.method(#customStatement, [statement, args]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<T> transaction<T>(
+    _i7.Future<T> Function()? action, {
+    bool? requireNew = false,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #transaction,
+              [action],
+              {#requireNew: requireNew},
+            ),
+            returnValue:
+                _i11.ifNotNull(
+                  _i11.dummyValueOrNull<T>(
+                    this,
+                    Invocation.method(
+                      #transaction,
+                      [action],
+                      {#requireNew: requireNew},
+                    ),
+                  ),
+                  (T v) => _i7.Future<T>.value(v),
+                ) ??
+                _FakeFuture_10<T>(
+                  this,
+                  Invocation.method(
+                    #transaction,
+                    [action],
+                    {#requireNew: requireNew},
+                  ),
+                ),
+          )
+          as _i7.Future<T>);
+
+  @override
+  _i7.Future<T> exclusively<T>(_i7.Future<T> Function()? action) =>
+      (super.noSuchMethod(
+            Invocation.method(#exclusively, [action]),
+            returnValue:
+                _i11.ifNotNull(
+                  _i11.dummyValueOrNull<T>(
+                    this,
+                    Invocation.method(#exclusively, [action]),
+                  ),
+                  (T v) => _i7.Future<T>.value(v),
+                ) ??
+                _FakeFuture_10<T>(
+                  this,
+                  Invocation.method(#exclusively, [action]),
+                ),
+          )
+          as _i7.Future<T>);
+
+  @override
+  _i7.Future<void> batch(_i7.FutureOr<void> Function(_i4.Batch)? runInBatch) =>
+      (super.noSuchMethod(
+            Invocation.method(#batch, [runInBatch]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<T> runWithInterceptor<T>(
+    _i7.Future<T> Function()? action, {
+    required _i4.QueryInterceptor? interceptor,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #runWithInterceptor,
+              [action],
+              {#interceptor: interceptor},
+            ),
+            returnValue:
+                _i11.ifNotNull(
+                  _i11.dummyValueOrNull<T>(
+                    this,
+                    Invocation.method(
+                      #runWithInterceptor,
+                      [action],
+                      {#interceptor: interceptor},
+                    ),
+                  ),
+                  (T v) => _i7.Future<T>.value(v),
+                ) ??
+                _FakeFuture_10<T>(
+                  this,
+                  Invocation.method(
+                    #runWithInterceptor,
+                    [action],
+                    {#interceptor: interceptor},
+                  ),
+                ),
+          )
+          as _i7.Future<T>);
+
+  @override
+  _i4.GenerationContext $write(
+    _i4.Component? component, {
+    bool? hasMultipleTables,
+    int? startIndex,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #$write,
+              [component],
+              {#hasMultipleTables: hasMultipleTables, #startIndex: startIndex},
+            ),
+            returnValue: _FakeGenerationContext_18(
+              this,
+              Invocation.method(
+                #$write,
+                [component],
+                {
+                  #hasMultipleTables: hasMultipleTables,
+                  #startIndex: startIndex,
+                },
+              ),
+            ),
+          )
+          as _i4.GenerationContext);
+
+  @override
+  _i4.GenerationContext $writeInsertable(
+    _i4.TableInfo<_i4.Table, dynamic>? table,
+    _i4.Insertable<dynamic>? insertable, {
+    int? startIndex,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #$writeInsertable,
+              [table, insertable],
+              {#startIndex: startIndex},
+            ),
+            returnValue: _FakeGenerationContext_18(
+              this,
+              Invocation.method(
+                #$writeInsertable,
+                [table, insertable],
+                {#startIndex: startIndex},
+              ),
+            ),
+          )
+          as _i4.GenerationContext);
+
+  @override
+  String $expandVar(int? start, int? amount) =>
+      (super.noSuchMethod(
+            Invocation.method(#$expandVar, [start, amount]),
+            returnValue: _i11.dummyValue<String>(
               this,
               Invocation.method(#$expandVar, [start, amount]),
             ),

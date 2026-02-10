@@ -26,5 +26,4 @@ export interface InboxMessage {
   };
   deliveredAt: FirebaseFirestore.Timestamp;
   expireAt: FirebaseFirestore.Timestamp;
-  isOutgoing: boolean;
 }

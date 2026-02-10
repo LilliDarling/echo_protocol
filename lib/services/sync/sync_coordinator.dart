@@ -105,6 +105,7 @@ class SyncCoordinator {
       protocol: _protocol,
       messageDao: _messageDao,
       conversationDao: _conversationDao,
+      blockedUserDao: _database!.blockedUserDao,
       myUserId: userId,
     );
 
@@ -145,8 +146,8 @@ class SyncCoordinator {
         final processed = await processor.processInboxMessage(message);
         if (processed != null) {
           _messageController.add(processed);
-          await _inboxListener.deleteMessage(message.id);
         }
+        await _inboxListener.deleteMessage(message.id);
       }
     } finally {
       _isProcessingQueue = false;

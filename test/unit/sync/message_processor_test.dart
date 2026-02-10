@@ -7,6 +7,7 @@ import 'package:echo_protocol/models/local/message.dart';
 import 'package:echo_protocol/models/local/conversation.dart';
 import 'package:echo_protocol/repositories/message_dao.dart';
 import 'package:echo_protocol/repositories/conversation_dao.dart';
+import 'package:echo_protocol/repositories/blocked_user_dao.dart';
 import 'package:echo_protocol/services/crypto/protocol_service.dart';
 import 'package:echo_protocol/services/sync/inbox_listener.dart';
 import 'package:echo_protocol/services/sync/message_processor.dart';
@@ -15,6 +16,7 @@ import 'package:echo_protocol/services/sync/message_processor.dart';
   ProtocolService,
   MessageDao,
   ConversationDao,
+  BlockedUserDao,
 ])
 import 'message_processor_test.mocks.dart';
 
@@ -24,23 +26,27 @@ void main() {
     late MockProtocolService mockProtocol;
     late MockMessageDao mockMessageDao;
     late MockConversationDao mockConversationDao;
+    late MockBlockedUserDao mockBlockedUserDao;
     const myUserId = 'my_user_id';
 
     setUp(() {
       mockProtocol = MockProtocolService();
       mockMessageDao = MockMessageDao();
       mockConversationDao = MockConversationDao();
+      mockBlockedUserDao = MockBlockedUserDao();
 
       when(mockMessageDao.transaction(any)).thenAnswer((invocation) async {
         final callback = invocation.positionalArguments[0] as Future<void> Function();
         await callback();
       });
       when(mockMessageDao.getById(any)).thenAnswer((_) async => null);
+      when(mockBlockedUserDao.isBlocked(any)).thenAnswer((_) async => false);
 
       processor = MessageProcessor(
         protocol: mockProtocol,
         messageDao: mockMessageDao,
         conversationDao: mockConversationDao,
+        blockedUserDao: mockBlockedUserDao,
         myUserId: myUserId,
       );
     });
@@ -207,6 +213,40 @@ void main() {
           envelope: anyNamed('envelope'),
           myUserId: anyNamed('myUserId'),
         ));
+        verifyNever(mockMessageDao.insert(any));
+        verifyNever(mockConversationDao.incrementUnreadCount(any));
+      });
+
+      test('drops message from blocked user without storing', () async {
+        final envelope = SealedEnvelope(
+          recipientId: myUserId,
+          encryptedPayload: Uint8List.fromList(List.generate(100, (i) => i)),
+          ephemeralPublicKey: Uint8List(32),
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+          expireAt: DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
+        );
+
+        final inboxMessage = InboxMessage(
+          id: 'msg_blocked',
+          envelope: envelope,
+          deliveredAt: DateTime.now(),
+        );
+
+        when(mockProtocol.unsealEnvelope(
+          envelope: anyNamed('envelope'),
+          myUserId: anyNamed('myUserId'),
+        )).thenAnswer((_) async => (senderId: 'blocked_user', plaintext: 'Unwanted message'));
+
+        when(mockBlockedUserDao.isBlocked('blocked_user')).thenAnswer((_) async => true);
+
+        final result = await processor.processInboxMessage(inboxMessage);
+
+        expect(result, isNull);
+        verify(mockProtocol.unsealEnvelope(
+          envelope: anyNamed('envelope'),
+          myUserId: anyNamed('myUserId'),
+        )).called(1);
+        verify(mockBlockedUserDao.isBlocked('blocked_user')).called(1);
         verifyNever(mockMessageDao.insert(any));
         verifyNever(mockConversationDao.incrementUnreadCount(any));
       });
