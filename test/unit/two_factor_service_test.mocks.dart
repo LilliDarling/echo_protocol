@@ -1473,6 +1473,12 @@ class MockSecureStorageService extends _i1.Mock
           as _i5.Future<String?>);
 
   @override
+  void clearSessionCache() => super.noSuchMethod(
+    Invocation.method(#clearSessionCache, []),
+    returnValueForMissingStub: null,
+  );
+
+  @override
   _i5.Future<void> clearAll() =>
       (super.noSuchMethod(
             Invocation.method(#clearAll, []),
@@ -1718,6 +1724,49 @@ class MockSecureStorageService extends _i1.Mock
             returnValueForMissingStub: _i5.Future<void>.value(),
           )
           as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> storeDatabaseKey(String? key) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeDatabaseKey, [key]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<String?> getDatabaseKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#getDatabaseKey, []),
+            returnValue: _i5.Future<String?>.value(),
+          )
+          as _i5.Future<String?>);
+
+  @override
+  _i5.Future<void> deleteDatabaseKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#deleteDatabaseKey, []),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> storeSequenceCounters(String? json) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeSequenceCounters, [json]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<String?> getSequenceCounters() =>
+      (super.noSuchMethod(
+            Invocation.method(#getSequenceCounters, []),
+            returnValue: _i5.Future<String?>.value(),
+          )
+          as _i5.Future<String?>);
 
   @override
   _i5.Future<bool> get2FASessionVerified() =>

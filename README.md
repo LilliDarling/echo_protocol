@@ -15,7 +15,7 @@ Echo Protocol is a Flutter-based mobile app that gives partners a dedicated spac
 - **Link Previews**: Automatic rich previews for shared URLs
 - **Typing Indicators**: See when your partner is typing in real-time
 - **Read Receipts**: Know when your messages have been delivered and read
-- **Message Status Tracking**: Visual indicators for pending, sent, delivered, and read states
+- **Message Status Tracking**: Visual indicators for pending, sent, delivered, and failed states
 - **Offline Support**: Queue messages while offline for automatic delivery when reconnected
 
 ### Shared Planning
@@ -24,17 +24,21 @@ Echo Protocol is a Flutter-based mobile app that gives partners a dedicated spac
 - **Shared Experiences**: Track activities you've done together and things you want to do in the future *(planned)*
 
 ### Security & Privacy
+- **Sealed Sender**: Sender identity hidden inside encrypted envelope (ephemeral X25519 ECDH + AES-256-GCM), server cannot see who sent a message
 - **X3DH Key Exchange**: Extended Triple Diffie-Hellman for secure session establishment
 - **Double Ratchet Protocol**: Per-message key derivation with forward and future secrecy
 - **End-to-End Encryption**: AES-256-GCM encryption for all messages and media
+- **Message Padding**: Power-of-2 bucket padding (128B–64KB) prevents ciphertext length analysis
 - **Per-Message Keys**: Each message uses a unique encryption key
 - **Forward Secrecy**: Past messages remain secure even if current keys are compromised
 - **Future Secrecy**: Compromised keys are healed by subsequent ratchet steps
 - **Media Encryption**: Independent per-file keys for images, videos, and GIFs
+- **Local Database Encryption**: SQLCipher with AES-256, secure memory wiping, and secure delete
 - **Public Key Fingerprint Verification**: Verify conversation partners via QR codes or security codes
 - **Replay Attack Protection**: Per-conversation sequence numbers and nonce tracking
 - **Rate Limiting**: Soft blocking with exponential backoff (30 msg/min, 500/hour)
-- **Two-Factor Authentication**: TOTP-based 2FA with backup codes
+- **Blocked User Enforcement**: Messages from blocked users silently dropped after decryption
+- **Two-Factor Authentication**: TOTP-based 2FA with backup codes and rate limiting on all 2FA operations
 - **Recovery Phrases**: BIP39 12-word mnemonic phrases for account recovery
 - **Device Management**: Link multiple devices with encrypted private key transfer
 - **Secure Storage**: Platform-specific secure storage (iOS Keychain, Android EncryptedSharedPreferences)
@@ -181,24 +185,28 @@ This project is currently in active development.
 - ✅ User authentication (email/password, Google Sign-In)
 - ✅ Two-factor authentication (TOTP + backup codes)
 - ✅ BIP39 recovery phrase generation and verification
+- ✅ Sealed sender messaging (sender identity hidden in encrypted envelope)
 - ✅ X3DH key exchange (Extended Triple Diffie-Hellman)
 - ✅ Double Ratchet protocol with forward and future secrecy
 - ✅ Per-message key derivation
 - ✅ End-to-end encryption (AES-256-GCM)
+- ✅ Message padding (power-of-2 buckets to prevent length analysis)
 - ✅ Media encryption with independent per-file keys
+- ✅ SQLCipher local database encryption with secure memory wiping
 - ✅ Out-of-order message handling
 - ✅ Public key fingerprint verification
 - ✅ Signed prekey generation and validation
 - ✅ One-time prekey management
 - ✅ Replay attack protection (sequence numbers + nonce tracking)
 - ✅ Rate limiting (global + per-conversation with soft blocking)
+- ✅ Blocked user enforcement (messages silently dropped)
 - ✅ Device linking and management
 - ✅ Secure key storage
 - ✅ Messaging interface with conversation view
 - ✅ Media sharing (images, videos, GIFs) with encryption
 - ✅ Link previews for shared URLs
 - ✅ Typing indicators
-- ✅ Read receipts and delivery status
+- ✅ Delivery status tracking
 - ✅ Offline message queue
 - ✅ Partner linking via invite codes
 
@@ -214,13 +222,16 @@ The following server-side functions handle security-critical operations:
 
 | Function | Purpose |
 |----------|---------|
+| `deliverMessage` | Sealed envelope delivery with rate limiting and replay protection |
+| `uploadPreKeys` | Upload signed prekey and one-time prekeys |
+| `getPreKeyBundle` | Fetch recipient's prekey bundle for X3DH |
+| `checkPreKeyCount` | Check if one-time prekeys need replenishment |
+| `acceptPartnerInvite` | Partner linking and key exchange |
 | `enable2FA` | Generate TOTP secret and backup codes |
 | `verify2FATOTP` | Server-side TOTP validation with rate limiting |
 | `verify2FABackupCode` | Validate and consume backup codes |
 | `disable2FA` | Remove 2FA from account |
 | `regenerateBackupCodes` | Generate new backup codes |
-| `validateMessageSend` | Message validation, rate limiting, replay protection |
-| `acceptPartnerInvite` | Partner linking and key exchange |
 
 ## Security Configuration
 

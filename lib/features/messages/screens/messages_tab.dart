@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../../services/partner.dart';
+import '../../../services/sync/sync_coordinator.dart';
+import '../../../models/local/conversation.dart';
 import 'partner_linking.dart';
 import 'conversation.dart';
 
@@ -14,12 +14,14 @@ class MessagesTab extends StatefulWidget {
 
 class _MessagesTabState extends State<MessagesTab> {
   final PartnerService _partnerService = PartnerService();
+  final SyncCoordinator _syncCoordinator = SyncCoordinator();
 
   bool _isLoading = true;
   bool _hasInitializedEncryption = false;
   PartnerInfo? _partner;
   String? _conversationId;
   String? _error;
+  LocalConversation? _cachedConversation;
 
   @override
   void initState() {
@@ -42,6 +44,10 @@ class _MessagesTabState extends State<MessagesTab> {
         await _partnerService.initializePartnerEncryption();
       }
 
+      if (conversationId != null) {
+        await _loadCachedConversationData(conversationId);
+      }
+
       if (mounted) {
         setState(() {
           _partner = partner;
@@ -56,6 +62,20 @@ class _MessagesTabState extends State<MessagesTab> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _loadCachedConversationData(String conversationId) async {
+    try {
+      final conversations = await _syncCoordinator.getConversations();
+      final cached = conversations.where((c) => c.id == conversationId).firstOrNull;
+      if (cached != null && mounted) {
+        setState(() {
+          _cachedConversation = cached;
+        });
+      }
+    } catch (_) {
+      // Ignore cache errors
     }
   }
 
@@ -115,6 +135,7 @@ class _MessagesTabState extends State<MessagesTab> {
     return _ConversationPreview(
       partner: _partner!,
       conversationId: _conversationId!,
+      cachedConversation: _cachedConversation,
     );
   }
 }
@@ -122,18 +143,13 @@ class _MessagesTabState extends State<MessagesTab> {
 class _ConversationPreview extends StatelessWidget {
   final PartnerInfo partner;
   final String conversationId;
+  final LocalConversation? cachedConversation;
 
   const _ConversationPreview({
     required this.partner,
     required this.conversationId,
+    this.cachedConversation,
   });
-
-  String _decryptPreview(String? encryptedMessage) {
-    if (encryptedMessage == null || encryptedMessage.isEmpty) {
-      return 'Start a conversation';
-    }
-    return 'Tap to view message';
-  }
 
   String _truncatePreview(String text, {int maxLength = 50}) {
     if (text.length <= maxLength) return text;
@@ -142,47 +158,44 @@ class _ConversationPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    String displayMessage;
+    DateTime? lastMessageAt;
+    int unreadCount;
 
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('conversations')
-          .doc(conversationId)
-          .snapshots(),
-      builder: (context, snapshot) {
-        final conversationData = snapshot.data?.data() as Map<String, dynamic>?;
-        final lastMessageEncrypted = conversationData?['lastMessage'] as String?;
-        final lastMessageAt = conversationData?['lastMessageAt'] as Timestamp?;
-        final unreadCounts =
-            conversationData?['unreadCount'] as Map<String, dynamic>?;
-        final myUnreadCount = unreadCounts?[currentUserId] as int? ?? 0;
-        final decryptedPreview = _decryptPreview(lastMessageEncrypted);
-        final displayMessage = _truncatePreview(decryptedPreview);
+    if (cachedConversation != null) {
+      final content = cachedConversation!.lastMessageContent;
+      displayMessage = content != null && content.isNotEmpty
+          ? _truncatePreview(content)
+          : 'Start a conversation';
+      lastMessageAt = cachedConversation!.lastMessageAt;
+      unreadCount = cachedConversation!.unreadCount;
+    } else {
+      displayMessage = 'Start a conversation';
+      unreadCount = 0;
+    }
 
-        return Column(
-          children: [
-            Expanded(
-              child: ListView(
-                children: [
-                  _buildConversationTile(
-                    context,
-                    lastMessage: displayMessage,
-                    lastMessageAt: lastMessageAt,
-                    unreadCount: myUnreadCount,
-                  ),
-                ],
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            children: [
+              _buildConversationTile(
+                context,
+                lastMessage: displayMessage,
+                lastMessageAt: lastMessageAt,
+                unreadCount: unreadCount,
               ),
-            ),
-          ],
-        );
-      },
+            ],
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildConversationTile(
     BuildContext context, {
     String? lastMessage,
-    Timestamp? lastMessageAt,
+    DateTime? lastMessageAt,
     int unreadCount = 0,
   }) {
     return Card(
@@ -245,7 +258,7 @@ class _ConversationPreview extends StatelessWidget {
                         ),
                         if (lastMessageAt != null)
                           Text(
-                            _formatTimestamp(lastMessageAt.toDate()),
+                            _formatTimestamp(lastMessageAt),
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade500,

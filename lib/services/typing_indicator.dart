@@ -3,8 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TypingIndicatorService {
   final FirebaseFirestore _db;
-  final String conversationId;
   final String currentUserId;
+  final String partnerId;
 
   Timer? _typingTimer;
   Timer? _debounceTimer;
@@ -14,6 +14,7 @@ class TypingIndicatorService {
 
   static const Duration _typingTimeout = Duration(seconds: 3);
   static const Duration _debounceDelay = Duration(milliseconds: 300);
+  static const Duration _signalTtl = Duration(seconds: 30);
 
   set enabled(bool value) => _enabled = value;
 
@@ -21,32 +22,27 @@ class TypingIndicatorService {
   Stream<bool> get partnerTypingStream => _partnerTypingController.stream;
 
   TypingIndicatorService({
-    required this.conversationId,
     required this.currentUserId,
+    required this.partnerId,
     FirebaseFirestore? firestore,
   }) : _db = firestore ?? FirebaseFirestore.instance;
 
-  DocumentReference get _conversationRef =>
-      _db.collection('conversations').doc(conversationId);
+  DocumentReference get _mySignalRef =>
+      _db.collection('typing_signals').doc(partnerId).collection('from').doc(currentUserId);
+
+  CollectionReference get _incomingSignalsRef =>
+      _db.collection('typing_signals').doc(currentUserId).collection('from');
 
   void startListening() {
-    _partnerTypingSubscription = _conversationRef.snapshots().listen((snapshot) {
-      if (!snapshot.exists) return;
-
-      final data = snapshot.data() as Map<String, dynamic>?;
-      if (data == null) return;
-
-      final typing = data['typing'] as Map<String, dynamic>? ?? {};
-
-      final partnerTyping = typing.entries
-          .where((e) => e.key != currentUserId)
-          .any((e) {
-            final timestamp = e.value as Timestamp?;
-            if (timestamp == null) return false;
-            final typingTime = timestamp.toDate();
-            return DateTime.now().difference(typingTime) < _typingTimeout;
-          });
-
+    _partnerTypingSubscription = _incomingSignalsRef.snapshots().listen((snapshot) {
+      final now = DateTime.now();
+      final partnerTyping = snapshot.docs.any((doc) {
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data == null) return false;
+        final timestamp = data['timestamp'] as Timestamp?;
+        if (timestamp == null) return false;
+        return now.difference(timestamp.toDate()) < _typingTimeout;
+      });
       _partnerTypingController.add(partnerTyping);
     });
   }
@@ -83,17 +79,16 @@ class TypingIndicatorService {
 
   Future<void> _updateTypingStatus() async {
     try {
-      await _conversationRef.update({
-        'typing.$currentUserId': FieldValue.serverTimestamp(),
+      await _mySignalRef.set({
+        'timestamp': FieldValue.serverTimestamp(),
+        'expireAt': Timestamp.fromDate(DateTime.now().add(_signalTtl)),
       });
     } catch (_) {}
   }
 
   Future<void> _clearTypingStatus() async {
     try {
-      await _conversationRef.update({
-        'typing.$currentUserId': FieldValue.delete(),
-      });
+      await _mySignalRef.delete();
     } catch (_) {}
   }
 

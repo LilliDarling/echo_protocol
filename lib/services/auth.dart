@@ -226,6 +226,8 @@ class AuthService {
   }
 
   Future<void> signOut() async {
+    _secureStorage.clearSessionCache();
+
     if (!kIsWeb) {
       try {
         await GoogleSignIn.instance.signOut();

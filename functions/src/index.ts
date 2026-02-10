@@ -16,7 +16,7 @@ export {verify2FABackupCode} from "./functions/verify2FABackupCode.js";
 export {enable2FA} from "./functions/enable2FA.js";
 export {disable2FA} from "./functions/disable2FA.js";
 export {regenerateBackupCodes} from "./functions/regenerateBackupCodes.js";
-export {sendMessage} from "./functions/sendMessage.js";
+export {deliverMessage} from "./functions/deliverMessage.js";
 export {acceptPartnerInvite} from "./functions/acceptPartnerInvite.js";
 export {getPreKeyBundle} from "./functions/getPreKeyBundle.js";
 export {uploadPreKeys} from "./functions/uploadPreKeys.js";

@@ -3,19 +3,13 @@ import 'dart:convert';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/echo.dart';
+import '../models/local/message.dart';
 
 class PendingMessage {
   final String id;
   final String conversationId;
-  final String senderId;
   final String recipientId;
-  final String plaintext;
-  final String encryptedContent;
-  final EchoType type;
-  final EchoMetadata metadata;
-  final int senderKeyVersion;
-  final int recipientKeyVersion;
+  final Map<String, dynamic> sealedEnvelope;
   final int sequenceNumber;
   final DateTime createdAt;
   int retryCount;
@@ -25,14 +19,8 @@ class PendingMessage {
   PendingMessage({
     required this.id,
     required this.conversationId,
-    required this.senderId,
     required this.recipientId,
-    required this.plaintext,
-    required this.encryptedContent,
-    required this.type,
-    required this.metadata,
-    required this.senderKeyVersion,
-    required this.recipientKeyVersion,
+    required this.sealedEnvelope,
     required this.sequenceNumber,
     required this.createdAt,
     this.retryCount = 0,
@@ -40,16 +28,15 @@ class PendingMessage {
     this.lastError,
   });
 
+  LocalMessageStatus get status => retryCount >= OfflineQueueService.maxRetries
+      ? LocalMessageStatus.failed
+      : LocalMessageStatus.pending;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'conversationId': conversationId,
-        'senderId': senderId,
         'recipientId': recipientId,
-        'encryptedContent': encryptedContent,
-        'type': type.value,
-        'metadata': metadata.toJson(),
-        'senderKeyVersion': senderKeyVersion,
-        'recipientKeyVersion': recipientKeyVersion,
+        'sealedEnvelope': sealedEnvelope,
         'sequenceNumber': sequenceNumber,
         'createdAt': createdAt.toIso8601String(),
         'retryCount': retryCount,
@@ -60,14 +47,8 @@ class PendingMessage {
   factory PendingMessage.fromJson(Map<String, dynamic> json) => PendingMessage(
         id: json['id'] as String,
         conversationId: json['conversationId'] as String,
-        senderId: json['senderId'] as String,
         recipientId: json['recipientId'] as String,
-        plaintext: '',
-        encryptedContent: json['encryptedContent'] as String,
-        type: EchoType.fromString(json['type'] as String),
-        metadata: EchoMetadata.fromJson(json['metadata'] as Map<String, dynamic>),
-        senderKeyVersion: json['senderKeyVersion'] as int,
-        recipientKeyVersion: json['recipientKeyVersion'] as int,
+        sealedEnvelope: Map<String, dynamic>.from(json['sealedEnvelope'] as Map),
         sequenceNumber: json['sequenceNumber'] as int,
         createdAt: DateTime.parse(json['createdAt'] as String),
         retryCount: json['retryCount'] as int? ?? 0,
@@ -75,23 +56,6 @@ class PendingMessage {
             ? DateTime.parse(json['lastRetryAt'] as String)
             : null,
         lastError: json['lastError'] as String?,
-      );
-
-  EchoModel toEchoModel() => EchoModel(
-        id: id,
-        senderId: senderId,
-        recipientId: recipientId,
-        content: encryptedContent,
-        timestamp: createdAt,
-        type: type,
-        status: retryCount >= OfflineQueueService.maxRetries
-            ? EchoStatus.failed
-            : EchoStatus.pending,
-        metadata: metadata,
-        senderKeyVersion: senderKeyVersion,
-        recipientKeyVersion: recipientKeyVersion,
-        sequenceNumber: sequenceNumber,
-        conversationId: conversationId,
       );
 }
 
@@ -176,27 +140,15 @@ class OfflineQueueService {
   Future<PendingMessage> enqueue({
     required String messageId,
     required String conversationId,
-    required String senderId,
     required String recipientId,
-    required String plaintext,
-    required String encryptedContent,
-    required EchoType type,
-    required EchoMetadata metadata,
-    required int senderKeyVersion,
-    required int recipientKeyVersion,
+    required Map<String, dynamic> sealedEnvelope,
     required int sequenceNumber,
   }) async {
     final pending = PendingMessage(
       id: messageId,
       conversationId: conversationId,
-      senderId: senderId,
       recipientId: recipientId,
-      plaintext: plaintext,
-      encryptedContent: encryptedContent,
-      type: type,
-      metadata: metadata,
-      senderKeyVersion: senderKeyVersion,
-      recipientKeyVersion: recipientKeyVersion,
+      sealedEnvelope: sealedEnvelope,
       sequenceNumber: sequenceNumber,
       createdAt: DateTime.now(),
     );
@@ -266,23 +218,11 @@ class OfflineQueueService {
       pending.lastRetryAt = DateTime.now();
       _statusController.add({pending.id: pending});
 
-      final result = await _functions.httpsCallable('sendMessage').call({
+      final result = await _functions.httpsCallable('deliverMessage').call({
         'messageId': pending.id,
-        'conversationId': pending.conversationId,
         'recipientId': pending.recipientId,
-        'content': pending.encryptedContent,
+        'sealedEnvelope': pending.sealedEnvelope,
         'sequenceNumber': pending.sequenceNumber,
-        'timestamp': pending.createdAt.millisecondsSinceEpoch,
-        'senderKeyVersion': pending.senderKeyVersion,
-        'recipientKeyVersion': pending.recipientKeyVersion,
-        'type': pending.type.value,
-        'metadata': pending.metadata.toJson(),
-        if (pending.type == EchoType.image || pending.type == EchoType.video)
-          'mediaType': pending.type.name,
-        if (pending.metadata.fileUrl != null)
-          'mediaUrl': pending.metadata.fileUrl,
-        if (pending.metadata.thumbnailUrl != null)
-          'thumbnailUrl': pending.metadata.thumbnailUrl,
       });
 
       final data = Map<String, dynamic>.from(result.data as Map);

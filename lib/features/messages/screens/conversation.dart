@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/theme_provider.dart';
 import '../../../models/echo.dart';
+import '../../../models/local/message.dart';
 import '../../../services/partner.dart';
 import '../../settings/fingerprint_verification.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_input.dart';
 import '../widgets/date_separator.dart';
 import '../widgets/typing_indicator.dart';
-import '../widgets/message_options_sheet.dart';
 import 'conversation_controller.dart';
 
 class ConversationScreen extends StatefulWidget {
@@ -136,16 +136,39 @@ class _ConversationScreenState extends State<ConversationScreen>
     }
   }
 
-  void _showMessageOptions(EchoModel message, String decryptedText) {
+  void _showMessageOptions(LocalMessage message) {
     if (message.senderId != _controller.currentUserId) return;
-    if (message.isDeleted) return;
 
-    MessageOptionsSheet.show(
-      context,
-      message: message,
-      decryptedText: decryptedText,
-      onEdit: _controller.editMessage,
-      onDelete: _controller.deleteMessage,
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Delete'),
+              onTap: () {
+                Navigator.pop(context);
+                _controller.deleteMessage(EchoModel(
+                  id: message.id,
+                  senderId: message.senderId,
+                  recipientId: '',
+                  content: '',
+                  timestamp: message.timestamp,
+                  type: EchoType.text,
+                  status: EchoStatus.sent,
+                  metadata: EchoMetadata.empty(),
+                  conversationId: message.conversationId,
+                  senderKeyVersion: 1,
+                  recipientKeyVersion: 1,
+                  sequenceNumber: 0,
+                ));
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -462,37 +485,90 @@ class _ConversationScreenState extends State<ConversationScreen>
         }
 
         final messageIndex = _controller.isLoadingMore ? index - 1 : index;
-        final message = _controller.messages[messageIndex];
-        final isMe = message.senderId == _controller.currentUserId;
-        final decryptedText = _controller.contentCache.get(message.id) ?? '...';
+        final localMessage = _controller.messages[messageIndex];
+        final isMe = localMessage.senderId == _controller.currentUserId;
 
         Widget? dateSeparator;
         if (messageIndex == 0 ||
-            !_isSameDay(_controller.messages[messageIndex - 1].timestamp, message.timestamp)) {
-          dateSeparator = DateSeparator(date: message.timestamp);
+            !_isSameDay(_controller.messages[messageIndex - 1].timestamp, localMessage.timestamp)) {
+          dateSeparator = DateSeparator(date: localMessage.timestamp);
         }
+
+        final echoMessage = _localToEcho(localMessage);
 
         return Column(
           children: [
             if (dateSeparator != null) dateSeparator,
             MessageBubble(
-              message: message,
-              decryptedContent: decryptedText,
+              message: echoMessage,
+              decryptedContent: localMessage.content,
               isMe: isMe,
               partnerName: widget.partner.name,
               mediaEncryptionService: _controller.mediaEncryptionService,
               myUserId: _controller.currentUserId,
-              onRetry: message.status.isFailed
-                  ? () => _controller.offlineQueue.retry(message.id)
+              onRetry: localMessage.status == LocalMessageStatus.failed
+                  ? () => _controller.offlineQueue.retry(localMessage.id)
                   : null,
-              onLongPress: isMe && !message.isDeleted
-                  ? () => _showMessageOptions(message, decryptedText)
+              onLongPress: isMe
+                  ? () => _showMessageOptions(localMessage)
                   : null,
             ),
           ],
         );
       },
     );
+  }
+
+  EchoModel _localToEcho(LocalMessage local) {
+    return EchoModel(
+      id: local.id,
+      senderId: local.senderId,
+      recipientId: local.isOutgoing ? widget.partner.id : _controller.currentUserId,
+      content: '',
+      timestamp: local.timestamp,
+      type: _convertType(local.type),
+      status: _convertStatus(local.status),
+      metadata: EchoMetadata(
+        mediaId: local.mediaId,
+        thumbnailUrl: local.thumbnailPath,
+      ),
+      conversationId: local.conversationId,
+      senderKeyVersion: 1,
+      recipientKeyVersion: 1,
+      sequenceNumber: 0,
+    );
+  }
+
+  EchoType _convertType(LocalMessageType type) {
+    switch (type) {
+      case LocalMessageType.text:
+        return EchoType.text;
+      case LocalMessageType.image:
+        return EchoType.image;
+      case LocalMessageType.video:
+        return EchoType.video;
+      case LocalMessageType.voice:
+        return EchoType.voice;
+      case LocalMessageType.link:
+        return EchoType.link;
+      case LocalMessageType.gif:
+        return EchoType.gif;
+    }
+  }
+
+  EchoStatus _convertStatus(LocalMessageStatus status) {
+    switch (status) {
+      case LocalMessageStatus.pending:
+        return EchoStatus.pending;
+      case LocalMessageStatus.sent:
+        return EchoStatus.sent;
+      case LocalMessageStatus.delivered:
+        return EchoStatus.delivered;
+      case LocalMessageStatus.read:
+        return EchoStatus.read;
+      case LocalMessageStatus.failed:
+        return EchoStatus.failed;
+    }
   }
 
   Widget _buildEmptyState() {

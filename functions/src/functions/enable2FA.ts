@@ -5,6 +5,7 @@ import * as speakeasy from "speakeasy";
 import {validateRequest} from "../utils/validation.js";
 import {hashBackupCode} from "../utils/hashing.js";
 import {generateBackupCodes} from "../utils/random.js";
+import {checkUserRateLimit, checkIpRateLimit} from "../services/rateLimit.js";
 import {TOTP_CONFIG} from "../config/constants.js";
 import {db} from "../firebase.js";
 
@@ -17,6 +18,9 @@ export const enable2FA = onCall(
     const ip = request.rawRequest.ip || "unknown";
 
     logger.info("2FA setup initiated");
+
+    await checkIpRateLimit(db, ip, userId);
+    await checkUserRateLimit(db, userId, "TOTP");
 
     try {
       const secret = speakeasy.generateSecret({

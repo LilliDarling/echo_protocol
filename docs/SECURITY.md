@@ -9,9 +9,10 @@ Echo Protocol implements **end-to-end encryption (E2EE)** to ensure that all mes
 ### Multi-Layer Security
 
 1. **Transport Layer**: HTTPS/TLS encryption for all data in transit
-2. **Application Layer**: X3DH + Double Ratchet for message content
-3. **Storage Layer**: Platform-specific secure storage for private keys
-4. **Media Layer**: Per-file encryption with unique keys
+2. **Sealed Sender Layer**: Ephemeral X25519 ECDH + AES-256-GCM envelope hides sender identity from server
+3. **Application Layer**: X3DH + Double Ratchet for message content
+4. **Storage Layer**: SQLCipher-encrypted local database + platform-specific secure storage for private keys
+5. **Media Layer**: Per-file encryption with unique keys
 
 ### Key Management
 
@@ -110,37 +111,42 @@ Root Key ────► DH Ratchet ────► New Root Key
 ```
 1. Sender types message (plaintext)
 2. Double Ratchet advances chain and derives unique message key
-3. Nonce derived from message key via HKDF (12 bytes)
-4. Construct associated data (sender ID, recipient ID, ratchet key, message index)
-5. Encrypt plaintext with AES-256-GCM using message key + nonce + AAD
-6. GCM generates authentication tag (prevents tampering)
-7. Package: [nonce | ciphertext | auth tag | ratchet public key | message index]
-8. Store encrypted message in Firestore
-9. Recipient retrieves encrypted message
-10. Double Ratchet locates or derives correct message key
-11. Verify AAD matches expected values
-12. Decrypt and verify authentication tag
-13. Securely delete message key from memory
-14. Display plaintext
+3. Encrypt plaintext with AES-256-GCM using message key
+4. Build sender certificate (sender ID + Ed25519 public key + signature)
+5. Assemble inner payload: [certificate length | certificate | encrypted message]
+6. Pad inner payload to power-of-2 bucket (128B–64KB) with random fill
+7. Generate ephemeral X25519 key pair
+8. ECDH with recipient's X25519 public key → shared secret
+9. HKDF-SHA256 derives sealed sender encryption key
+10. Encrypt padded payload with AES-256-GCM → sealed envelope
+11. Clear all intermediate key material from memory
+12. Deliver sealed envelope to recipient's inbox via cloud function
+13. Recipient performs ECDH with ephemeral public key → shared secret
+14. Decrypt sealed envelope → recover padded inner payload
+15. Unpad and extract sender certificate + encrypted message
+16. Verify sender certificate signature (Ed25519)
+17. Double Ratchet decrypts the inner message
+18. Securely clear all intermediate buffers
+19. Display plaintext
 ```
 
 ### What's Encrypted vs. Unencrypted
 
 #### Encrypted (Unreadable in Database)
 - ✅ Message content (text)
+- ✅ Sender identity (inside sealed envelope, extracted only by recipient)
+- ✅ Message type (inside sealed envelope)
+- ✅ Sender certificate and signature (inside sealed envelope)
 - ✅ File data (images, videos, voice messages)
 - ✅ Link URLs in messages
-- ✅ Gift idea descriptions (optional)
-- ✅ Date idea descriptions (optional)
 
-#### Unencrypted (Metadata for functionality)
-- ❌ Sender ID
-- ❌ Recipient ID
-- ❌ Timestamp
-- ❌ Message type (text/image/video/voice/link)
-- ❌ Status (sent/delivered/read)
+#### Unencrypted (Metadata visible to server)
+- ❌ Recipient ID (inbox routing requires knowing the recipient)
+- ❌ Delivery timestamp (server-generated)
+- ❌ Envelope expiry time
+- ❌ Ciphertext size (mitigated by power-of-2 padding buckets)
 - ❌ User names and avatars
-- ❌ File names (but not content)
+- ❌ Partnership relationship (`users.partnerId` in Firestore)
 
 ### Media Encryption
 
@@ -172,6 +178,71 @@ Images, videos, and GIFs are encrypted independently with unique per-file keys:
 - **Authenticated Encryption**: Tampering detection via GCM
 - **Secure Caching**: Decrypted media cached in app-private storage
 
+### Sealed Sender
+
+Sealed sender prevents the server from learning who sent a message to whom on a per-message basis. The sender's identity is hidden inside the encrypted envelope and only revealed to the recipient after decryption.
+
+#### How It Works
+```
+1. Sender creates a SenderCertificate:
+   - Contains: sender ID + Ed25519 public key + timestamp
+   - Signed with sender's Ed25519 private key
+2. Build inner payload: [certificate length (2 bytes) | certificate | Double Ratchet ciphertext]
+3. Pad to power-of-2 bucket (128, 256, 512, ... 65536 bytes):
+   - Format: [4-byte big-endian length | payload | random fill]
+   - Random fill prevents pattern analysis
+4. Generate ephemeral X25519 key pair (single use)
+5. ECDH: ephemeral private key × recipient's X25519 public key → shared secret
+6. HKDF-SHA256 derives encryption key:
+   - IKM: shared secret
+   - Salt: "SealedSender-v1"
+   - Info: ephemeral public key || recipient public key
+7. Encrypt padded payload with AES-256-GCM
+8. Package: [12-byte nonce | ciphertext | 16-byte GCM tag]
+9. Securely clear: shared secret, encryption key, padded payload, inner payload
+```
+
+#### Security Properties
+- **Sender Anonymity**: Server sees only the recipient ID and encrypted blob
+- **Forward Secrecy**: Ephemeral key pair generated per message, never reused
+- **Authenticated Sender**: Recipient verifies Ed25519 signature on sender certificate
+- **Size Obfuscation**: Power-of-2 padding hides exact message length
+- **Key Material Hygiene**: All intermediate secrets cleared from memory after use
+
+#### What the Server Sees
+```
+Inbox document:
+  sealedEnvelope:
+    payload: <base64 encrypted blob>     # opaque
+    ephemeralKey: <base64 32-byte key>    # single-use, not linkable
+    timestamp: <creation time>
+    expireAt: <24-hour TTL>
+  deliveredAt: <server timestamp>
+  expireAt: <7-day retention TTL>
+```
+
+The server cannot determine sender ID, message content, or message type from the inbox document.
+
+### Local Database Encryption
+
+All local data is stored in a SQLCipher-encrypted database.
+
+#### Configuration
+- **Encryption**: AES-256 via SQLCipher
+- **Key**: 32-byte random key stored in platform secure storage
+- **PRAGMAs**:
+  - `cipher_memory_security = ON`: Wipe SQLCipher internal memory on free
+  - `cipher_page_size = 4096`: Explicit page size for version consistency
+  - `secure_delete = ON`: Overwrite deleted data with zeros
+  - `temp_store = MEMORY`: Temp tables in memory, not on disk
+  - `foreign_keys = ON`: Referential integrity
+
+#### What's Stored Locally
+- Decrypted message content (for display without re-decrypting)
+- Conversation metadata (last message preview, unread count)
+- Blocked user list
+- Message status (pending/sent/delivered/failed)
+
 ### Security Guarantees
 
 ✅ **Forward Secrecy**: Compromise of current keys cannot decrypt past messages
@@ -180,7 +251,11 @@ Images, videos, and GIFs are encrypted independently with unique per-file keys:
 ✅ **Authenticated Encryption**: GCM mode prevents tampering and forgery
 ✅ **Replay Attack Protection**: Per-conversation sequence numbers and nonce tracking
 ✅ **Rate Limiting**: Soft blocking with exponential backoff prevents spam and abuse
+✅ **Sealed Sender**: Server cannot see who sent a message
+✅ **Message Padding**: Power-of-2 buckets prevent ciphertext length analysis
+✅ **Blocked User Enforcement**: Messages from blocked users dropped after decryption
 ✅ **Zero-Knowledge**: Server cannot read messages
+✅ **Local DB Encryption**: SQLCipher with secure memory wiping and secure delete
 ✅ **Device-Only Private Keys**: Private keys never transmitted
 ✅ **Platform Security**: Leverages iOS Keychain / Android KeyStore
 ✅ **Industry-Standard Encryption**: X25519 + AES-256-GCM + HKDF-SHA256
@@ -205,7 +280,8 @@ Images, videos, and GIFs are encrypted independently with unique per-file keys:
 #### Not Protected Against:
 - ❌ Compromised device (malware can read decrypted messages in memory)
 - ❌ Partner's device access (they can decrypt messages sent to them)
-- ❌ Metadata analysis (who/when communication occurs is visible) - currently being updated
+- ❌ Server-side relationship metadata (`users.partnerId` reveals partnership; sealed sender hides per-message sender but server knows the relationship exists)
+- ❌ Timing analysis (delivery timestamps visible to server)
 
 ## Implementation Notes
 
@@ -235,20 +311,29 @@ Images, videos, and GIFs are encrypted independently with unique per-file keys:
 ### Message Send/Receive Flow
 ```
 Sending:
-1. Advance sending chain ratchet
-2. Derive unique message key from chain
-3. Encrypt message with AES-256-GCM
-4. Include current ratchet public key
-5. Store encrypted message in Firestore
-6. Securely clear message key
+1. Advance sending chain ratchet → derive unique message key
+2. Encrypt plaintext with AES-256-GCM (Double Ratchet inner layer)
+3. Build sender certificate with Ed25519 signature
+4. Assemble inner payload → pad to power-of-2 bucket with random fill
+5. Generate ephemeral X25519 key pair
+6. ECDH with recipient's X25519 public key → derive sealed sender key via HKDF
+7. Encrypt padded payload with AES-256-GCM (sealed sender outer layer)
+8. Clear all intermediate key material from memory
+9. Deliver sealed envelope to recipient's inbox via cloud function
+10. Store local copy in SQLCipher-encrypted database
 
 Receiving:
-1. Check if new ratchet key received
-2. If new key: perform DH ratchet step
-3. Derive message key for message index
-4. Decrypt and verify authentication
-5. Update receiving chain state
-6. Securely clear message key
+1. Firestore snapshot listener delivers sealed envelope from inbox
+2. Check message ID for duplicate (idempotent reprocessing)
+3. ECDH with ephemeral public key → derive decryption key via HKDF
+4. Decrypt sealed envelope → unpad inner payload
+5. Verify sender certificate (Ed25519 signature)
+6. Extract sender ID from certificate (sealed sender reveal)
+7. Check if sender is blocked → drop silently if yes
+8. Double Ratchet decrypts inner message (DH ratchet step if needed)
+9. Store decrypted message in SQLCipher-encrypted local database
+10. Delete envelope from Firestore inbox
+11. Clear all intermediate buffers from memory
 ```
 
 ### Key Rotation
@@ -677,11 +762,17 @@ If your device is compromised:
 - [x] Per-message key derivation
 - [x] Media encryption with independent keys
 - [x] Out-of-order message handling
+- [x] Sealed sender (sender identity hidden in encrypted envelope)
+- [x] Message padding (power-of-2 buckets to prevent length analysis)
+- [x] SQLCipher local database encryption with hardened PRAGMAs
+- [x] Blocked user enforcement (messages silently dropped)
+- [ ] Cross-device message vault (encrypted sent-message sync)
+- [ ] Server-side block enforcement
+- [ ] PreKey depletion protection (rate limit bundle retrieval)
 - [ ] Add message self-destruct timer
 - [ ] Screenshot detection and warnings
 - [ ] Biometric authentication for app access
 - [ ] Remote key revocation
-- [ ] Cross-device session synchronization
 
 ---
 
