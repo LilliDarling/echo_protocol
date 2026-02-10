@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,6 +9,8 @@ import '../../repositories/message_dao.dart';
 import '../../repositories/conversation_dao.dart';
 import '../crypto/protocol_service.dart';
 import '../database/app_database.dart';
+import '../secure_storage.dart';
+import '../../utils/security.dart';
 import 'inbox_listener.dart';
 import 'message_processor.dart';
 
@@ -30,18 +33,23 @@ class SyncCoordinator {
   final _stateController = StreamController<SyncState>.broadcast();
   final _messageController = StreamController<ProcessedMessage>.broadcast();
 
+  final SecureStorageService _storage = SecureStorageService();
+  Map<String, int> _sequenceCounters = {};
+
+  final _messageQueue = <InboxMessage>[];
+  bool _isProcessingQueue = false;
+
   SyncState _state = SyncState.idle;
   String? _error;
+  bool _initialized = false;
 
-  SyncCoordinator({
-    FirebaseAuth? auth,
-    FirebaseFunctions? functions,
-    AppDatabase? database,
-    ProtocolService? protocol,
-  })  : _auth = auth ?? FirebaseAuth.instance,
-        _functions = functions ?? FirebaseFunctions.instance,
-        _database = database,
-        _protocol = protocol ?? ProtocolService() {
+  static final SyncCoordinator _instance = SyncCoordinator._internal();
+  factory SyncCoordinator() => _instance;
+
+  SyncCoordinator._internal()
+    : _auth = FirebaseAuth.instance,
+      _functions = FirebaseFunctions.instance,
+      _protocol = ProtocolService() {
     _inboxListener = InboxListener(auth: _auth);
   }
 
@@ -54,6 +62,8 @@ class SyncCoordinator {
   String? get error => _error;
 
   Future<void> initialize() async {
+    if (_initialized) return;
+
     _setState(SyncState.initializing);
 
     try {
@@ -61,6 +71,7 @@ class SyncCoordinator {
       _messageDao = _database!.messageDao;
       _conversationDao = _database!.conversationDao;
       await _protocol.initializeFromStorage();
+      await _loadSequenceCounters();
 
       _authSubscription = _auth.authStateChanges().listen(_onAuthChanged);
 
@@ -68,6 +79,7 @@ class SyncCoordinator {
         await _startSync();
       }
 
+      _initialized = true;
       _setState(SyncState.ready);
     } catch (e) {
       _error = e.toString();
@@ -96,8 +108,6 @@ class SyncCoordinator {
       myUserId: userId,
     );
 
-    await _processPendingMessages();
-
     _inboxListener.start();
     _inboxSubscription = _inboxListener.messages.listen(_onInboxMessage);
 
@@ -108,32 +118,38 @@ class SyncCoordinator {
     _inboxSubscription?.cancel();
     _inboxSubscription = null;
     _inboxListener.stop();
+    _messageQueue.clear();
     _processor = null;
+    _protocol.dispose();
+    _initialized = false;
     _setState(SyncState.idle);
   }
 
-  Future<void> _processPendingMessages() async {
-    if (_processor == null) return;
-
-    final pending = await _inboxListener.fetchPending();
-
-    for (final message in pending) {
-      await _processMessage(message);
-    }
+  void _onInboxMessage(InboxMessage message) {
+    _messageQueue.add(message);
+    _drainQueue();
   }
 
-  Future<void> _onInboxMessage(InboxMessage message) async {
-    await _processMessage(message);
-  }
+  Future<void> _drainQueue() async {
+    if (_isProcessingQueue) return;
+    _isProcessingQueue = true;
 
-  Future<void> _processMessage(InboxMessage message) async {
-    if (_processor == null) return;
-
-    final processed = await _processor!.processInboxMessage(message);
-
-    if (processed != null) {
-      _messageController.add(processed);
-      await _inboxListener.deleteMessage(message.id);
+    try {
+      while (_messageQueue.isNotEmpty) {
+        final processor = _processor;
+        if (processor == null) {
+          _messageQueue.clear();
+          break;
+        }
+        final message = _messageQueue.removeAt(0);
+        final processed = await processor.processInboxMessage(message);
+        if (processed != null) {
+          _messageController.add(processed);
+          await _inboxListener.deleteMessage(message.id);
+        }
+      }
+    } finally {
+      _isProcessingQueue = false;
     }
   }
 
@@ -154,10 +170,9 @@ class SyncCoordinator {
         recipientPublicKey: recipientPublicKey,
       );
 
-      final senderPayload = await _protocol.encryptForSelf(plaintext: content);
-
       final conversationId = _getConversationId(userId, recipientId);
-      final messageId = DateTime.now().millisecondsSinceEpoch.toString();
+      final randomBytes = SecurityUtils.generateSecureRandomBytes(16);
+      final messageId = base64Url.encode(randomBytes).replaceAll('=', '');
 
       final localMessage = LocalMessage(
         id: messageId,
@@ -172,19 +187,37 @@ class SyncCoordinator {
         createdAt: DateTime.now(),
       );
 
-      await _messageDao.insert(localMessage);
+      await _database!.transaction(() async {
+        await _messageDao.insert(localMessage);
 
-      await _conversationDao.updateLastMessage(
-        conversationId: conversationId,
-        content: content.length > 100 ? '${content.substring(0, 100)}...' : content,
-        timestamp: DateTime.now(),
-      );
+        final preview = content.length > 100 ? '${content.substring(0, 100)}...' : content;
+        final existing = await _conversationDao.getById(conversationId);
+        if (existing != null) {
+          await _conversationDao.updateLastMessage(
+            conversationId: conversationId,
+            content: preview,
+            timestamp: DateTime.now(),
+          );
+        } else {
+          final now = DateTime.now();
+          await _conversationDao.insert(LocalConversation(
+            id: conversationId,
+            recipientId: recipientId,
+            recipientUsername: '',
+            recipientPublicKey: '',
+            lastMessageContent: preview,
+            lastMessageAt: now,
+            unreadCount: 0,
+            createdAt: now,
+            updatedAt: now,
+          ));
+        }
+      });
 
       final result = await _functions.httpsCallable('deliverMessage').call({
         'messageId': messageId,
         'recipientId': recipientId,
         'sealedEnvelope': envelope.toJson(),
-        'senderPayload': senderPayload,
         'sequenceNumber': await _getNextSequence(conversationId),
       });
 
@@ -207,11 +240,24 @@ class SyncCoordinator {
     return '${ids[0]}_${ids[1]}';
   }
 
-  int _sequenceCounter = 0;
+  Future<void> _loadSequenceCounters() async {
+    final json = await _storage.getSequenceCounters();
+    if (json != null) {
+      try {
+        final decoded = jsonDecode(json) as Map<String, dynamic>;
+        _sequenceCounters = decoded.map((k, v) => MapEntry(k, v as int));
+      } catch (_) {
+        _sequenceCounters = {};
+      }
+    }
+  }
 
   Future<int> _getNextSequence(String conversationId) async {
-    _sequenceCounter++;
-    return _sequenceCounter;
+    final current = _sequenceCounters[conversationId] ?? 0;
+    final next = current + 1;
+    _sequenceCounters[conversationId] = next;
+    await _storage.storeSequenceCounters(jsonEncode(_sequenceCounters));
+    return next;
   }
 
   Future<List<LocalConversation>> getConversations() async {

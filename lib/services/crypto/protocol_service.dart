@@ -190,39 +190,6 @@ class ProtocolService {
     );
   }
 
-  Future<String> encryptForSelf({
-    required String plaintext,
-  }) async {
-    _ensureInitialized();
-    final publicKey = await _identityKey!.toPublicKey();
-
-    final selfEnvelope = await SealedEnvelope.seal(
-      senderId: 'self',
-      recipientId: 'self',
-      recipientPublicKey: publicKey.x25519PublicKey,
-      encryptedMessage: Uint8List.fromList(utf8.encode(plaintext)),
-      senderSigningKey: _identityKey!.ed25519KeyPair,
-      senderPublicKey: publicKey.ed25519PublicKey,
-    );
-
-    return jsonEncode(selfEnvelope.toJson());
-  }
-
-  Future<String> decryptFromSelf({
-    required String encryptedPayload,
-  }) async {
-    _ensureInitialized();
-
-    final json = jsonDecode(encryptedPayload) as Map<String, dynamic>;
-    final envelope = SealedEnvelope.fromJson(json);
-
-    final unsealed = await envelope.unseal(
-      recipientKeyPair: _identityKey!.x25519KeyPair,
-    );
-
-    return utf8.decode(unsealed.encryptedMessage);
-  }
-
   Future<bool> hasActiveSession(String recipientId, String ourUserId) async {
     return _sessionManager.hasActiveSession(recipientId, ourUserId);
   }

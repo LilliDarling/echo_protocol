@@ -15,6 +15,7 @@ import '../../../services/typing_indicator.dart';
 import '../../../services/auto_delete.dart';
 import '../../../services/sync/sync_coordinator.dart';
 import '../../../repositories/message_dao.dart';
+import '../../../utils/security.dart';
 
 class ConversationController extends ChangeNotifier {
   final PartnerInfo partner;
@@ -104,8 +105,8 @@ class ConversationController extends ChangeNotifier {
 
   Future<void> initialize() async {
     await _initializeServices();
-    await _loadInitialMessages();
     _subscribeToNewMessages();
+    await _loadInitialMessages();
   }
 
   Future<void> _initializeServices() async {
@@ -176,7 +177,9 @@ class ConversationController extends ChangeNotifier {
         limit: _pageSize,
       );
 
-      _messages = localMessages;
+      final dbIds = localMessages.map((m) => m.id).toSet();
+      final streamOnly = _messages.where((m) => !dbIds.contains(m.id)).toList();
+      _messages = [...localMessages, ...streamOnly];
       _hasMoreMessages = localMessages.length >= _pageSize;
       _isLoading = false;
       notifyListeners();
@@ -298,7 +301,8 @@ class ConversationController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final messageId = DateTime.now().millisecondsSinceEpoch.toString();
+      final randomBytes = SecurityUtils.generateSecureRandomBytes(16);
+      final messageId = base64Url.encode(randomBytes).replaceAll('=', '');
       final timestamp = DateTime.now();
 
       final optimisticMessage = LocalMessage(
@@ -325,14 +329,11 @@ class ConversationController extends ChangeNotifier {
           recipientId: partner.id,
           recipientPublicKey: recipientPubKey,
         );
-        final senderPayload = await _protocolService.encryptForSelf(plaintext: text);
-
         await _offlineQueue.enqueue(
           messageId: messageId,
           conversationId: conversationId,
           recipientId: partner.id,
           sealedEnvelope: envelope.toJson(),
-          senderPayload: senderPayload,
           sequenceNumber: 0,
         );
         return;

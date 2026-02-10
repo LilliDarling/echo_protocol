@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../models/local/conversation.dart';
 import '../../models/local/message.dart';
 import '../../repositories/message_dao.dart';
 import '../../repositories/conversation_dao.dart';
@@ -41,9 +42,6 @@ class MessageProcessor {
 
   Future<ProcessedMessage?> processInboxMessage(InboxMessage inboxMessage) async {
     try {
-      if (inboxMessage.isOutgoing) {
-        return await _processOutgoingMessage(inboxMessage);
-      }
       return await _processIncomingMessage(inboxMessage);
     } catch (e) {
       return null;
@@ -51,10 +49,19 @@ class MessageProcessor {
   }
 
   Future<ProcessedMessage?> _processIncomingMessage(InboxMessage inboxMessage) async {
-    if (inboxMessage.envelope == null) return null;
+    final existing = await _messageDao.getById(inboxMessage.id);
+    if (existing != null) {
+      return ProcessedMessage(
+        messageId: existing.id,
+        senderId: existing.senderId,
+        conversationId: existing.conversationId,
+        content: existing.content,
+        timestamp: existing.timestamp,
+      );
+    }
 
     final result = await _protocol.unsealEnvelope(
-      envelope: inboxMessage.envelope!,
+      envelope: inboxMessage.envelope,
       myUserId: _myUserId,
     );
 
@@ -73,14 +80,15 @@ class MessageProcessor {
       createdAt: DateTime.now(),
     );
 
-    await _messageDao.insert(localMessage);
-
-    await _updateConversation(
-      conversationId: conversationId,
-      senderId: result.senderId,
-      content: result.plaintext,
-      timestamp: inboxMessage.deliveredAt,
-    );
+    await _messageDao.transaction(() async {
+      await _messageDao.insert(localMessage);
+      await _updateConversation(
+        conversationId: conversationId,
+        partnerId: result.senderId,
+        content: result.plaintext,
+        timestamp: inboxMessage.deliveredAt,
+      );
+    });
 
     return ProcessedMessage(
       messageId: inboxMessage.id,
@@ -91,61 +99,11 @@ class MessageProcessor {
     );
   }
 
-  Future<ProcessedMessage?> _processOutgoingMessage(InboxMessage inboxMessage) async {
-    if (inboxMessage.senderPayload == null || inboxMessage.recipientId == null) {
-      return null;
-    }
-
-    final plaintext = await _protocol.decryptFromSelf(
-      encryptedPayload: inboxMessage.senderPayload!,
-    );
-
-    final conversationId = _getConversationId(inboxMessage.recipientId!);
-    final messageId = inboxMessage.id.replaceAll('_out', '');
-
-    final existing = await _messageDao.getById(messageId);
-    if (existing != null) {
-      return null;
-    }
-
-    final localMessage = LocalMessage(
-      id: messageId,
-      conversationId: conversationId,
-      senderId: _myUserId,
-      senderUsername: '',
-      content: plaintext,
-      timestamp: inboxMessage.deliveredAt,
-      type: LocalMessageType.text,
-      status: LocalMessageStatus.sent,
-      isOutgoing: true,
-      createdAt: DateTime.now(),
-    );
-
-    await _messageDao.insert(localMessage);
-
-    await _updateConversation(
-      conversationId: conversationId,
-      senderId: _myUserId,
-      content: plaintext,
-      timestamp: inboxMessage.deliveredAt,
-      isOutgoing: true,
-    );
-
-    return ProcessedMessage(
-      messageId: messageId,
-      senderId: _myUserId,
-      conversationId: conversationId,
-      content: plaintext,
-      timestamp: inboxMessage.deliveredAt,
-    );
-  }
-
   Future<void> _updateConversation({
     required String conversationId,
-    required String senderId,
+    required String partnerId,
     required String content,
     required DateTime timestamp,
-    bool isOutgoing = false,
   }) async {
     final existing = await _conversationDao.getById(conversationId);
 
@@ -155,9 +113,20 @@ class MessageProcessor {
         content: _truncatePreview(content),
         timestamp: timestamp,
       );
-      if (!isOutgoing) {
-        await _conversationDao.incrementUnreadCount(conversationId);
-      }
+      await _conversationDao.incrementUnreadCount(conversationId);
+    } else {
+      final now = DateTime.now();
+      await _conversationDao.insert(LocalConversation(
+        id: conversationId,
+        recipientId: partnerId,
+        recipientUsername: '',
+        recipientPublicKey: '',
+        lastMessageContent: _truncatePreview(content),
+        lastMessageAt: timestamp,
+        unreadCount: 1,
+        createdAt: now,
+        updatedAt: now,
+      ));
     }
   }
 

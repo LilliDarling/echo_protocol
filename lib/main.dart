@@ -65,8 +65,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
   final SecureStorageService _secureStorage = SecureStorageService();
   final ProtocolService _protocolService = ProtocolService();
   final NotificationService _notificationService = NotificationService();
-  SyncCoordinator? _syncCoordinator;
-
   bool _keysLoaded = false;
   bool _isLoadingKeys = false;
   String? _pendingRecoveryPhrase;
@@ -130,8 +128,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
         _checkedPendingPhrase = false;
         _notificationsInitialized = false;
         _syncInitialized = false;
-        _syncCoordinator?.dispose();
-        _syncCoordinator = null;
         _notificationService.dispose();
         Provider.of<ThemeProvider>(context, listen: false).reset();
         return const LoginScreen();
@@ -163,8 +159,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         }
 
         if (!_syncInitialized && hasKeys) {
-          _syncCoordinator = SyncCoordinator();
-          await _syncCoordinator!.initialize();
+          await SyncCoordinator().initialize();
           _syncInitialized = true;
         }
       }

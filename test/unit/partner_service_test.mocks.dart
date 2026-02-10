@@ -1591,36 +1591,6 @@ class MockProtocolService extends _i1.Mock implements _i13.ProtocolService {
           as _i7.Future<({String plaintext, String senderId})>);
 
   @override
-  _i7.Future<String> encryptForSelf({required String? plaintext}) =>
-      (super.noSuchMethod(
-            Invocation.method(#encryptForSelf, [], {#plaintext: plaintext}),
-            returnValue: _i7.Future<String>.value(
-              _i11.dummyValue<String>(
-                this,
-                Invocation.method(#encryptForSelf, [], {#plaintext: plaintext}),
-              ),
-            ),
-          )
-          as _i7.Future<String>);
-
-  @override
-  _i7.Future<String> decryptFromSelf({required String? encryptedPayload}) =>
-      (super.noSuchMethod(
-            Invocation.method(#decryptFromSelf, [], {
-              #encryptedPayload: encryptedPayload,
-            }),
-            returnValue: _i7.Future<String>.value(
-              _i11.dummyValue<String>(
-                this,
-                Invocation.method(#decryptFromSelf, [], {
-                  #encryptedPayload: encryptedPayload,
-                }),
-              ),
-            ),
-          )
-          as _i7.Future<String>);
-
-  @override
   _i7.Future<bool> hasActiveSession(String? recipientId, String? ourUserId) =>
       (super.noSuchMethod(
             Invocation.method(#hasActiveSession, [recipientId, ourUserId]),
@@ -1903,6 +1873,12 @@ class MockSecureStorageService extends _i1.Mock
           as _i7.Future<String?>);
 
   @override
+  void clearSessionCache() => super.noSuchMethod(
+    Invocation.method(#clearSessionCache, []),
+    returnValueForMissingStub: null,
+  );
+
+  @override
   _i7.Future<void> clearAll() =>
       (super.noSuchMethod(
             Invocation.method(#clearAll, []),
@@ -2174,6 +2150,23 @@ class MockSecureStorageService extends _i1.Mock
             returnValueForMissingStub: _i7.Future<void>.value(),
           )
           as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> storeSequenceCounters(String? json) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeSequenceCounters, [json]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getSequenceCounters() =>
+      (super.noSuchMethod(
+            Invocation.method(#getSequenceCounters, []),
+            returnValue: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
 
   @override
   _i7.Future<bool> get2FASessionVerified() =>

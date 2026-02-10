@@ -5,45 +5,27 @@ import '../../models/crypto/sealed_envelope.dart';
 
 class InboxMessage {
   final String id;
-  final SealedEnvelope? envelope;
-  final String? senderPayload;
+  final SealedEnvelope envelope;
   final DateTime deliveredAt;
-  final bool isOutgoing;
-  final String? recipientId;
 
   InboxMessage({
     required this.id,
-    this.envelope,
-    this.senderPayload,
+    required this.envelope,
     required this.deliveredAt,
-    required this.isOutgoing,
-    this.recipientId,
   });
 
   factory InboxMessage.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    final isOutgoing = data['isOutgoing'] as bool? ?? false;
-
-    SealedEnvelope? envelope;
-    String? senderPayload;
-
-    if (isOutgoing) {
-      senderPayload = data['senderPayload'] as String?;
-    } else {
-      final envelopeData = data['sealedEnvelope'] as Map<String, dynamic>;
-      envelope = SealedEnvelope.fromJson({
-        'recipientId': '',
-        ...envelopeData,
-      });
-    }
+    final envelopeData = data['sealedEnvelope'] as Map<String, dynamic>;
+    final envelope = SealedEnvelope.fromJson({
+      'recipientId': '',
+      ...envelopeData,
+    });
 
     return InboxMessage(
       id: doc.id,
       envelope: envelope,
-      senderPayload: senderPayload,
       deliveredAt: (data['deliveredAt'] as Timestamp).toDate(),
-      isOutgoing: isOutgoing,
-      recipientId: data['recipientId'] as String?,
     );
   }
 }
@@ -111,28 +93,6 @@ class InboxListener {
         .collection('pending')
         .doc(messageId)
         .delete();
-  }
-
-  Future<List<InboxMessage>> fetchPending() async {
-    if (_userId == null) return [];
-
-    final snapshot = await _db
-        .collection('inboxes')
-        .doc(_userId)
-        .collection('pending')
-        .orderBy('deliveredAt', descending: false)
-        .get();
-
-    return snapshot.docs
-        .map((doc) {
-          try {
-            return InboxMessage.fromFirestore(doc);
-          } catch (_) {
-            return null;
-          }
-        })
-        .whereType<InboxMessage>()
-        .toList();
   }
 
   void dispose() {

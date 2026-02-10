@@ -210,6 +210,10 @@ class SecureStorageService {
     return await _secureRead(_sessionKeyKey);
   }
 
+  void clearSessionCache() {
+    _WebEncryptionLayer.clearCache();
+  }
+
   Future<void> clearAll() async {
     _WebEncryptionLayer.clearCache();
     await _storage.deleteAll();
@@ -372,6 +376,16 @@ class SecureStorageService {
 
   Future<void> deleteDatabaseKey() async {
     await _secureDelete(_databaseKeyKey);
+  }
+
+  static const String _sequenceCountersKey = 'inbox_sequence_counters';
+
+  Future<void> storeSequenceCounters(String json) async {
+    await _secureWrite(_sequenceCountersKey, json);
+  }
+
+  Future<String?> getSequenceCounters() async {
+    return await _secureRead(_sequenceCountersKey);
   }
 
   static Map<String, dynamic> getSecurityInfo() {

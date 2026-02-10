@@ -7,7 +7,6 @@ export interface DeliverMessageRequest {
     timestamp: number;
     expireAt: number;
   };
-  senderPayload?: string;
   sequenceNumber: number;
 }
 

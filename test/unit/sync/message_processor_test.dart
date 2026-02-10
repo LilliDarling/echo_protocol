@@ -31,6 +31,12 @@ void main() {
       mockMessageDao = MockMessageDao();
       mockConversationDao = MockConversationDao();
 
+      when(mockMessageDao.transaction(any)).thenAnswer((invocation) async {
+        final callback = invocation.positionalArguments[0] as Future<void> Function();
+        await callback();
+      });
+      when(mockMessageDao.getById(any)).thenAnswer((_) async => null);
+
       processor = MessageProcessor(
         protocol: mockProtocol,
         messageDao: mockMessageDao,
@@ -53,7 +59,6 @@ void main() {
           id: 'msg_123',
           envelope: envelope,
           deliveredAt: DateTime.now(),
-          isOutgoing: false,
         );
 
         when(mockProtocol.unsealEnvelope(
@@ -112,7 +117,6 @@ void main() {
           id: 'msg_bad',
           envelope: envelope,
           deliveredAt: DateTime.now(),
-          isOutgoing: false,
         );
 
         when(mockProtocol.unsealEnvelope(
@@ -139,7 +143,6 @@ void main() {
           id: 'msg_inc',
           envelope: envelope,
           deliveredAt: DateTime.now(),
-          isOutgoing: false,
         );
 
         when(mockProtocol.unsealEnvelope(
@@ -167,147 +170,45 @@ void main() {
 
         verify(mockConversationDao.incrementUnreadCount(any)).called(1);
       });
-    });
 
-    group('processInboxMessage - outgoing messages (multi-device)', () {
-      test('decrypts self-encrypted payload for outgoing message', () async {
-        final inboxMessage = InboxMessage(
-          id: 'msg_456_out',
-          deliveredAt: DateTime.now(),
-          isOutgoing: true,
-          senderPayload: '{"encrypted": "self_sealed_content"}',
-          recipientId: 'bob',
+      test('skips insert on reprocessed message (idempotent)', () async {
+        final envelope = SealedEnvelope(
+          recipientId: myUserId,
+          encryptedPayload: Uint8List(50),
+          ephemeralPublicKey: Uint8List(32),
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+          expireAt: DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
         );
 
-        when(mockProtocol.decryptFromSelf(
-          encryptedPayload: anyNamed('encryptedPayload'),
-        )).thenAnswer((_) async => 'Synced message content');
+        final inboxMessage = InboxMessage(
+          id: 'msg_dup',
+          envelope: envelope,
+          deliveredAt: DateTime.now(),
+        );
 
-        when(mockMessageDao.getById('msg_456')).thenAnswer((_) async => null);
-        when(mockMessageDao.insert(any)).thenAnswer((_) async {});
-        when(mockConversationDao.getById(any)).thenAnswer((_) async => LocalConversation(
-          id: 'bob_my_user_id',
-          recipientId: 'bob',
-          recipientUsername: 'Bob',
-          recipientPublicKey: 'key',
+        when(mockMessageDao.getById('msg_dup')).thenAnswer((_) async => LocalMessage(
+          id: 'msg_dup',
+          conversationId: 'alice_my_user_id',
+          senderId: 'alice',
+          senderUsername: '',
+          content: 'Already processed',
+          timestamp: DateTime.now(),
+          isOutgoing: false,
           createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
         ));
-        when(mockConversationDao.updateLastMessage(
-          conversationId: anyNamed('conversationId'),
-          content: anyNamed('content'),
-          timestamp: anyNamed('timestamp'),
-        )).thenAnswer((_) async {});
 
         final result = await processor.processInboxMessage(inboxMessage);
 
         expect(result, isNotNull);
-        expect(result!.messageId, 'msg_456');
-        expect(result.senderId, myUserId);
-        expect(result.content, 'Synced message content');
+        expect(result!.messageId, 'msg_dup');
+        expect(result.content, 'Already processed');
 
-        verify(mockProtocol.decryptFromSelf(
-          encryptedPayload: '{"encrypted": "self_sealed_content"}',
-        )).called(1);
-
-        verify(mockMessageDao.insert(argThat(
-          predicate<LocalMessage>((m) =>
-            m.id == 'msg_456' &&
-            m.isOutgoing == true &&
-            m.status == LocalMessageStatus.sent
-          ),
-        ))).called(1);
-      });
-
-      test('skips duplicate outgoing message', () async {
-        final inboxMessage = InboxMessage(
-          id: 'msg_existing_out',
-          deliveredAt: DateTime.now(),
-          isOutgoing: true,
-          senderPayload: '{"encrypted": "content"}',
-          recipientId: 'bob',
-        );
-
-        when(mockProtocol.decryptFromSelf(
-          encryptedPayload: anyNamed('encryptedPayload'),
-        )).thenAnswer((_) async => 'Content');
-
-        when(mockMessageDao.getById('msg_existing')).thenAnswer((_) async => LocalMessage(
-          id: 'msg_existing',
-          conversationId: 'conv1',
-          senderId: myUserId,
-          senderUsername: '',
-          content: 'Already exists',
-          timestamp: DateTime.now(),
-          isOutgoing: true,
-          createdAt: DateTime.now(),
+        verifyNever(mockProtocol.unsealEnvelope(
+          envelope: anyNamed('envelope'),
+          myUserId: anyNamed('myUserId'),
         ));
-
-        final result = await processor.processInboxMessage(inboxMessage);
-
-        expect(result, isNull);
         verifyNever(mockMessageDao.insert(any));
-      });
-
-      test('does not increment unread for outgoing messages', () async {
-        final inboxMessage = InboxMessage(
-          id: 'msg_unread_out',
-          deliveredAt: DateTime.now(),
-          isOutgoing: true,
-          senderPayload: '{"encrypted": "content"}',
-          recipientId: 'carol',
-        );
-
-        when(mockProtocol.decryptFromSelf(
-          encryptedPayload: anyNamed('encryptedPayload'),
-        )).thenAnswer((_) async => 'Outgoing content');
-
-        when(mockMessageDao.getById('msg_unread')).thenAnswer((_) async => null);
-        when(mockMessageDao.insert(any)).thenAnswer((_) async {});
-        when(mockConversationDao.getById(any)).thenAnswer((_) async => LocalConversation(
-          id: 'carol_my_user_id',
-          recipientId: 'carol',
-          recipientUsername: 'Carol',
-          recipientPublicKey: 'key',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ));
-        when(mockConversationDao.updateLastMessage(
-          conversationId: anyNamed('conversationId'),
-          content: anyNamed('content'),
-          timestamp: anyNamed('timestamp'),
-        )).thenAnswer((_) async {});
-
-        await processor.processInboxMessage(inboxMessage);
-
         verifyNever(mockConversationDao.incrementUnreadCount(any));
-      });
-
-      test('returns null when senderPayload missing', () async {
-        final inboxMessage = InboxMessage(
-          id: 'msg_no_payload_out',
-          deliveredAt: DateTime.now(),
-          isOutgoing: true,
-          recipientId: 'bob',
-        );
-
-        final result = await processor.processInboxMessage(inboxMessage);
-
-        expect(result, isNull);
-        verifyNever(mockProtocol.decryptFromSelf(encryptedPayload: anyNamed('encryptedPayload')));
-      });
-
-      test('returns null when recipientId missing', () async {
-        final inboxMessage = InboxMessage(
-          id: 'msg_no_recipient_out',
-          deliveredAt: DateTime.now(),
-          isOutgoing: true,
-          senderPayload: '{"encrypted": "content"}',
-        );
-
-        final result = await processor.processInboxMessage(inboxMessage);
-
-        expect(result, isNull);
       });
     });
 
@@ -367,34 +268,24 @@ void main() {
   });
 
   group('InboxMessage', () {
-    test('distinguishes incoming from outgoing', () {
-      final incoming = InboxMessage(
+    test('creates incoming message with sealed envelope', () {
+      final envelope = SealedEnvelope(
+        recipientId: 'me',
+        encryptedPayload: Uint8List(10),
+        ephemeralPublicKey: Uint8List(32),
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+        expireAt: DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
+      );
+
+      final message = InboxMessage(
         id: 'msg_in',
-        envelope: SealedEnvelope(
-          recipientId: 'me',
-          encryptedPayload: Uint8List(10),
-          ephemeralPublicKey: Uint8List(32),
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-          expireAt: DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
-        ),
+        envelope: envelope,
         deliveredAt: DateTime.now(),
-        isOutgoing: false,
       );
 
-      final outgoing = InboxMessage(
-        id: 'msg_out',
-        deliveredAt: DateTime.now(),
-        isOutgoing: true,
-        senderPayload: 'encrypted_self',
-        recipientId: 'partner',
-      );
-
-      expect(incoming.isOutgoing, false);
-      expect(incoming.envelope, isNotNull);
-
-      expect(outgoing.isOutgoing, true);
-      expect(outgoing.senderPayload, isNotNull);
-      expect(outgoing.recipientId, 'partner');
+      expect(message.id, 'msg_in');
+      expect(message.envelope.recipientId, 'me');
+      expect(message.deliveredAt, isNotNull);
     });
   });
 }

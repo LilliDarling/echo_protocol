@@ -1169,6 +1169,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_messages_timestamp',
     'CREATE INDEX idx_messages_timestamp ON messages (timestamp)',
   );
+  late final Index idxMessagesSyncedToVault = Index(
+    'idx_messages_synced_to_vault',
+    'CREATE INDEX idx_messages_synced_to_vault ON messages (synced_to_vault)',
+  );
   late final ConversationDao conversationDao = ConversationDao(
     this as AppDatabase,
   );
@@ -1187,6 +1191,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxConversationsUpdated,
     idxMessagesConversation,
     idxMessagesTimestamp,
+    idxMessagesSyncedToVault,
   ];
 }
 

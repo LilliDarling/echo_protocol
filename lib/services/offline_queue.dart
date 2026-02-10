@@ -10,7 +10,6 @@ class PendingMessage {
   final String conversationId;
   final String recipientId;
   final Map<String, dynamic> sealedEnvelope;
-  final String senderPayload;
   final int sequenceNumber;
   final DateTime createdAt;
   int retryCount;
@@ -22,7 +21,6 @@ class PendingMessage {
     required this.conversationId,
     required this.recipientId,
     required this.sealedEnvelope,
-    required this.senderPayload,
     required this.sequenceNumber,
     required this.createdAt,
     this.retryCount = 0,
@@ -39,7 +37,6 @@ class PendingMessage {
         'conversationId': conversationId,
         'recipientId': recipientId,
         'sealedEnvelope': sealedEnvelope,
-        'senderPayload': senderPayload,
         'sequenceNumber': sequenceNumber,
         'createdAt': createdAt.toIso8601String(),
         'retryCount': retryCount,
@@ -52,7 +49,6 @@ class PendingMessage {
         conversationId: json['conversationId'] as String,
         recipientId: json['recipientId'] as String,
         sealedEnvelope: Map<String, dynamic>.from(json['sealedEnvelope'] as Map),
-        senderPayload: json['senderPayload'] as String,
         sequenceNumber: json['sequenceNumber'] as int,
         createdAt: DateTime.parse(json['createdAt'] as String),
         retryCount: json['retryCount'] as int? ?? 0,
@@ -146,7 +142,6 @@ class OfflineQueueService {
     required String conversationId,
     required String recipientId,
     required Map<String, dynamic> sealedEnvelope,
-    required String senderPayload,
     required int sequenceNumber,
   }) async {
     final pending = PendingMessage(
@@ -154,7 +149,6 @@ class OfflineQueueService {
       conversationId: conversationId,
       recipientId: recipientId,
       sealedEnvelope: sealedEnvelope,
-      senderPayload: senderPayload,
       sequenceNumber: sequenceNumber,
       createdAt: DateTime.now(),
     );
@@ -228,7 +222,6 @@ class OfflineQueueService {
         'messageId': pending.id,
         'recipientId': pending.recipientId,
         'sealedEnvelope': pending.sealedEnvelope,
-        'senderPayload': pending.senderPayload,
         'sequenceNumber': pending.sequenceNumber,
       });
 

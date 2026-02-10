@@ -34,6 +34,7 @@ class Conversations extends Table {
 @UseRowClass(LocalMessage)
 @TableIndex(name: 'idx_messages_conversation', columns: {#conversationId})
 @TableIndex(name: 'idx_messages_timestamp', columns: {#timestamp})
+@TableIndex(name: 'idx_messages_synced_to_vault', columns: {#syncedToVault})
 class Messages extends Table {
   TextColumn get id => text()();
   TextColumn get conversationId =>

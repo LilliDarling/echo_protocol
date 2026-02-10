@@ -12,6 +12,8 @@ class SealedEnvelope {
   final int expireAt;
 
   static const int _defaultTtlHours = 24;
+  static const int _minBucket = 128;
+  static const int _maxBucket = 65536;
 
   SealedEnvelope({
     required this.recipientId,
@@ -36,6 +38,8 @@ class SealedEnvelope {
     );
 
     final innerPayload = _buildInnerPayload(certificate, encryptedMessage);
+    final paddedPayload = _padPayload(innerPayload);
+    SecurityUtils.secureClear(innerPayload);
 
     final x25519 = X25519();
     final ephemeralKeyPair = await x25519.newKeyPair();
@@ -58,10 +62,11 @@ class SealedEnvelope {
     final aesGcm = AesGcm.with256bits();
     final nonce = SecurityUtils.generateSecureRandomBytes(12);
     final secretBox = await aesGcm.encrypt(
-      innerPayload,
+      paddedPayload,
       secretKey: SecretKey(encryptionKey),
       nonce: nonce,
     );
+    SecurityUtils.secureClear(paddedPayload);
 
     final encryptedPayload = Uint8List.fromList([
       ...nonce,
@@ -91,6 +96,43 @@ class SealedEnvelope {
       ...certBytes,
       ...message,
     ]);
+  }
+
+  static int _nextBucket(int size) {
+    var bucket = _minBucket;
+    while (bucket < size && bucket < _maxBucket) {
+      bucket *= 2;
+    }
+    return bucket < size ? size : bucket;
+  }
+
+  static Uint8List _padPayload(Uint8List payload) {
+    final totalNeeded = 4 + payload.length;
+    final bucketSize = _nextBucket(totalNeeded);
+
+    final padded = Uint8List(bucketSize);
+    final lengthBytes = ByteData(4)..setUint32(0, payload.length, Endian.big);
+    padded.setRange(0, 4, lengthBytes.buffer.asUint8List());
+    padded.setRange(4, 4 + payload.length, payload);
+
+    final fillLength = bucketSize - totalNeeded;
+    if (fillLength > 0) {
+      final randomFill = SecurityUtils.generateSecureRandomBytes(fillLength);
+      padded.setRange(totalNeeded, bucketSize, randomFill);
+    }
+
+    return padded;
+  }
+
+  static Uint8List _unpadPayload(Uint8List padded) {
+    if (padded.length < 4) {
+      throw Exception('Invalid padded payload');
+    }
+    final length = ByteData.sublistView(padded, 0, 4).getUint32(0, Endian.big);
+    if (length > padded.length - 4) {
+      throw Exception('Invalid payload length');
+    }
+    return padded.sublist(4, 4 + length);
   }
 
   Future<UnsealedContent> unseal({
@@ -128,10 +170,14 @@ class SealedEnvelope {
     SecurityUtils.secureClear(Uint8List.fromList(sharedSecretBytes));
     SecurityUtils.secureClear(decryptionKey);
 
-    final innerBytes = Uint8List.fromList(innerPayload);
+    final paddedBytes = Uint8List.fromList(innerPayload);
+    final innerBytes = _unpadPayload(paddedBytes);
+    SecurityUtils.secureClear(paddedBytes);
+
     final certLen = ByteData.sublistView(innerBytes, 0, 2).getUint16(0, Endian.big);
     final certBytes = innerBytes.sublist(2, 2 + certLen);
     final encryptedMessage = innerBytes.sublist(2 + certLen);
+    SecurityUtils.secureClear(innerBytes);
 
     final certificate = SenderCertificate.fromBytes(certBytes);
 
