@@ -498,7 +498,7 @@ class _ConversationScreenState extends State<ConversationScreen>
 
         return Column(
           children: [
-            if (dateSeparator != null) dateSeparator,
+            ?dateSeparator,
             MessageBubble(
               message: echoMessage,
               decryptedContent: localMessage.content,

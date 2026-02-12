@@ -87,10 +87,10 @@ class MediaUploadService {
       'thumbnailUrl': thumbnailUrl,
       'fileName': hashedFilename,
       'isEncrypted': isEncryptionEnabled ? 'true' : 'false',
-      if (mediaId != null) 'mediaId': mediaId,
-      if (thumbMediaId != null) 'thumbMediaId': thumbMediaId,
-      if (mediaKey != null) 'mediaKey': mediaKey,
-      if (thumbMediaKey != null) 'thumbMediaKey': thumbMediaKey,
+      'mediaId': ?mediaId,
+      'thumbMediaId': ?thumbMediaId,
+      'mediaKey': ?mediaKey,
+      'thumbMediaKey': ?thumbMediaKey,
     };
   }
 
@@ -174,10 +174,10 @@ class MediaUploadService {
       'thumbnailUrl': thumbnailUrl ?? '',
       'fileName': hashedFilename,
       'isEncrypted': isEncryptionEnabled ? 'true' : 'false',
-      if (mediaId != null) 'mediaId': mediaId,
-      if (thumbMediaId != null) 'thumbMediaId': thumbMediaId,
-      if (mediaKey != null) 'mediaKey': mediaKey,
-      if (thumbMediaKey != null) 'thumbMediaKey': thumbMediaKey,
+      'mediaId': ?mediaId,
+      'thumbMediaId': ?thumbMediaId,
+      'mediaKey': ?mediaKey,
+      'thumbMediaKey': ?thumbMediaKey,
     };
   }
 

@@ -121,11 +121,9 @@ void main() {
     });
 
     group('acceptInvite', () {
-      late MockDocumentSnapshot mockInviteSnapshot;
       late MockHttpsCallable mockCallable;
 
       setUp(() {
-        mockInviteSnapshot = MockDocumentSnapshot();
         mockCallable = MockHttpsCallable();
 
         when(mockCollection.doc('user123')).thenReturn(mockUserDoc);
