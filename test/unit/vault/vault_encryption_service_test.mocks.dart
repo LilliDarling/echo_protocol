@@ -371,6 +371,32 @@ class MockSecureStorageService extends _i1.Mock
           as _i3.Future<void>);
 
   @override
+  _i3.Future<int> getLastSyncedChunkIndex() =>
+      (super.noSuchMethod(
+            Invocation.method(#getLastSyncedChunkIndex, []),
+            returnValue: _i3.Future<int>.value(0),
+          )
+          as _i3.Future<int>);
+
+  @override
+  _i3.Future<void> storeLastSyncedChunkIndex(int? index) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeLastSyncedChunkIndex, [index]),
+            returnValue: _i3.Future<void>.value(),
+            returnValueForMissingStub: _i3.Future<void>.value(),
+          )
+          as _i3.Future<void>);
+
+  @override
+  _i3.Future<void> deleteLastSyncedChunkIndex() =>
+      (super.noSuchMethod(
+            Invocation.method(#deleteLastSyncedChunkIndex, []),
+            returnValue: _i3.Future<void>.value(),
+            returnValueForMissingStub: _i3.Future<void>.value(),
+          )
+          as _i3.Future<void>);
+
+  @override
   _i3.Future<void> storeVaultKey(String? key) =>
       (super.noSuchMethod(
             Invocation.method(#storeVaultKey, [key]),

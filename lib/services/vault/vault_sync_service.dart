@@ -1,18 +1,29 @@
 import 'dart:async';
+import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../../models/local/conversation.dart';
+import '../../models/vault/vault_chunk.dart';
+import '../../models/vault/retention_settings.dart';
 import '../../repositories/message_dao.dart';
 import '../../repositories/conversation_dao.dart';
 import '../database/app_database.dart';
+import '../secure_storage.dart';
 import '../../utils/logger.dart';
 import 'vault_chunk_builder.dart';
+import 'vault_media_service.dart';
 import 'vault_storage_service.dart';
 
 enum VaultSyncState { idle, uploading, downloading, error }
 
 class VaultSyncService {
   final FirebaseAuth _auth;
+  final FirebaseFirestore _db;
+  final FirebaseStorage _firebaseStorage;
   final VaultStorageService _storageService;
+  final VaultMediaService _mediaService;
+  final SecureStorageService _secureStorage;
   MessageDao? _messageDao;
   ConversationDao? _conversationDao;
 
@@ -28,15 +39,27 @@ class VaultSyncService {
 
   VaultSyncService._internal()
       : _auth = FirebaseAuth.instance,
-        _storageService = VaultStorageService();
+        _db = FirebaseFirestore.instance,
+        _firebaseStorage = FirebaseStorage.instance,
+        _storageService = VaultStorageService(),
+        _mediaService = VaultMediaService(),
+        _secureStorage = SecureStorageService();
 
   VaultSyncService.forTesting({
     required FirebaseAuth auth,
+    required FirebaseFirestore firestore,
+    required FirebaseStorage firebaseStorage,
     required VaultStorageService storageService,
+    required VaultMediaService mediaService,
+    required SecureStorageService secureStorage,
     required MessageDao messageDao,
     required ConversationDao conversationDao,
   })  : _auth = auth,
+        _db = firestore,
+        _firebaseStorage = firebaseStorage,
         _storageService = storageService,
+        _mediaService = mediaService,
+        _secureStorage = secureStorage,
         _messageDao = messageDao,
         _conversationDao = conversationDao,
         _initialized = true;
@@ -73,6 +96,25 @@ class VaultSyncService {
     try {
       final messageDao = _messageDao!;
       final conversationDao = _conversationDao!;
+
+      // Check for newer chunks from other devices before uploading
+      final lastSyncedIndex = await _secureStorage.getLastSyncedChunkIndex();
+      final serverLatestIndex =
+          await _storageService.getLatestChunkIndex(userId);
+
+      if (serverLatestIndex > lastSyncedIndex) {
+        LoggerService.info(
+            'Newer vault chunks detected (server: $serverLatestIndex, local: $lastSyncedIndex), downloading first');
+        _isSyncing = false;
+        try {
+          await downloadAndMerge();
+        } catch (e) {
+          LoggerService.error(
+              'Failed to download newer chunks before upload', e);
+        }
+        _isSyncing = true;
+        _setState(VaultSyncState.uploading);
+      }
 
       final unsyncedMessages =
           await messageDao.getUnsyncedMessages(limit: 2000);
@@ -116,6 +158,23 @@ class VaultSyncService {
         totalSynced += messageIds.length;
       }
 
+      // Upload media for synced messages based on retention policy
+      final retentionPolicy = await _getRetentionPolicy(userId);
+      if (retentionPolicy != RetentionPolicy.messagesOnly) {
+        await _uploadMediaForChunks(
+          userId: userId,
+          chunks: chunks,
+          retentionPolicy: retentionPolicy,
+        );
+      }
+
+      // Update last synced index
+      if (chunks.isNotEmpty) {
+        final maxIndex =
+            chunks.map((c) => c.chunkIndex).reduce((a, b) => a > b ? a : b);
+        await _secureStorage.storeLastSyncedChunkIndex(maxIndex);
+      }
+
       LoggerService.info('Vault upload complete: $totalSynced messages');
       _setState(VaultSyncState.idle);
       return totalSynced;
@@ -142,8 +201,12 @@ class VaultSyncService {
       final messageDao = _messageDao!;
       final conversationDao = _conversationDao!;
 
-      final chunkMetadataList =
-          await _storageService.listChunks(userId: userId);
+      // Only fetch chunks newer than our last synced index
+      final lastSyncedIndex = await _secureStorage.getLastSyncedChunkIndex();
+      final chunkMetadataList = await _storageService.listChunks(
+        userId: userId,
+        afterIndex: lastSyncedIndex >= 0 ? lastSyncedIndex : null,
+      );
 
       if (chunkMetadataList.isEmpty) {
         _setState(VaultSyncState.idle);
@@ -176,7 +239,16 @@ class VaultSyncService {
           await messageDao.insertBatch(vaultConv.messages);
           totalMerged += vaultConv.messages.length;
         }
+
+        // Download media for recovered messages (best-effort)
+        await _downloadMediaForChunk(userId: userId, chunk: chunk);
       }
+
+      // Update last synced chunk index
+      final maxIndex = chunkMetadataList
+          .map((m) => m.chunkIndex)
+          .reduce((a, b) => a > b ? a : b);
+      await _secureStorage.storeLastSyncedChunkIndex(maxIndex);
 
       LoggerService.info('Vault download complete: $totalMerged messages');
       _setState(VaultSyncState.idle);
@@ -195,6 +267,111 @@ class VaultSyncService {
     if (!_initialized) return false;
     final messages = await _messageDao!.getUnsyncedMessages(limit: 1);
     return messages.isNotEmpty;
+  }
+
+  Future<RetentionPolicy> _getRetentionPolicy(String userId) async {
+    try {
+      final doc = await _db.collection('users').doc(userId).get();
+      final prefs = doc.data()?['preferences'] as Map<String, dynamic>?;
+      final value = prefs?['vaultRetention'] as String?;
+      return value != null
+          ? RetentionPolicy.fromString(value)
+          : RetentionPolicy.smart;
+    } catch (_) {
+      return RetentionPolicy.smart;
+    }
+  }
+
+  Future<void> _uploadMediaForChunks({
+    required String userId,
+    required List<VaultChunk> chunks,
+    required RetentionPolicy retentionPolicy,
+  }) async {
+    final uploadedMediaIds = <String>{};
+    final expiry = retentionPolicy.mediaExpiry;
+    final expireAt =
+        expiry != null && expiry != Duration.zero
+            ? DateTime.now().add(expiry)
+            : null;
+
+    for (final chunk in chunks) {
+      for (final conv in chunk.conversations) {
+        for (final msg in conv.messages) {
+          if (msg.mediaId != null && !uploadedMediaIds.contains(msg.mediaId)) {
+            try {
+              // Try to fetch the already-encrypted media from regular storage
+              final encryptedBytes = await _tryFetchMedia(userId, msg.mediaId!);
+              if (encryptedBytes != null) {
+                await _mediaService.uploadMediaToVault(
+                  userId: userId,
+                  mediaId: msg.mediaId!,
+                  encryptedBytes: encryptedBytes,
+                  expireAt: expireAt,
+                );
+                uploadedMediaIds.add(msg.mediaId!);
+              }
+            } catch (e) {
+              LoggerService.error(
+                  'Media vault upload failed: ${msg.mediaId}', e);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  Future<Uint8List?> _tryFetchMedia(String userId, String mediaId) async {
+    // Try common media storage paths
+    final paths = [
+      'media/images/$userId/$mediaId',
+      'media/videos/$userId/$mediaId',
+      'media/thumbnails/$userId/$mediaId',
+    ];
+
+    for (final path in paths) {
+      try {
+        final ref = _firebaseStorage.ref().child(path);
+        final data = await ref.getData();
+        if (data != null) return data;
+      } catch (_) {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _downloadMediaForChunk({
+    required String userId,
+    required VaultChunk chunk,
+  }) async {
+    for (final conv in chunk.conversations) {
+      for (final msg in conv.messages) {
+        if (msg.mediaId != null) {
+          try {
+            final encryptedBytes = await _mediaService.downloadMediaFromVault(
+              userId: userId,
+              mediaId: msg.mediaId!,
+            );
+            if (encryptedBytes != null) {
+              // Re-upload to regular media storage for local access
+              final ref = _firebaseStorage
+                  .ref()
+                  .child('media/images/$userId/${msg.mediaId}');
+              await ref.putData(
+                encryptedBytes,
+                SettableMetadata(
+                  contentType: 'application/octet-stream',
+                  cacheControl: 'private, max-age=0',
+                ),
+              );
+            }
+          } catch (e) {
+            LoggerService.error(
+                'Media vault download failed: ${msg.mediaId}', e);
+          }
+        }
+      }
+    }
   }
 
   void _setState(VaultSyncState newState) {

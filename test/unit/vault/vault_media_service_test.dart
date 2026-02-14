@@ -3,9 +3,11 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:echo_protocol/services/vault/vault_media_service.dart';
 
 @GenerateNiceMocks([
+  MockSpec<FirebaseStorage>(),
   MockSpec<Reference>(),
 ])
 import 'vault_media_service_test.mocks.dart';
@@ -28,15 +30,20 @@ void main() {
 
     group('downloadMediaFromVault', () {
       test('downloads from correct storage path', () async {
+        final fakeFirestore = FakeFirebaseFirestore();
+        final mockStorage = MockFirebaseStorage();
         final mockRef = MockReference();
         final mockChildRef = MockReference();
         final fakeData = Uint8List.fromList([1, 2, 3, 4]);
 
+        when(mockStorage.ref()).thenReturn(mockRef);
         when(mockRef.child(any)).thenReturn(mockChildRef);
         when(mockChildRef.getData(any)).thenAnswer((_) async => fakeData);
 
-        final storage = _FakeFirebaseStorage(mockRef);
-        final service = VaultMediaService(storage: storage);
+        final service = VaultMediaService(
+          firestore: fakeFirestore,
+          storage: mockStorage,
+        );
 
         final result = await service.downloadMediaFromVault(
           userId: 'user123',
@@ -48,14 +55,19 @@ void main() {
       });
 
       test('returns null when media not found', () async {
+        final fakeFirestore = FakeFirebaseFirestore();
+        final mockStorage = MockFirebaseStorage();
         final mockRef = MockReference();
         final mockChildRef = MockReference();
 
+        when(mockStorage.ref()).thenReturn(mockRef);
         when(mockRef.child(any)).thenReturn(mockChildRef);
         when(mockChildRef.getData(any)).thenAnswer((_) async => null);
 
-        final storage = _FakeFirebaseStorage(mockRef);
-        final service = VaultMediaService(storage: storage);
+        final service = VaultMediaService(
+          firestore: fakeFirestore,
+          storage: mockStorage,
+        );
 
         final result = await service.downloadMediaFromVault(
           userId: 'user123',
@@ -66,12 +78,4 @@ void main() {
       });
     });
   });
-}
-
-class _FakeFirebaseStorage extends Fake implements FirebaseStorage {
-  final Reference _rootRef;
-  _FakeFirebaseStorage(this._rootRef);
-
-  @override
-  Reference ref([String? path]) => _rootRef;
 }

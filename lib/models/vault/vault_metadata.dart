@@ -50,3 +50,40 @@ class VaultChunkMetadata {
     );
   }
 }
+
+class VaultMediaMetadata {
+  final String mediaId;
+  final String storagePath;
+  final DateTime uploadedAt;
+  final DateTime? expireAt;
+  final int sizeBytes;
+
+  VaultMediaMetadata({
+    required this.mediaId,
+    required this.storagePath,
+    required this.uploadedAt,
+    this.expireAt,
+    required this.sizeBytes,
+  });
+
+  Map<String, dynamic> toFirestore() => {
+        'mediaId': mediaId,
+        'storagePath': storagePath,
+        'uploadedAt': uploadedAt.millisecondsSinceEpoch,
+        'expireAt': expireAt?.millisecondsSinceEpoch,
+        'sizeBytes': sizeBytes,
+      };
+
+  factory VaultMediaMetadata.fromFirestore(Map<String, dynamic> data) {
+    return VaultMediaMetadata(
+      mediaId: data['mediaId'] as String,
+      storagePath: data['storagePath'] as String,
+      uploadedAt:
+          DateTime.fromMillisecondsSinceEpoch(data['uploadedAt'] as int),
+      expireAt: data['expireAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(data['expireAt'] as int)
+          : null,
+      sizeBytes: data['sizeBytes'] as int,
+    );
+  }
+}

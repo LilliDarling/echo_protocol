@@ -6,6 +6,7 @@ import '../settings/fingerprint_verification.dart';
 import '../settings/device_linking.dart';
 import '../settings/two_factor_settings.dart';
 import '../settings/preferences.dart';
+import '../settings/storage_settings.dart';
 import 'edit_profile.dart';
 
 class ProfileTab extends StatefulWidget {
@@ -309,6 +310,31 @@ class _ProfileTabState extends State<ProfileTab> {
               context,
               MaterialPageRoute(
                 builder: (context) => const PreferencesScreen(),
+              ),
+            );
+          },
+        ),
+
+        ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.teal.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.cloud,
+              color: Colors.teal.shade700,
+            ),
+          ),
+          title: const Text('Storage & Backup'),
+          subtitle: const Text('Vault sync and retention settings'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const StorageSettingsScreen(),
               ),
             );
           },

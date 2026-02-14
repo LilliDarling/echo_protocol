@@ -3,25 +3,32 @@
 // Do not manually edit this file.
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-import 'dart:async' as _i11;
+import 'dart:async' as _i7;
+import 'dart:typed_data' as _i17;
 
-import 'package:drift/drift.dart' as _i8;
-import 'package:drift/src/runtime/executor/stream_queries.dart' as _i9;
-import 'package:echo_protocol/models/local/conversation.dart' as _i16;
-import 'package:echo_protocol/models/local/message.dart' as _i15;
-import 'package:echo_protocol/models/vault/vault_chunk.dart' as _i6;
-import 'package:echo_protocol/models/vault/vault_metadata.dart' as _i5;
-import 'package:echo_protocol/repositories/conversation_dao.dart' as _i12;
-import 'package:echo_protocol/repositories/message_dao.dart' as _i10;
-import 'package:echo_protocol/services/database/app_database.dart' as _i7;
+import 'package:cloud_firestore/cloud_firestore.dart' as _i6;
+import 'package:cloud_firestore_platform_interface/cloud_firestore_platform_interface.dart'
+    as _i5;
+import 'package:drift/drift.dart' as _i12;
+import 'package:drift/src/runtime/executor/stream_queries.dart' as _i13;
+import 'package:echo_protocol/models/local/conversation.dart' as _i22;
+import 'package:echo_protocol/models/local/message.dart' as _i21;
+import 'package:echo_protocol/models/vault/vault_chunk.dart' as _i10;
+import 'package:echo_protocol/models/vault/vault_metadata.dart' as _i9;
+import 'package:echo_protocol/repositories/conversation_dao.dart' as _i15;
+import 'package:echo_protocol/repositories/message_dao.dart' as _i14;
+import 'package:echo_protocol/services/database/app_database.dart' as _i11;
+import 'package:echo_protocol/services/secure_storage.dart' as _i20;
+import 'package:echo_protocol/services/vault/vault_media_service.dart' as _i19;
 import 'package:echo_protocol/services/vault/vault_storage_service.dart'
-    as _i14;
+    as _i18;
 import 'package:firebase_auth/firebase_auth.dart' as _i4;
 import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart'
     as _i3;
 import 'package:firebase_core/firebase_core.dart' as _i2;
+import 'package:firebase_storage/firebase_storage.dart' as _i8;
 import 'package:mockito/mockito.dart' as _i1;
-import 'package:mockito/src/dummies.dart' as _i13;
+import 'package:mockito/src/dummies.dart' as _i16;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -61,146 +68,204 @@ class _FakeConfirmationResult_3 extends _i1.SmartFake
     : super(parent, parentInvocation);
 }
 
-class _FakeVaultChunkMetadata_4 extends _i1.SmartFake
-    implements _i5.VaultChunkMetadata {
-  _FakeVaultChunkMetadata_4(Object parent, Invocation parentInvocation)
+class _FakeSettings_4 extends _i1.SmartFake implements _i5.Settings {
+  _FakeSettings_4(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeVaultChunk_5 extends _i1.SmartFake implements _i6.VaultChunk {
-  _FakeVaultChunk_5(Object parent, Invocation parentInvocation)
+class _FakeCollectionReference_5<T extends Object?> extends _i1.SmartFake
+    implements _i6.CollectionReference<T> {
+  _FakeCollectionReference_5(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeAppDatabase_6 extends _i1.SmartFake implements _i7.AppDatabase {
-  _FakeAppDatabase_6(Object parent, Invocation parentInvocation)
+class _FakeWriteBatch_6 extends _i1.SmartFake implements _i6.WriteBatch {
+  _FakeWriteBatch_6(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeDatabaseConnection_7 extends _i1.SmartFake
-    implements _i8.DatabaseConnection {
-  _FakeDatabaseConnection_7(Object parent, Invocation parentInvocation)
+class _FakeLoadBundleTask_7 extends _i1.SmartFake
+    implements _i6.LoadBundleTask {
+  _FakeLoadBundleTask_7(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeDriftDatabaseOptions_8 extends _i1.SmartFake
-    implements _i8.DriftDatabaseOptions {
-  _FakeDriftDatabaseOptions_8(Object parent, Invocation parentInvocation)
+class _FakeQuerySnapshot_8<T1 extends Object?> extends _i1.SmartFake
+    implements _i6.QuerySnapshot<T1> {
+  _FakeQuerySnapshot_8(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeQueryExecutor_9 extends _i1.SmartFake implements _i8.QueryExecutor {
-  _FakeQueryExecutor_9(Object parent, Invocation parentInvocation)
+class _FakeQuery_9<T extends Object?> extends _i1.SmartFake
+    implements _i6.Query<T> {
+  _FakeQuery_9(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeStreamQueryStore_10 extends _i1.SmartFake
-    implements _i9.StreamQueryStore {
-  _FakeStreamQueryStore_10(Object parent, Invocation parentInvocation)
+class _FakeDocumentReference_10<T extends Object?> extends _i1.SmartFake
+    implements _i6.DocumentReference<T> {
+  _FakeDocumentReference_10(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeDatabaseConnectionUser_11 extends _i1.SmartFake
-    implements _i8.DatabaseConnectionUser {
-  _FakeDatabaseConnectionUser_11(Object parent, Invocation parentInvocation)
+class _FakeFuture_11<T1> extends _i1.SmartFake implements _i7.Future<T1> {
+  _FakeFuture_11(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _Fake$ConversationsTable_12 extends _i1.SmartFake
-    implements _i7.$ConversationsTable {
-  _Fake$ConversationsTable_12(Object parent, Invocation parentInvocation)
+class _FakeDuration_12 extends _i1.SmartFake implements Duration {
+  _FakeDuration_12(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _Fake$MessagesTable_13 extends _i1.SmartFake
-    implements _i7.$MessagesTable {
-  _Fake$MessagesTable_13(Object parent, Invocation parentInvocation)
+class _FakeReference_13 extends _i1.SmartFake implements _i8.Reference {
+  _FakeReference_13(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeMessageDaoManager_14 extends _i1.SmartFake
-    implements _i10.MessageDaoManager {
-  _FakeMessageDaoManager_14(Object parent, Invocation parentInvocation)
+class _FakeVaultChunkMetadata_14 extends _i1.SmartFake
+    implements _i9.VaultChunkMetadata {
+  _FakeVaultChunkMetadata_14(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeFuture_15<T1> extends _i1.SmartFake implements _i11.Future<T1> {
-  _FakeFuture_15(Object parent, Invocation parentInvocation)
+class _FakeVaultChunk_15 extends _i1.SmartFake implements _i10.VaultChunk {
+  _FakeVaultChunk_15(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeInsertStatement_16<T1 extends _i8.Table, D1> extends _i1.SmartFake
-    implements _i8.InsertStatement<T1, D1> {
-  _FakeInsertStatement_16(Object parent, Invocation parentInvocation)
+class _FakeVaultMediaMetadata_16 extends _i1.SmartFake
+    implements _i9.VaultMediaMetadata {
+  _FakeVaultMediaMetadata_16(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeUpdateStatement_17<T extends _i8.Table, D> extends _i1.SmartFake
-    implements _i8.UpdateStatement<T, D> {
-  _FakeUpdateStatement_17(Object parent, Invocation parentInvocation)
+class _FakeAppDatabase_17 extends _i1.SmartFake implements _i11.AppDatabase {
+  _FakeAppDatabase_17(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeSimpleSelectStatement_18<T1 extends _i8.HasResultSet, D>
+class _FakeDatabaseConnection_18 extends _i1.SmartFake
+    implements _i12.DatabaseConnection {
+  _FakeDatabaseConnection_18(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeDriftDatabaseOptions_19 extends _i1.SmartFake
+    implements _i12.DriftDatabaseOptions {
+  _FakeDriftDatabaseOptions_19(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeQueryExecutor_20 extends _i1.SmartFake
+    implements _i12.QueryExecutor {
+  _FakeQueryExecutor_20(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeStreamQueryStore_21 extends _i1.SmartFake
+    implements _i13.StreamQueryStore {
+  _FakeStreamQueryStore_21(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeDatabaseConnectionUser_22 extends _i1.SmartFake
+    implements _i12.DatabaseConnectionUser {
+  _FakeDatabaseConnectionUser_22(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _Fake$ConversationsTable_23 extends _i1.SmartFake
+    implements _i11.$ConversationsTable {
+  _Fake$ConversationsTable_23(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _Fake$MessagesTable_24 extends _i1.SmartFake
+    implements _i11.$MessagesTable {
+  _Fake$MessagesTable_24(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeMessageDaoManager_25 extends _i1.SmartFake
+    implements _i14.MessageDaoManager {
+  _FakeMessageDaoManager_25(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeInsertStatement_26<T1 extends _i12.Table, D1> extends _i1.SmartFake
+    implements _i12.InsertStatement<T1, D1> {
+  _FakeInsertStatement_26(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeUpdateStatement_27<T extends _i12.Table, D> extends _i1.SmartFake
+    implements _i12.UpdateStatement<T, D> {
+  _FakeUpdateStatement_27(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeSimpleSelectStatement_28<T1 extends _i12.HasResultSet, D>
     extends _i1.SmartFake
-    implements _i8.SimpleSelectStatement<T1, D> {
-  _FakeSimpleSelectStatement_18(Object parent, Invocation parentInvocation)
+    implements _i12.SimpleSelectStatement<T1, D> {
+  _FakeSimpleSelectStatement_28(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeJoinedSelectStatement_19<FirstT extends _i8.HasResultSet, FirstD>
+class _FakeJoinedSelectStatement_29<FirstT extends _i12.HasResultSet, FirstD>
     extends _i1.SmartFake
-    implements _i8.JoinedSelectStatement<FirstT, FirstD> {
-  _FakeJoinedSelectStatement_19(Object parent, Invocation parentInvocation)
+    implements _i12.JoinedSelectStatement<FirstT, FirstD> {
+  _FakeJoinedSelectStatement_29(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeBaseSelectStatement_20<Row> extends _i1.SmartFake
-    implements _i8.BaseSelectStatement<Row> {
-  _FakeBaseSelectStatement_20(Object parent, Invocation parentInvocation)
+class _FakeBaseSelectStatement_30<Row> extends _i1.SmartFake
+    implements _i12.BaseSelectStatement<Row> {
+  _FakeBaseSelectStatement_30(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeDeleteStatement_21<T1 extends _i8.Table, D1> extends _i1.SmartFake
-    implements _i8.DeleteStatement<T1, D1> {
-  _FakeDeleteStatement_21(Object parent, Invocation parentInvocation)
+class _FakeDeleteStatement_31<T1 extends _i12.Table, D1> extends _i1.SmartFake
+    implements _i12.DeleteStatement<T1, D1> {
+  _FakeDeleteStatement_31(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeSelectable_22<T> extends _i1.SmartFake implements _i8.Selectable<T> {
-  _FakeSelectable_22(Object parent, Invocation parentInvocation)
+class _FakeSelectable_32<T> extends _i1.SmartFake
+    implements _i12.Selectable<T> {
+  _FakeSelectable_32(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeGenerationContext_23 extends _i1.SmartFake
-    implements _i8.GenerationContext {
-  _FakeGenerationContext_23(Object parent, Invocation parentInvocation)
+class _FakeGenerationContext_33 extends _i1.SmartFake
+    implements _i12.GenerationContext {
+  _FakeGenerationContext_33(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeConversationDaoManager_24 extends _i1.SmartFake
-    implements _i12.ConversationDaoManager {
-  _FakeConversationDaoManager_24(Object parent, Invocation parentInvocation)
+class _FakeConversationDaoManager_34 extends _i1.SmartFake
+    implements _i15.ConversationDaoManager {
+  _FakeConversationDaoManager_34(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeUserMetadata_25 extends _i1.SmartFake implements _i3.UserMetadata {
-  _FakeUserMetadata_25(Object parent, Invocation parentInvocation)
+class _FakeUserMetadata_35 extends _i1.SmartFake implements _i3.UserMetadata {
+  _FakeUserMetadata_35(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeMultiFactor_26 extends _i1.SmartFake implements _i4.MultiFactor {
-  _FakeMultiFactor_26(Object parent, Invocation parentInvocation)
+class _FakeMultiFactor_36 extends _i1.SmartFake implements _i4.MultiFactor {
+  _FakeMultiFactor_36(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeIdTokenResult_27 extends _i1.SmartFake implements _i3.IdTokenResult {
-  _FakeIdTokenResult_27(Object parent, Invocation parentInvocation)
+class _FakeIdTokenResult_37 extends _i1.SmartFake implements _i3.IdTokenResult {
+  _FakeIdTokenResult_37(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeUser_28 extends _i1.SmartFake implements _i4.User {
-  _FakeUser_28(Object parent, Invocation parentInvocation)
+class _FakeUser_38 extends _i1.SmartFake implements _i4.User {
+  _FakeUser_38(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
@@ -248,7 +313,7 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
           as Map<dynamic, dynamic>);
 
   @override
-  _i11.Future<void> useAuthEmulator(
+  _i7.Future<void> useAuthEmulator(
     String? host,
     int? port, {
     bool? automaticHostMapping = true,
@@ -259,41 +324,41 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
               [host, port],
               {#automaticHostMapping: automaticHostMapping},
             ),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> applyActionCode(String? code) =>
+  _i7.Future<void> applyActionCode(String? code) =>
       (super.noSuchMethod(
             Invocation.method(#applyActionCode, [code]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<_i3.ActionCodeInfo> checkActionCode(String? code) =>
+  _i7.Future<_i3.ActionCodeInfo> checkActionCode(String? code) =>
       (super.noSuchMethod(
             Invocation.method(#checkActionCode, [code]),
-            returnValue: _i11.Future<_i3.ActionCodeInfo>.value(
+            returnValue: _i7.Future<_i3.ActionCodeInfo>.value(
               _FakeActionCodeInfo_1(
                 this,
                 Invocation.method(#checkActionCode, [code]),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i3.ActionCodeInfo>.value(
+            returnValueForMissingStub: _i7.Future<_i3.ActionCodeInfo>.value(
               _FakeActionCodeInfo_1(
                 this,
                 Invocation.method(#checkActionCode, [code]),
               ),
             ),
           )
-          as _i11.Future<_i3.ActionCodeInfo>);
+          as _i7.Future<_i3.ActionCodeInfo>);
 
   @override
-  _i11.Future<void> confirmPasswordReset({
+  _i7.Future<void> confirmPasswordReset({
     required String? code,
     required String? newPassword,
   }) =>
@@ -302,13 +367,13 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
               #code: code,
               #newPassword: newPassword,
             }),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<_i4.UserCredential> createUserWithEmailAndPassword({
+  _i7.Future<_i4.UserCredential> createUserWithEmailAndPassword({
     required String? email,
     required String? password,
   }) =>
@@ -317,7 +382,7 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
               #email: email,
               #password: password,
             }),
-            returnValue: _i11.Future<_i4.UserCredential>.value(
+            returnValue: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#createUserWithEmailAndPassword, [], {
@@ -326,7 +391,7 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
                 }),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.UserCredential>.value(
+            returnValueForMissingStub: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#createUserWithEmailAndPassword, [], {
@@ -336,37 +401,37 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
               ),
             ),
           )
-          as _i11.Future<_i4.UserCredential>);
+          as _i7.Future<_i4.UserCredential>);
 
   @override
-  _i11.Future<List<String>> fetchSignInMethodsForEmail(String? email) =>
+  _i7.Future<List<String>> fetchSignInMethodsForEmail(String? email) =>
       (super.noSuchMethod(
             Invocation.method(#fetchSignInMethodsForEmail, [email]),
-            returnValue: _i11.Future<List<String>>.value(<String>[]),
-            returnValueForMissingStub: _i11.Future<List<String>>.value(
+            returnValue: _i7.Future<List<String>>.value(<String>[]),
+            returnValueForMissingStub: _i7.Future<List<String>>.value(
               <String>[],
             ),
           )
-          as _i11.Future<List<String>>);
+          as _i7.Future<List<String>>);
 
   @override
-  _i11.Future<_i4.UserCredential> getRedirectResult() =>
+  _i7.Future<_i4.UserCredential> getRedirectResult() =>
       (super.noSuchMethod(
             Invocation.method(#getRedirectResult, []),
-            returnValue: _i11.Future<_i4.UserCredential>.value(
+            returnValue: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#getRedirectResult, []),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.UserCredential>.value(
+            returnValueForMissingStub: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#getRedirectResult, []),
               ),
             ),
           )
-          as _i11.Future<_i4.UserCredential>);
+          as _i7.Future<_i4.UserCredential>);
 
   @override
   bool isSignInWithEmailLink(String? emailLink) =>
@@ -378,34 +443,34 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
           as bool);
 
   @override
-  _i11.Stream<_i4.User?> authStateChanges() =>
+  _i7.Stream<_i4.User?> authStateChanges() =>
       (super.noSuchMethod(
             Invocation.method(#authStateChanges, []),
-            returnValue: _i11.Stream<_i4.User?>.empty(),
-            returnValueForMissingStub: _i11.Stream<_i4.User?>.empty(),
+            returnValue: _i7.Stream<_i4.User?>.empty(),
+            returnValueForMissingStub: _i7.Stream<_i4.User?>.empty(),
           )
-          as _i11.Stream<_i4.User?>);
+          as _i7.Stream<_i4.User?>);
 
   @override
-  _i11.Stream<_i4.User?> idTokenChanges() =>
+  _i7.Stream<_i4.User?> idTokenChanges() =>
       (super.noSuchMethod(
             Invocation.method(#idTokenChanges, []),
-            returnValue: _i11.Stream<_i4.User?>.empty(),
-            returnValueForMissingStub: _i11.Stream<_i4.User?>.empty(),
+            returnValue: _i7.Stream<_i4.User?>.empty(),
+            returnValueForMissingStub: _i7.Stream<_i4.User?>.empty(),
           )
-          as _i11.Stream<_i4.User?>);
+          as _i7.Stream<_i4.User?>);
 
   @override
-  _i11.Stream<_i4.User?> userChanges() =>
+  _i7.Stream<_i4.User?> userChanges() =>
       (super.noSuchMethod(
             Invocation.method(#userChanges, []),
-            returnValue: _i11.Stream<_i4.User?>.empty(),
-            returnValueForMissingStub: _i11.Stream<_i4.User?>.empty(),
+            returnValue: _i7.Stream<_i4.User?>.empty(),
+            returnValueForMissingStub: _i7.Stream<_i4.User?>.empty(),
           )
-          as _i11.Stream<_i4.User?>);
+          as _i7.Stream<_i4.User?>);
 
   @override
-  _i11.Future<void> sendPasswordResetEmail({
+  _i7.Future<void> sendPasswordResetEmail({
     required String? email,
     _i3.ActionCodeSettings? actionCodeSettings,
   }) =>
@@ -414,13 +479,13 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
               #email: email,
               #actionCodeSettings: actionCodeSettings,
             }),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> sendSignInLinkToEmail({
+  _i7.Future<void> sendSignInLinkToEmail({
     required String? email,
     required _i3.ActionCodeSettings? actionCodeSettings,
   }) =>
@@ -429,22 +494,22 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
               #email: email,
               #actionCodeSettings: actionCodeSettings,
             }),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> setLanguageCode(String? languageCode) =>
+  _i7.Future<void> setLanguageCode(String? languageCode) =>
       (super.noSuchMethod(
             Invocation.method(#setLanguageCode, [languageCode]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> setSettings({
+  _i7.Future<void> setSettings({
     bool? appVerificationDisabledForTesting = false,
     String? userAccessGroup,
     String? phoneNumber,
@@ -460,81 +525,81 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
               #smsCode: smsCode,
               #forceRecaptchaFlow: forceRecaptchaFlow,
             }),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> setPersistence(_i3.Persistence? persistence) =>
+  _i7.Future<void> setPersistence(_i3.Persistence? persistence) =>
       (super.noSuchMethod(
             Invocation.method(#setPersistence, [persistence]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<_i4.UserCredential> signInAnonymously() =>
+  _i7.Future<_i4.UserCredential> signInAnonymously() =>
       (super.noSuchMethod(
             Invocation.method(#signInAnonymously, []),
-            returnValue: _i11.Future<_i4.UserCredential>.value(
+            returnValue: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#signInAnonymously, []),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.UserCredential>.value(
+            returnValueForMissingStub: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#signInAnonymously, []),
               ),
             ),
           )
-          as _i11.Future<_i4.UserCredential>);
+          as _i7.Future<_i4.UserCredential>);
 
   @override
-  _i11.Future<_i4.UserCredential> signInWithCredential(
+  _i7.Future<_i4.UserCredential> signInWithCredential(
     _i3.AuthCredential? credential,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#signInWithCredential, [credential]),
-            returnValue: _i11.Future<_i4.UserCredential>.value(
+            returnValue: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#signInWithCredential, [credential]),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.UserCredential>.value(
+            returnValueForMissingStub: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#signInWithCredential, [credential]),
               ),
             ),
           )
-          as _i11.Future<_i4.UserCredential>);
+          as _i7.Future<_i4.UserCredential>);
 
   @override
-  _i11.Future<_i4.UserCredential> signInWithCustomToken(String? token) =>
+  _i7.Future<_i4.UserCredential> signInWithCustomToken(String? token) =>
       (super.noSuchMethod(
             Invocation.method(#signInWithCustomToken, [token]),
-            returnValue: _i11.Future<_i4.UserCredential>.value(
+            returnValue: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#signInWithCustomToken, [token]),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.UserCredential>.value(
+            returnValueForMissingStub: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#signInWithCustomToken, [token]),
               ),
             ),
           )
-          as _i11.Future<_i4.UserCredential>);
+          as _i7.Future<_i4.UserCredential>);
 
   @override
-  _i11.Future<_i4.UserCredential> signInWithEmailAndPassword({
+  _i7.Future<_i4.UserCredential> signInWithEmailAndPassword({
     required String? email,
     required String? password,
   }) =>
@@ -543,7 +608,7 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
               #email: email,
               #password: password,
             }),
-            returnValue: _i11.Future<_i4.UserCredential>.value(
+            returnValue: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#signInWithEmailAndPassword, [], {
@@ -552,7 +617,7 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
                 }),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.UserCredential>.value(
+            returnValueForMissingStub: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#signInWithEmailAndPassword, [], {
@@ -562,10 +627,10 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
               ),
             ),
           )
-          as _i11.Future<_i4.UserCredential>);
+          as _i7.Future<_i4.UserCredential>);
 
   @override
-  _i11.Future<_i4.UserCredential> signInWithEmailLink({
+  _i7.Future<_i4.UserCredential> signInWithEmailLink({
     required String? email,
     required String? emailLink,
   }) =>
@@ -574,7 +639,7 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
               #email: email,
               #emailLink: emailLink,
             }),
-            returnValue: _i11.Future<_i4.UserCredential>.value(
+            returnValue: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#signInWithEmailLink, [], {
@@ -583,7 +648,7 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
                 }),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.UserCredential>.value(
+            returnValueForMissingStub: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#signInWithEmailLink, [], {
@@ -593,37 +658,37 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
               ),
             ),
           )
-          as _i11.Future<_i4.UserCredential>);
+          as _i7.Future<_i4.UserCredential>);
 
   @override
-  _i11.Future<_i4.UserCredential> signInWithProvider(
+  _i7.Future<_i4.UserCredential> signInWithProvider(
     _i3.AuthProvider? provider,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#signInWithProvider, [provider]),
-            returnValue: _i11.Future<_i4.UserCredential>.value(
+            returnValue: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#signInWithProvider, [provider]),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.UserCredential>.value(
+            returnValueForMissingStub: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#signInWithProvider, [provider]),
               ),
             ),
           )
-          as _i11.Future<_i4.UserCredential>);
+          as _i7.Future<_i4.UserCredential>);
 
   @override
-  _i11.Future<_i4.ConfirmationResult> signInWithPhoneNumber(
+  _i7.Future<_i4.ConfirmationResult> signInWithPhoneNumber(
     String? phoneNumber, [
     _i4.RecaptchaVerifier? verifier,
   ]) =>
       (super.noSuchMethod(
             Invocation.method(#signInWithPhoneNumber, [phoneNumber, verifier]),
-            returnValue: _i11.Future<_i4.ConfirmationResult>.value(
+            returnValue: _i7.Future<_i4.ConfirmationResult>.value(
               _FakeConfirmationResult_3(
                 this,
                 Invocation.method(#signInWithPhoneNumber, [
@@ -632,77 +697,76 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
                 ]),
               ),
             ),
-            returnValueForMissingStub:
-                _i11.Future<_i4.ConfirmationResult>.value(
-                  _FakeConfirmationResult_3(
-                    this,
-                    Invocation.method(#signInWithPhoneNumber, [
-                      phoneNumber,
-                      verifier,
-                    ]),
-                  ),
-                ),
+            returnValueForMissingStub: _i7.Future<_i4.ConfirmationResult>.value(
+              _FakeConfirmationResult_3(
+                this,
+                Invocation.method(#signInWithPhoneNumber, [
+                  phoneNumber,
+                  verifier,
+                ]),
+              ),
+            ),
           )
-          as _i11.Future<_i4.ConfirmationResult>);
+          as _i7.Future<_i4.ConfirmationResult>);
 
   @override
-  _i11.Future<_i4.UserCredential> signInWithPopup(_i3.AuthProvider? provider) =>
+  _i7.Future<_i4.UserCredential> signInWithPopup(_i3.AuthProvider? provider) =>
       (super.noSuchMethod(
             Invocation.method(#signInWithPopup, [provider]),
-            returnValue: _i11.Future<_i4.UserCredential>.value(
+            returnValue: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#signInWithPopup, [provider]),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.UserCredential>.value(
+            returnValueForMissingStub: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#signInWithPopup, [provider]),
               ),
             ),
           )
-          as _i11.Future<_i4.UserCredential>);
+          as _i7.Future<_i4.UserCredential>);
 
   @override
-  _i11.Future<void> signInWithRedirect(_i3.AuthProvider? provider) =>
+  _i7.Future<void> signInWithRedirect(_i3.AuthProvider? provider) =>
       (super.noSuchMethod(
             Invocation.method(#signInWithRedirect, [provider]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> signOut() =>
+  _i7.Future<void> signOut() =>
       (super.noSuchMethod(
             Invocation.method(#signOut, []),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<String> verifyPasswordResetCode(String? code) =>
+  _i7.Future<String> verifyPasswordResetCode(String? code) =>
       (super.noSuchMethod(
             Invocation.method(#verifyPasswordResetCode, [code]),
-            returnValue: _i11.Future<String>.value(
-              _i13.dummyValue<String>(
+            returnValue: _i7.Future<String>.value(
+              _i16.dummyValue<String>(
                 this,
                 Invocation.method(#verifyPasswordResetCode, [code]),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<String>.value(
-              _i13.dummyValue<String>(
+            returnValueForMissingStub: _i7.Future<String>.value(
+              _i16.dummyValue<String>(
                 this,
                 Invocation.method(#verifyPasswordResetCode, [code]),
               ),
             ),
           )
-          as _i11.Future<String>);
+          as _i7.Future<String>);
 
   @override
-  _i11.Future<void> verifyPhoneNumber({
+  _i7.Future<void> verifyPhoneNumber({
     String? phoneNumber,
     _i3.PhoneMultiFactorInfo? multiFactorInfo,
     required _i3.PhoneVerificationCompleted? verificationCompleted,
@@ -727,51 +791,621 @@ class MockFirebaseAuth extends _i1.Mock implements _i4.FirebaseAuth {
               #forceResendingToken: forceResendingToken,
               #multiFactorSession: multiFactorSession,
             }),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> revokeTokenWithAuthorizationCode(
+  _i7.Future<void> revokeTokenWithAuthorizationCode(
     String? authorizationCode,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#revokeTokenWithAuthorizationCode, [
               authorizationCode,
             ]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> initializeRecaptchaConfig() =>
+  _i7.Future<void> initializeRecaptchaConfig() =>
       (super.noSuchMethod(
             Invocation.method(#initializeRecaptchaConfig, []),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
+}
+
+/// A class which mocks [FirebaseFirestore].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockFirebaseFirestore extends _i1.Mock implements _i6.FirebaseFirestore {
+  @override
+  _i2.FirebaseApp get app =>
+      (super.noSuchMethod(
+            Invocation.getter(#app),
+            returnValue: _FakeFirebaseApp_0(this, Invocation.getter(#app)),
+            returnValueForMissingStub: _FakeFirebaseApp_0(
+              this,
+              Invocation.getter(#app),
+            ),
+          )
+          as _i2.FirebaseApp);
+
+  @override
+  String get databaseURL =>
+      (super.noSuchMethod(
+            Invocation.getter(#databaseURL),
+            returnValue: _i16.dummyValue<String>(
+              this,
+              Invocation.getter(#databaseURL),
+            ),
+            returnValueForMissingStub: _i16.dummyValue<String>(
+              this,
+              Invocation.getter(#databaseURL),
+            ),
+          )
+          as String);
+
+  @override
+  String get databaseId =>
+      (super.noSuchMethod(
+            Invocation.getter(#databaseId),
+            returnValue: _i16.dummyValue<String>(
+              this,
+              Invocation.getter(#databaseId),
+            ),
+            returnValueForMissingStub: _i16.dummyValue<String>(
+              this,
+              Invocation.getter(#databaseId),
+            ),
+          )
+          as String);
+
+  @override
+  _i5.Settings get settings =>
+      (super.noSuchMethod(
+            Invocation.getter(#settings),
+            returnValue: _FakeSettings_4(this, Invocation.getter(#settings)),
+            returnValueForMissingStub: _FakeSettings_4(
+              this,
+              Invocation.getter(#settings),
+            ),
+          )
+          as _i5.Settings);
+
+  @override
+  set app(_i2.FirebaseApp? value) => super.noSuchMethod(
+    Invocation.setter(#app, value),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  set databaseURL(String? value) => super.noSuchMethod(
+    Invocation.setter(#databaseURL, value),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  set databaseId(String? value) => super.noSuchMethod(
+    Invocation.setter(#databaseId, value),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  set settings(_i5.Settings? settings) => super.noSuchMethod(
+    Invocation.setter(#settings, settings),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  Map<dynamic, dynamic> get pluginConstants =>
+      (super.noSuchMethod(
+            Invocation.getter(#pluginConstants),
+            returnValue: <dynamic, dynamic>{},
+            returnValueForMissingStub: <dynamic, dynamic>{},
+          )
+          as Map<dynamic, dynamic>);
+
+  @override
+  _i6.CollectionReference<Map<String, dynamic>> collection(
+    String? collectionPath,
+  ) =>
+      (super.noSuchMethod(
+            Invocation.method(#collection, [collectionPath]),
+            returnValue: _FakeCollectionReference_5<Map<String, dynamic>>(
+              this,
+              Invocation.method(#collection, [collectionPath]),
+            ),
+            returnValueForMissingStub:
+                _FakeCollectionReference_5<Map<String, dynamic>>(
+                  this,
+                  Invocation.method(#collection, [collectionPath]),
+                ),
+          )
+          as _i6.CollectionReference<Map<String, dynamic>>);
+
+  @override
+  _i6.WriteBatch batch() =>
+      (super.noSuchMethod(
+            Invocation.method(#batch, []),
+            returnValue: _FakeWriteBatch_6(this, Invocation.method(#batch, [])),
+            returnValueForMissingStub: _FakeWriteBatch_6(
+              this,
+              Invocation.method(#batch, []),
+            ),
+          )
+          as _i6.WriteBatch);
+
+  @override
+  _i7.Future<void> clearPersistence() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearPersistence, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> enablePersistence([
+    _i5.PersistenceSettings? persistenceSettings,
+  ]) =>
+      (super.noSuchMethod(
+            Invocation.method(#enablePersistence, [persistenceSettings]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i6.LoadBundleTask loadBundle(_i17.Uint8List? bundle) =>
+      (super.noSuchMethod(
+            Invocation.method(#loadBundle, [bundle]),
+            returnValue: _FakeLoadBundleTask_7(
+              this,
+              Invocation.method(#loadBundle, [bundle]),
+            ),
+            returnValueForMissingStub: _FakeLoadBundleTask_7(
+              this,
+              Invocation.method(#loadBundle, [bundle]),
+            ),
+          )
+          as _i6.LoadBundleTask);
+
+  @override
+  void useFirestoreEmulator(
+    String? host,
+    int? port, {
+    bool? sslEnabled = false,
+    bool? automaticHostMapping = true,
+  }) => super.noSuchMethod(
+    Invocation.method(
+      #useFirestoreEmulator,
+      [host, port],
+      {#sslEnabled: sslEnabled, #automaticHostMapping: automaticHostMapping},
+    ),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  _i7.Future<_i6.QuerySnapshot<T>> namedQueryWithConverterGet<T>(
+    String? name, {
+    _i5.GetOptions? options = const _i5.GetOptions(),
+    required _i6.FromFirestore<T>? fromFirestore,
+    required _i6.ToFirestore<T>? toFirestore,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #namedQueryWithConverterGet,
+              [name],
+              {
+                #options: options,
+                #fromFirestore: fromFirestore,
+                #toFirestore: toFirestore,
+              },
+            ),
+            returnValue: _i7.Future<_i6.QuerySnapshot<T>>.value(
+              _FakeQuerySnapshot_8<T>(
+                this,
+                Invocation.method(
+                  #namedQueryWithConverterGet,
+                  [name],
+                  {
+                    #options: options,
+                    #fromFirestore: fromFirestore,
+                    #toFirestore: toFirestore,
+                  },
+                ),
+              ),
+            ),
+            returnValueForMissingStub: _i7.Future<_i6.QuerySnapshot<T>>.value(
+              _FakeQuerySnapshot_8<T>(
+                this,
+                Invocation.method(
+                  #namedQueryWithConverterGet,
+                  [name],
+                  {
+                    #options: options,
+                    #fromFirestore: fromFirestore,
+                    #toFirestore: toFirestore,
+                  },
+                ),
+              ),
+            ),
+          )
+          as _i7.Future<_i6.QuerySnapshot<T>>);
+
+  @override
+  _i7.Future<_i6.QuerySnapshot<Map<String, dynamic>>> namedQueryGet(
+    String? name, {
+    _i5.GetOptions? options = const _i5.GetOptions(),
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#namedQueryGet, [name], {#options: options}),
+            returnValue:
+                _i7.Future<_i6.QuerySnapshot<Map<String, dynamic>>>.value(
+                  _FakeQuerySnapshot_8<Map<String, dynamic>>(
+                    this,
+                    Invocation.method(
+                      #namedQueryGet,
+                      [name],
+                      {#options: options},
+                    ),
+                  ),
+                ),
+            returnValueForMissingStub:
+                _i7.Future<_i6.QuerySnapshot<Map<String, dynamic>>>.value(
+                  _FakeQuerySnapshot_8<Map<String, dynamic>>(
+                    this,
+                    Invocation.method(
+                      #namedQueryGet,
+                      [name],
+                      {#options: options},
+                    ),
+                  ),
+                ),
+          )
+          as _i7.Future<_i6.QuerySnapshot<Map<String, dynamic>>>);
+
+  @override
+  _i6.Query<Map<String, dynamic>> collectionGroup(String? collectionPath) =>
+      (super.noSuchMethod(
+            Invocation.method(#collectionGroup, [collectionPath]),
+            returnValue: _FakeQuery_9<Map<String, dynamic>>(
+              this,
+              Invocation.method(#collectionGroup, [collectionPath]),
+            ),
+            returnValueForMissingStub: _FakeQuery_9<Map<String, dynamic>>(
+              this,
+              Invocation.method(#collectionGroup, [collectionPath]),
+            ),
+          )
+          as _i6.Query<Map<String, dynamic>>);
+
+  @override
+  _i7.Future<void> disableNetwork() =>
+      (super.noSuchMethod(
+            Invocation.method(#disableNetwork, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i6.DocumentReference<Map<String, dynamic>> doc(String? documentPath) =>
+      (super.noSuchMethod(
+            Invocation.method(#doc, [documentPath]),
+            returnValue: _FakeDocumentReference_10<Map<String, dynamic>>(
+              this,
+              Invocation.method(#doc, [documentPath]),
+            ),
+            returnValueForMissingStub:
+                _FakeDocumentReference_10<Map<String, dynamic>>(
+                  this,
+                  Invocation.method(#doc, [documentPath]),
+                ),
+          )
+          as _i6.DocumentReference<Map<String, dynamic>>);
+
+  @override
+  _i7.Future<void> enableNetwork() =>
+      (super.noSuchMethod(
+            Invocation.method(#enableNetwork, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Stream<void> snapshotsInSync() =>
+      (super.noSuchMethod(
+            Invocation.method(#snapshotsInSync, []),
+            returnValue: _i7.Stream<void>.empty(),
+            returnValueForMissingStub: _i7.Stream<void>.empty(),
+          )
+          as _i7.Stream<void>);
+
+  @override
+  _i7.Future<T> runTransaction<T>(
+    _i6.TransactionHandler<T>? transactionHandler, {
+    Duration? timeout = const Duration(seconds: 30),
+    int? maxAttempts = 5,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #runTransaction,
+              [transactionHandler],
+              {#timeout: timeout, #maxAttempts: maxAttempts},
+            ),
+            returnValue:
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
+                    this,
+                    Invocation.method(
+                      #runTransaction,
+                      [transactionHandler],
+                      {#timeout: timeout, #maxAttempts: maxAttempts},
+                    ),
+                  ),
+                  (T v) => _i7.Future<T>.value(v),
+                ) ??
+                _FakeFuture_11<T>(
+                  this,
+                  Invocation.method(
+                    #runTransaction,
+                    [transactionHandler],
+                    {#timeout: timeout, #maxAttempts: maxAttempts},
+                  ),
+                ),
+            returnValueForMissingStub:
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
+                    this,
+                    Invocation.method(
+                      #runTransaction,
+                      [transactionHandler],
+                      {#timeout: timeout, #maxAttempts: maxAttempts},
+                    ),
+                  ),
+                  (T v) => _i7.Future<T>.value(v),
+                ) ??
+                _FakeFuture_11<T>(
+                  this,
+                  Invocation.method(
+                    #runTransaction,
+                    [transactionHandler],
+                    {#timeout: timeout, #maxAttempts: maxAttempts},
+                  ),
+                ),
+          )
+          as _i7.Future<T>);
+
+  @override
+  _i7.Future<void> terminate() =>
+      (super.noSuchMethod(
+            Invocation.method(#terminate, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> waitForPendingWrites() =>
+      (super.noSuchMethod(
+            Invocation.method(#waitForPendingWrites, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> setIndexConfiguration({
+    required List<_i5.Index>? indexes,
+    List<_i5.FieldOverrides>? fieldOverrides,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#setIndexConfiguration, [], {
+              #indexes: indexes,
+              #fieldOverrides: fieldOverrides,
+            }),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> setIndexConfigurationFromJSON(String? json) =>
+      (super.noSuchMethod(
+            Invocation.method(#setIndexConfigurationFromJSON, [json]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+}
+
+/// A class which mocks [FirebaseStorage].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockFirebaseStorage extends _i1.Mock implements _i8.FirebaseStorage {
+  @override
+  _i2.FirebaseApp get app =>
+      (super.noSuchMethod(
+            Invocation.getter(#app),
+            returnValue: _FakeFirebaseApp_0(this, Invocation.getter(#app)),
+            returnValueForMissingStub: _FakeFirebaseApp_0(
+              this,
+              Invocation.getter(#app),
+            ),
+          )
+          as _i2.FirebaseApp);
+
+  @override
+  String get bucket =>
+      (super.noSuchMethod(
+            Invocation.getter(#bucket),
+            returnValue: _i16.dummyValue<String>(
+              this,
+              Invocation.getter(#bucket),
+            ),
+            returnValueForMissingStub: _i16.dummyValue<String>(
+              this,
+              Invocation.getter(#bucket),
+            ),
+          )
+          as String);
+
+  @override
+  Duration get maxOperationRetryTime =>
+      (super.noSuchMethod(
+            Invocation.getter(#maxOperationRetryTime),
+            returnValue: _FakeDuration_12(
+              this,
+              Invocation.getter(#maxOperationRetryTime),
+            ),
+            returnValueForMissingStub: _FakeDuration_12(
+              this,
+              Invocation.getter(#maxOperationRetryTime),
+            ),
+          )
+          as Duration);
+
+  @override
+  Duration get maxUploadRetryTime =>
+      (super.noSuchMethod(
+            Invocation.getter(#maxUploadRetryTime),
+            returnValue: _FakeDuration_12(
+              this,
+              Invocation.getter(#maxUploadRetryTime),
+            ),
+            returnValueForMissingStub: _FakeDuration_12(
+              this,
+              Invocation.getter(#maxUploadRetryTime),
+            ),
+          )
+          as Duration);
+
+  @override
+  Duration get maxDownloadRetryTime =>
+      (super.noSuchMethod(
+            Invocation.getter(#maxDownloadRetryTime),
+            returnValue: _FakeDuration_12(
+              this,
+              Invocation.getter(#maxDownloadRetryTime),
+            ),
+            returnValueForMissingStub: _FakeDuration_12(
+              this,
+              Invocation.getter(#maxDownloadRetryTime),
+            ),
+          )
+          as Duration);
+
+  @override
+  set app(_i2.FirebaseApp? value) => super.noSuchMethod(
+    Invocation.setter(#app, value),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  set bucket(String? value) => super.noSuchMethod(
+    Invocation.setter(#bucket, value),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  Map<dynamic, dynamic> get pluginConstants =>
+      (super.noSuchMethod(
+            Invocation.getter(#pluginConstants),
+            returnValue: <dynamic, dynamic>{},
+            returnValueForMissingStub: <dynamic, dynamic>{},
+          )
+          as Map<dynamic, dynamic>);
+
+  @override
+  _i8.Reference ref([String? path]) =>
+      (super.noSuchMethod(
+            Invocation.method(#ref, [path]),
+            returnValue: _FakeReference_13(
+              this,
+              Invocation.method(#ref, [path]),
+            ),
+            returnValueForMissingStub: _FakeReference_13(
+              this,
+              Invocation.method(#ref, [path]),
+            ),
+          )
+          as _i8.Reference);
+
+  @override
+  _i8.Reference refFromURL(String? url) =>
+      (super.noSuchMethod(
+            Invocation.method(#refFromURL, [url]),
+            returnValue: _FakeReference_13(
+              this,
+              Invocation.method(#refFromURL, [url]),
+            ),
+            returnValueForMissingStub: _FakeReference_13(
+              this,
+              Invocation.method(#refFromURL, [url]),
+            ),
+          )
+          as _i8.Reference);
+
+  @override
+  void setMaxOperationRetryTime(Duration? time) => super.noSuchMethod(
+    Invocation.method(#setMaxOperationRetryTime, [time]),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  void setMaxUploadRetryTime(Duration? time) => super.noSuchMethod(
+    Invocation.method(#setMaxUploadRetryTime, [time]),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  void setMaxDownloadRetryTime(Duration? time) => super.noSuchMethod(
+    Invocation.method(#setMaxDownloadRetryTime, [time]),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  _i7.Future<void> useStorageEmulator(
+    String? host,
+    int? port, {
+    bool? automaticHostMapping = true,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #useStorageEmulator,
+              [host, port],
+              {#automaticHostMapping: automaticHostMapping},
+            ),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
 }
 
 /// A class which mocks [VaultStorageService].
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockVaultStorageService extends _i1.Mock
-    implements _i14.VaultStorageService {
+    implements _i18.VaultStorageService {
   @override
-  _i11.Future<_i5.VaultChunkMetadata> uploadChunk({
+  _i7.Future<_i9.VaultChunkMetadata> uploadChunk({
     required String? userId,
-    required _i6.VaultChunk? chunk,
+    required _i10.VaultChunk? chunk,
   }) =>
       (super.noSuchMethod(
             Invocation.method(#uploadChunk, [], {
               #userId: userId,
               #chunk: chunk,
             }),
-            returnValue: _i11.Future<_i5.VaultChunkMetadata>.value(
-              _FakeVaultChunkMetadata_4(
+            returnValue: _i7.Future<_i9.VaultChunkMetadata>.value(
+              _FakeVaultChunkMetadata_14(
                 this,
                 Invocation.method(#uploadChunk, [], {
                   #userId: userId,
@@ -779,31 +1413,30 @@ class MockVaultStorageService extends _i1.Mock
                 }),
               ),
             ),
-            returnValueForMissingStub:
-                _i11.Future<_i5.VaultChunkMetadata>.value(
-                  _FakeVaultChunkMetadata_4(
-                    this,
-                    Invocation.method(#uploadChunk, [], {
-                      #userId: userId,
-                      #chunk: chunk,
-                    }),
-                  ),
-                ),
+            returnValueForMissingStub: _i7.Future<_i9.VaultChunkMetadata>.value(
+              _FakeVaultChunkMetadata_14(
+                this,
+                Invocation.method(#uploadChunk, [], {
+                  #userId: userId,
+                  #chunk: chunk,
+                }),
+              ),
+            ),
           )
-          as _i11.Future<_i5.VaultChunkMetadata>);
+          as _i7.Future<_i9.VaultChunkMetadata>);
 
   @override
-  _i11.Future<_i6.VaultChunk> downloadChunk({
+  _i7.Future<_i10.VaultChunk> downloadChunk({
     required String? userId,
-    required _i5.VaultChunkMetadata? metadata,
+    required _i9.VaultChunkMetadata? metadata,
   }) =>
       (super.noSuchMethod(
             Invocation.method(#downloadChunk, [], {
               #userId: userId,
               #metadata: metadata,
             }),
-            returnValue: _i11.Future<_i6.VaultChunk>.value(
-              _FakeVaultChunk_5(
+            returnValue: _i7.Future<_i10.VaultChunk>.value(
+              _FakeVaultChunk_15(
                 this,
                 Invocation.method(#downloadChunk, [], {
                   #userId: userId,
@@ -811,8 +1444,8 @@ class MockVaultStorageService extends _i1.Mock
                 }),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i6.VaultChunk>.value(
-              _FakeVaultChunk_5(
+            returnValueForMissingStub: _i7.Future<_i10.VaultChunk>.value(
+              _FakeVaultChunk_15(
                 this,
                 Invocation.method(#downloadChunk, [], {
                   #userId: userId,
@@ -821,10 +1454,10 @@ class MockVaultStorageService extends _i1.Mock
               ),
             ),
           )
-          as _i11.Future<_i6.VaultChunk>);
+          as _i7.Future<_i10.VaultChunk>);
 
   @override
-  _i11.Future<List<_i5.VaultChunkMetadata>> listChunks({
+  _i7.Future<List<_i9.VaultChunkMetadata>> listChunks({
     required String? userId,
     int? afterIndex,
   }) =>
@@ -833,236 +1466,783 @@ class MockVaultStorageService extends _i1.Mock
               #userId: userId,
               #afterIndex: afterIndex,
             }),
-            returnValue: _i11.Future<List<_i5.VaultChunkMetadata>>.value(
-              <_i5.VaultChunkMetadata>[],
+            returnValue: _i7.Future<List<_i9.VaultChunkMetadata>>.value(
+              <_i9.VaultChunkMetadata>[],
             ),
             returnValueForMissingStub:
-                _i11.Future<List<_i5.VaultChunkMetadata>>.value(
-                  <_i5.VaultChunkMetadata>[],
+                _i7.Future<List<_i9.VaultChunkMetadata>>.value(
+                  <_i9.VaultChunkMetadata>[],
                 ),
           )
-          as _i11.Future<List<_i5.VaultChunkMetadata>>);
+          as _i7.Future<List<_i9.VaultChunkMetadata>>);
 
   @override
-  _i11.Future<int> getLatestChunkIndex(String? userId) =>
+  _i7.Future<int> getLatestChunkIndex(String? userId) =>
       (super.noSuchMethod(
             Invocation.method(#getLatestChunkIndex, [userId]),
-            returnValue: _i11.Future<int>.value(0),
-            returnValueForMissingStub: _i11.Future<int>.value(0),
+            returnValue: _i7.Future<int>.value(0),
+            returnValueForMissingStub: _i7.Future<int>.value(0),
           )
-          as _i11.Future<int>);
+          as _i7.Future<int>);
+}
+
+/// A class which mocks [VaultMediaService].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockVaultMediaService extends _i1.Mock implements _i19.VaultMediaService {
+  @override
+  _i7.Future<_i9.VaultMediaMetadata> uploadMediaToVault({
+    required String? userId,
+    required String? mediaId,
+    required _i17.Uint8List? encryptedBytes,
+    DateTime? expireAt,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#uploadMediaToVault, [], {
+              #userId: userId,
+              #mediaId: mediaId,
+              #encryptedBytes: encryptedBytes,
+              #expireAt: expireAt,
+            }),
+            returnValue: _i7.Future<_i9.VaultMediaMetadata>.value(
+              _FakeVaultMediaMetadata_16(
+                this,
+                Invocation.method(#uploadMediaToVault, [], {
+                  #userId: userId,
+                  #mediaId: mediaId,
+                  #encryptedBytes: encryptedBytes,
+                  #expireAt: expireAt,
+                }),
+              ),
+            ),
+            returnValueForMissingStub: _i7.Future<_i9.VaultMediaMetadata>.value(
+              _FakeVaultMediaMetadata_16(
+                this,
+                Invocation.method(#uploadMediaToVault, [], {
+                  #userId: userId,
+                  #mediaId: mediaId,
+                  #encryptedBytes: encryptedBytes,
+                  #expireAt: expireAt,
+                }),
+              ),
+            ),
+          )
+          as _i7.Future<_i9.VaultMediaMetadata>);
+
+  @override
+  _i7.Future<_i17.Uint8List?> downloadMediaFromVault({
+    required String? userId,
+    required String? mediaId,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#downloadMediaFromVault, [], {
+              #userId: userId,
+              #mediaId: mediaId,
+            }),
+            returnValue: _i7.Future<_i17.Uint8List?>.value(),
+            returnValueForMissingStub: _i7.Future<_i17.Uint8List?>.value(),
+          )
+          as _i7.Future<_i17.Uint8List?>);
+}
+
+/// A class which mocks [SecureStorageService].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockSecureStorageService extends _i1.Mock
+    implements _i20.SecureStorageService {
+  @override
+  _i7.Future<void> storePrivateKey(String? privateKey) =>
+      (super.noSuchMethod(
+            Invocation.method(#storePrivateKey, [privateKey]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getPrivateKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#getPrivateKey, []),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<void> storePublicKey(String? publicKey) =>
+      (super.noSuchMethod(
+            Invocation.method(#storePublicKey, [publicKey]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getPublicKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#getPublicKey, []),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<void> storePartnerPublicKey(String? partnerPublicKey) =>
+      (super.noSuchMethod(
+            Invocation.method(#storePartnerPublicKey, [partnerPublicKey]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getPartnerPublicKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#getPartnerPublicKey, []),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<void> storeUserId(String? userId) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeUserId, [userId]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getUserId() =>
+      (super.noSuchMethod(
+            Invocation.method(#getUserId, []),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<void> storeSessionKey(String? sessionKey) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeSessionKey, [sessionKey]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getSessionKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#getSessionKey, []),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  void clearSessionCache() => super.noSuchMethod(
+    Invocation.method(#clearSessionCache, []),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  _i7.Future<void> clearAll() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearAll, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<bool> hasEncryptionKeys() =>
+      (super.noSuchMethod(
+            Invocation.method(#hasEncryptionKeys, []),
+            returnValue: _i7.Future<bool>.value(false),
+            returnValueForMissingStub: _i7.Future<bool>.value(false),
+          )
+          as _i7.Future<bool>);
+
+  @override
+  _i7.Future<void> clearEncryptionKeys() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearEncryptionKeys, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<bool> hasPartnerKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#hasPartnerKey, []),
+            returnValue: _i7.Future<bool>.value(false),
+            returnValueForMissingStub: _i7.Future<bool>.value(false),
+          )
+          as _i7.Future<bool>);
+
+  @override
+  _i7.Future<void> storeTrustedFingerprint(String? fingerprint) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeTrustedFingerprint, [fingerprint]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getTrustedFingerprint() =>
+      (super.noSuchMethod(
+            Invocation.method(#getTrustedFingerprint, []),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<bool> isFingerprintAcknowledged() =>
+      (super.noSuchMethod(
+            Invocation.method(#isFingerprintAcknowledged, []),
+            returnValue: _i7.Future<bool>.value(false),
+            returnValueForMissingStub: _i7.Future<bool>.value(false),
+          )
+          as _i7.Future<bool>);
+
+  @override
+  _i7.Future<void> clearFingerprintAcknowledgment() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearFingerprintAcknowledgment, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> clearTrustedFingerprint() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearTrustedFingerprint, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> storeTwoFactorSecret(String? secret) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeTwoFactorSecret, [secret]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getTwoFactorSecret() =>
+      (super.noSuchMethod(
+            Invocation.method(#getTwoFactorSecret, []),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<void> storeBackupCodes(List<String>? codes) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeBackupCodes, [codes]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<List<String>?> getBackupCodes() =>
+      (super.noSuchMethod(
+            Invocation.method(#getBackupCodes, []),
+            returnValue: _i7.Future<List<String>?>.value(),
+            returnValueForMissingStub: _i7.Future<List<String>?>.value(),
+          )
+          as _i7.Future<List<String>?>);
+
+  @override
+  _i7.Future<void> clearTwoFactor() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearTwoFactor, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> storeDeviceId(String? deviceId) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeDeviceId, [deviceId]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getDeviceId() =>
+      (super.noSuchMethod(
+            Invocation.method(#getDeviceId, []),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<void> storeArchivedKeyPair({
+    required int? version,
+    required String? publicKey,
+    required String? privateKey,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeArchivedKeyPair, [], {
+              #version: version,
+              #publicKey: publicKey,
+              #privateKey: privateKey,
+            }),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getArchivedPrivateKey(int? version) =>
+      (super.noSuchMethod(
+            Invocation.method(#getArchivedPrivateKey, [version]),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<String?> getArchivedPublicKey(int? version) =>
+      (super.noSuchMethod(
+            Invocation.method(#getArchivedPublicKey, [version]),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<List<int>> getArchivedKeyVersions() =>
+      (super.noSuchMethod(
+            Invocation.method(#getArchivedKeyVersions, []),
+            returnValue: _i7.Future<List<int>>.value(<int>[]),
+            returnValueForMissingStub: _i7.Future<List<int>>.value(<int>[]),
+          )
+          as _i7.Future<List<int>>);
+
+  @override
+  _i7.Future<void> storeCurrentKeyVersion(int? version) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeCurrentKeyVersion, [version]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<int?> getCurrentKeyVersion() =>
+      (super.noSuchMethod(
+            Invocation.method(#getCurrentKeyVersion, []),
+            returnValue: _i7.Future<int?>.value(),
+            returnValueForMissingStub: _i7.Future<int?>.value(),
+          )
+          as _i7.Future<int?>);
+
+  @override
+  _i7.Future<void> storePendingRecoveryPhrase(String? phrase) =>
+      (super.noSuchMethod(
+            Invocation.method(#storePendingRecoveryPhrase, [phrase]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getPendingRecoveryPhrase() =>
+      (super.noSuchMethod(
+            Invocation.method(#getPendingRecoveryPhrase, []),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<void> clearPendingRecoveryPhrase() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearPendingRecoveryPhrase, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> storeCacheKey(String? cacheKey) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeCacheKey, [cacheKey]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getCacheKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#getCacheKey, []),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<void> deleteCacheKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#deleteCacheKey, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<int> getLastSyncedChunkIndex() =>
+      (super.noSuchMethod(
+            Invocation.method(#getLastSyncedChunkIndex, []),
+            returnValue: _i7.Future<int>.value(0),
+            returnValueForMissingStub: _i7.Future<int>.value(0),
+          )
+          as _i7.Future<int>);
+
+  @override
+  _i7.Future<void> storeLastSyncedChunkIndex(int? index) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeLastSyncedChunkIndex, [index]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> deleteLastSyncedChunkIndex() =>
+      (super.noSuchMethod(
+            Invocation.method(#deleteLastSyncedChunkIndex, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> storeVaultKey(String? key) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeVaultKey, [key]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getVaultKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#getVaultKey, []),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<void> deleteVaultKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#deleteVaultKey, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> storeDatabaseKey(String? key) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeDatabaseKey, [key]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getDatabaseKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#getDatabaseKey, []),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<void> deleteDatabaseKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#deleteDatabaseKey, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> storeSequenceCounters(String? json) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeSequenceCounters, [json]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getSequenceCounters() =>
+      (super.noSuchMethod(
+            Invocation.method(#getSequenceCounters, []),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<bool> get2FASessionVerified() =>
+      (super.noSuchMethod(
+            Invocation.method(#get2FASessionVerified, []),
+            returnValue: _i7.Future<bool>.value(false),
+            returnValueForMissingStub: _i7.Future<bool>.value(false),
+          )
+          as _i7.Future<bool>);
+
+  @override
+  _i7.Future<void> refresh2FASession() =>
+      (super.noSuchMethod(
+            Invocation.method(#refresh2FASession, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<Duration?> get2FASessionTimeRemaining() =>
+      (super.noSuchMethod(
+            Invocation.method(#get2FASessionTimeRemaining, []),
+            returnValue: _i7.Future<Duration?>.value(),
+            returnValueForMissingStub: _i7.Future<Duration?>.value(),
+          )
+          as _i7.Future<Duration?>);
 }
 
 /// A class which mocks [MessageDao].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
+class MockMessageDao extends _i1.Mock implements _i14.MessageDao {
   @override
-  _i7.AppDatabase get attachedDatabase =>
+  _i11.AppDatabase get attachedDatabase =>
       (super.noSuchMethod(
             Invocation.getter(#attachedDatabase),
-            returnValue: _FakeAppDatabase_6(
+            returnValue: _FakeAppDatabase_17(
               this,
               Invocation.getter(#attachedDatabase),
             ),
-            returnValueForMissingStub: _FakeAppDatabase_6(
+            returnValueForMissingStub: _FakeAppDatabase_17(
               this,
               Invocation.getter(#attachedDatabase),
             ),
           )
-          as _i7.AppDatabase);
+          as _i11.AppDatabase);
 
   @override
-  _i8.DatabaseConnection get connection =>
+  _i12.DatabaseConnection get connection =>
       (super.noSuchMethod(
             Invocation.getter(#connection),
-            returnValue: _FakeDatabaseConnection_7(
+            returnValue: _FakeDatabaseConnection_18(
               this,
               Invocation.getter(#connection),
             ),
-            returnValueForMissingStub: _FakeDatabaseConnection_7(
+            returnValueForMissingStub: _FakeDatabaseConnection_18(
               this,
               Invocation.getter(#connection),
             ),
           )
-          as _i8.DatabaseConnection);
+          as _i12.DatabaseConnection);
 
   @override
-  _i8.DriftDatabaseOptions get options =>
+  _i12.DriftDatabaseOptions get options =>
       (super.noSuchMethod(
             Invocation.getter(#options),
-            returnValue: _FakeDriftDatabaseOptions_8(
+            returnValue: _FakeDriftDatabaseOptions_19(
               this,
               Invocation.getter(#options),
             ),
-            returnValueForMissingStub: _FakeDriftDatabaseOptions_8(
+            returnValueForMissingStub: _FakeDriftDatabaseOptions_19(
               this,
               Invocation.getter(#options),
             ),
           )
-          as _i8.DriftDatabaseOptions);
+          as _i12.DriftDatabaseOptions);
 
   @override
-  _i8.SqlTypes get typeMapping =>
+  _i12.SqlTypes get typeMapping =>
       (super.noSuchMethod(
             Invocation.getter(#typeMapping),
-            returnValue: _i13.dummyValue<_i8.SqlTypes>(
+            returnValue: _i16.dummyValue<_i12.SqlTypes>(
               this,
               Invocation.getter(#typeMapping),
             ),
-            returnValueForMissingStub: _i13.dummyValue<_i8.SqlTypes>(
+            returnValueForMissingStub: _i16.dummyValue<_i12.SqlTypes>(
               this,
               Invocation.getter(#typeMapping),
             ),
           )
-          as _i8.SqlTypes);
+          as _i12.SqlTypes);
 
   @override
-  _i8.QueryExecutor get executor =>
+  _i12.QueryExecutor get executor =>
       (super.noSuchMethod(
             Invocation.getter(#executor),
-            returnValue: _FakeQueryExecutor_9(
+            returnValue: _FakeQueryExecutor_20(
               this,
               Invocation.getter(#executor),
             ),
-            returnValueForMissingStub: _FakeQueryExecutor_9(
+            returnValueForMissingStub: _FakeQueryExecutor_20(
               this,
               Invocation.getter(#executor),
             ),
           )
-          as _i8.QueryExecutor);
+          as _i12.QueryExecutor);
 
   @override
-  _i9.StreamQueryStore get streamQueries =>
+  _i13.StreamQueryStore get streamQueries =>
       (super.noSuchMethod(
             Invocation.getter(#streamQueries),
-            returnValue: _FakeStreamQueryStore_10(
+            returnValue: _FakeStreamQueryStore_21(
               this,
               Invocation.getter(#streamQueries),
             ),
-            returnValueForMissingStub: _FakeStreamQueryStore_10(
+            returnValueForMissingStub: _FakeStreamQueryStore_21(
               this,
               Invocation.getter(#streamQueries),
             ),
           )
-          as _i9.StreamQueryStore);
+          as _i13.StreamQueryStore);
 
   @override
-  _i8.DatabaseConnectionUser get resolvedEngine =>
+  _i12.DatabaseConnectionUser get resolvedEngine =>
       (super.noSuchMethod(
             Invocation.getter(#resolvedEngine),
-            returnValue: _FakeDatabaseConnectionUser_11(
+            returnValue: _FakeDatabaseConnectionUser_22(
               this,
               Invocation.getter(#resolvedEngine),
             ),
-            returnValueForMissingStub: _FakeDatabaseConnectionUser_11(
+            returnValueForMissingStub: _FakeDatabaseConnectionUser_22(
               this,
               Invocation.getter(#resolvedEngine),
             ),
           )
-          as _i8.DatabaseConnectionUser);
+          as _i12.DatabaseConnectionUser);
 
   @override
-  _i7.$ConversationsTable get conversations =>
+  _i11.$ConversationsTable get conversations =>
       (super.noSuchMethod(
             Invocation.getter(#conversations),
-            returnValue: _Fake$ConversationsTable_12(
+            returnValue: _Fake$ConversationsTable_23(
               this,
               Invocation.getter(#conversations),
             ),
-            returnValueForMissingStub: _Fake$ConversationsTable_12(
+            returnValueForMissingStub: _Fake$ConversationsTable_23(
               this,
               Invocation.getter(#conversations),
             ),
           )
-          as _i7.$ConversationsTable);
+          as _i11.$ConversationsTable);
 
   @override
-  _i7.$MessagesTable get messages =>
+  _i11.$MessagesTable get messages =>
       (super.noSuchMethod(
             Invocation.getter(#messages),
-            returnValue: _Fake$MessagesTable_13(
+            returnValue: _Fake$MessagesTable_24(
               this,
               Invocation.getter(#messages),
             ),
-            returnValueForMissingStub: _Fake$MessagesTable_13(
+            returnValueForMissingStub: _Fake$MessagesTable_24(
               this,
               Invocation.getter(#messages),
             ),
           )
-          as _i7.$MessagesTable);
+          as _i11.$MessagesTable);
 
   @override
-  _i10.MessageDaoManager get managers =>
+  _i14.MessageDaoManager get managers =>
       (super.noSuchMethod(
             Invocation.getter(#managers),
-            returnValue: _FakeMessageDaoManager_14(
+            returnValue: _FakeMessageDaoManager_25(
               this,
               Invocation.getter(#managers),
             ),
-            returnValueForMissingStub: _FakeMessageDaoManager_14(
+            returnValueForMissingStub: _FakeMessageDaoManager_25(
               this,
               Invocation.getter(#managers),
             ),
           )
-          as _i10.MessageDaoManager);
+          as _i14.MessageDaoManager);
 
   @override
-  _i11.Future<void> insert(_i15.LocalMessage? message) =>
+  _i7.Future<void> insert(_i21.LocalMessage? message) =>
       (super.noSuchMethod(
             Invocation.method(#insert, [message]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> insertBatch(List<_i15.LocalMessage>? messageList) =>
+  _i7.Future<void> insertBatch(List<_i21.LocalMessage>? messageList) =>
       (super.noSuchMethod(
             Invocation.method(#insertBatch, [messageList]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> updateMessage(_i15.LocalMessage? message) =>
+  _i7.Future<void> updateMessage(_i21.LocalMessage? message) =>
       (super.noSuchMethod(
             Invocation.method(#updateMessage, [message]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> deleteMessage(String? id) =>
+  _i7.Future<void> deleteMessage(String? id) =>
       (super.noSuchMethod(
             Invocation.method(#deleteMessage, [id]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> deleteByConversation(String? conversationId) =>
+  _i7.Future<void> deleteByConversation(String? conversationId) =>
       (super.noSuchMethod(
             Invocation.method(#deleteByConversation, [conversationId]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<_i15.LocalMessage?> getById(String? id) =>
+  _i7.Future<_i21.LocalMessage?> getById(String? id) =>
       (super.noSuchMethod(
             Invocation.method(#getById, [id]),
-            returnValue: _i11.Future<_i15.LocalMessage?>.value(),
-            returnValueForMissingStub: _i11.Future<_i15.LocalMessage?>.value(),
+            returnValue: _i7.Future<_i21.LocalMessage?>.value(),
+            returnValueForMissingStub: _i7.Future<_i21.LocalMessage?>.value(),
           )
-          as _i11.Future<_i15.LocalMessage?>);
+          as _i7.Future<_i21.LocalMessage?>);
 
   @override
-  _i11.Future<List<_i15.LocalMessage>> getByConversation(
+  _i7.Future<List<_i21.LocalMessage>> getByConversation(
     String? conversationId, {
     int? limit = 50,
     int? offset = 0,
@@ -1073,18 +2253,18 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
               [conversationId],
               {#limit: limit, #offset: offset},
             ),
-            returnValue: _i11.Future<List<_i15.LocalMessage>>.value(
-              <_i15.LocalMessage>[],
+            returnValue: _i7.Future<List<_i21.LocalMessage>>.value(
+              <_i21.LocalMessage>[],
             ),
             returnValueForMissingStub:
-                _i11.Future<List<_i15.LocalMessage>>.value(
-                  <_i15.LocalMessage>[],
+                _i7.Future<List<_i21.LocalMessage>>.value(
+                  <_i21.LocalMessage>[],
                 ),
           )
-          as _i11.Future<List<_i15.LocalMessage>>);
+          as _i7.Future<List<_i21.LocalMessage>>);
 
   @override
-  _i11.Future<List<_i15.LocalMessage>> getMessagesBefore(
+  _i7.Future<List<_i21.LocalMessage>> getMessagesBefore(
     String? conversationId,
     DateTime? before, {
     int? limit = 50,
@@ -1095,105 +2275,103 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
               [conversationId, before],
               {#limit: limit},
             ),
-            returnValue: _i11.Future<List<_i15.LocalMessage>>.value(
-              <_i15.LocalMessage>[],
+            returnValue: _i7.Future<List<_i21.LocalMessage>>.value(
+              <_i21.LocalMessage>[],
             ),
             returnValueForMissingStub:
-                _i11.Future<List<_i15.LocalMessage>>.value(
-                  <_i15.LocalMessage>[],
+                _i7.Future<List<_i21.LocalMessage>>.value(
+                  <_i21.LocalMessage>[],
                 ),
           )
-          as _i11.Future<List<_i15.LocalMessage>>);
+          as _i7.Future<List<_i21.LocalMessage>>);
 
   @override
-  _i11.Future<List<_i15.LocalMessage>> getMessagesAfter(
+  _i7.Future<List<_i21.LocalMessage>> getMessagesAfter(
     String? conversationId,
     DateTime? after,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#getMessagesAfter, [conversationId, after]),
-            returnValue: _i11.Future<List<_i15.LocalMessage>>.value(
-              <_i15.LocalMessage>[],
+            returnValue: _i7.Future<List<_i21.LocalMessage>>.value(
+              <_i21.LocalMessage>[],
             ),
             returnValueForMissingStub:
-                _i11.Future<List<_i15.LocalMessage>>.value(
-                  <_i15.LocalMessage>[],
+                _i7.Future<List<_i21.LocalMessage>>.value(
+                  <_i21.LocalMessage>[],
                 ),
           )
-          as _i11.Future<List<_i15.LocalMessage>>);
+          as _i7.Future<List<_i21.LocalMessage>>);
 
   @override
-  _i11.Future<_i15.LocalMessage?> getLatestMessage(String? conversationId) =>
+  _i7.Future<_i21.LocalMessage?> getLatestMessage(String? conversationId) =>
       (super.noSuchMethod(
             Invocation.method(#getLatestMessage, [conversationId]),
-            returnValue: _i11.Future<_i15.LocalMessage?>.value(),
-            returnValueForMissingStub: _i11.Future<_i15.LocalMessage?>.value(),
+            returnValue: _i7.Future<_i21.LocalMessage?>.value(),
+            returnValueForMissingStub: _i7.Future<_i21.LocalMessage?>.value(),
           )
-          as _i11.Future<_i15.LocalMessage?>);
+          as _i7.Future<_i21.LocalMessage?>);
 
   @override
-  _i11.Future<void> updateStatus(String? id, _i15.LocalMessageStatus? status) =>
+  _i7.Future<void> updateStatus(String? id, _i21.LocalMessageStatus? status) =>
       (super.noSuchMethod(
             Invocation.method(#updateStatus, [id, status]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> markAsSynced(String? id) =>
+  _i7.Future<void> markAsSynced(String? id) =>
       (super.noSuchMethod(
             Invocation.method(#markAsSynced, [id]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> markBatchAsSynced(List<String>? ids) =>
+  _i7.Future<void> markBatchAsSynced(List<String>? ids) =>
       (super.noSuchMethod(
             Invocation.method(#markBatchAsSynced, [ids]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<List<_i15.LocalMessage>> getUnsyncedMessages({
-    int? limit = 100,
-  }) =>
+  _i7.Future<List<_i21.LocalMessage>> getUnsyncedMessages({int? limit = 100}) =>
       (super.noSuchMethod(
             Invocation.method(#getUnsyncedMessages, [], {#limit: limit}),
-            returnValue: _i11.Future<List<_i15.LocalMessage>>.value(
-              <_i15.LocalMessage>[],
+            returnValue: _i7.Future<List<_i21.LocalMessage>>.value(
+              <_i21.LocalMessage>[],
             ),
             returnValueForMissingStub:
-                _i11.Future<List<_i15.LocalMessage>>.value(
-                  <_i15.LocalMessage>[],
+                _i7.Future<List<_i21.LocalMessage>>.value(
+                  <_i21.LocalMessage>[],
                 ),
           )
-          as _i11.Future<List<_i15.LocalMessage>>);
+          as _i7.Future<List<_i21.LocalMessage>>);
 
   @override
-  _i11.Future<int> getMessageCount(String? conversationId) =>
+  _i7.Future<int> getMessageCount(String? conversationId) =>
       (super.noSuchMethod(
             Invocation.method(#getMessageCount, [conversationId]),
-            returnValue: _i11.Future<int>.value(0),
-            returnValueForMissingStub: _i11.Future<int>.value(0),
+            returnValue: _i7.Future<int>.value(0),
+            returnValueForMissingStub: _i7.Future<int>.value(0),
           )
-          as _i11.Future<int>);
+          as _i7.Future<int>);
 
   @override
-  _i11.Future<void> deleteOlderThan(DateTime? cutoff) =>
+  _i7.Future<void> deleteOlderThan(DateTime? cutoff) =>
       (super.noSuchMethod(
             Invocation.method(#deleteOlderThan, [cutoff]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<int> deleteOlderThanInConversation(
+  _i7.Future<int> deleteOlderThanInConversation(
     String? conversationId,
     DateTime? cutoff,
   ) =>
@@ -1202,43 +2380,43 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
               conversationId,
               cutoff,
             ]),
-            returnValue: _i11.Future<int>.value(0),
-            returnValueForMissingStub: _i11.Future<int>.value(0),
+            returnValue: _i7.Future<int>.value(0),
+            returnValueForMissingStub: _i7.Future<int>.value(0),
           )
-          as _i11.Future<int>);
+          as _i7.Future<int>);
 
   @override
-  _i11.Stream<List<_i15.LocalMessage>> watchConversation(
+  _i7.Stream<List<_i21.LocalMessage>> watchConversation(
     String? conversationId,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#watchConversation, [conversationId]),
-            returnValue: _i11.Stream<List<_i15.LocalMessage>>.empty(),
+            returnValue: _i7.Stream<List<_i21.LocalMessage>>.empty(),
             returnValueForMissingStub:
-                _i11.Stream<List<_i15.LocalMessage>>.empty(),
+                _i7.Stream<List<_i21.LocalMessage>>.empty(),
           )
-          as _i11.Stream<List<_i15.LocalMessage>>);
+          as _i7.Stream<List<_i21.LocalMessage>>);
 
   @override
-  _i11.Stream<T> createStream<T extends Object>(
-    _i9.QueryStreamFetcher<T>? stmt,
+  _i7.Stream<T> createStream<T extends Object>(
+    _i13.QueryStreamFetcher<T>? stmt,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#createStream, [stmt]),
-            returnValue: _i11.Stream<T>.empty(),
-            returnValueForMissingStub: _i11.Stream<T>.empty(),
+            returnValue: _i7.Stream<T>.empty(),
+            returnValueForMissingStub: _i7.Stream<T>.empty(),
           )
-          as _i11.Stream<T>);
+          as _i7.Stream<T>);
 
   @override
-  T alias<T, D>(_i8.ResultSetImplementation<T, D>? table, String? alias) =>
+  T alias<T, D>(_i12.ResultSetImplementation<T, D>? table, String? alias) =>
       (super.noSuchMethod(
             Invocation.method(#alias, [table, alias]),
-            returnValue: _i13.dummyValue<T>(
+            returnValue: _i16.dummyValue<T>(
               this,
               Invocation.method(#alias, [table, alias]),
             ),
-            returnValueForMissingStub: _i13.dummyValue<T>(
+            returnValueForMissingStub: _i16.dummyValue<T>(
               this,
               Invocation.method(#alias, [table, alias]),
             ),
@@ -1246,168 +2424,169 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
           as T);
 
   @override
-  void markTablesUpdated(Iterable<_i8.TableInfo<_i8.Table, dynamic>>? tables) =>
-      super.noSuchMethod(
-        Invocation.method(#markTablesUpdated, [tables]),
-        returnValueForMissingStub: null,
-      );
+  void markTablesUpdated(
+    Iterable<_i12.TableInfo<_i12.Table, dynamic>>? tables,
+  ) => super.noSuchMethod(
+    Invocation.method(#markTablesUpdated, [tables]),
+    returnValueForMissingStub: null,
+  );
 
   @override
-  void notifyUpdates(Set<_i8.TableUpdate>? updates) => super.noSuchMethod(
+  void notifyUpdates(Set<_i12.TableUpdate>? updates) => super.noSuchMethod(
     Invocation.method(#notifyUpdates, [updates]),
     returnValueForMissingStub: null,
   );
 
   @override
-  _i11.Stream<Set<_i8.TableUpdate>> tableUpdates([
-    _i8.TableUpdateQuery? query = const _i8.TableUpdateQuery.any(),
+  _i7.Stream<Set<_i12.TableUpdate>> tableUpdates([
+    _i12.TableUpdateQuery? query = const _i12.TableUpdateQuery.any(),
   ]) =>
       (super.noSuchMethod(
             Invocation.method(#tableUpdates, [query]),
-            returnValue: _i11.Stream<Set<_i8.TableUpdate>>.empty(),
+            returnValue: _i7.Stream<Set<_i12.TableUpdate>>.empty(),
             returnValueForMissingStub:
-                _i11.Stream<Set<_i8.TableUpdate>>.empty(),
+                _i7.Stream<Set<_i12.TableUpdate>>.empty(),
           )
-          as _i11.Stream<Set<_i8.TableUpdate>>);
+          as _i7.Stream<Set<_i12.TableUpdate>>);
 
   @override
-  _i11.Future<T> doWhenOpened<T>(
-    _i11.FutureOr<T> Function(_i8.QueryExecutor)? fn,
+  _i7.Future<T> doWhenOpened<T>(
+    _i7.FutureOr<T> Function(_i12.QueryExecutor)? fn,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#doWhenOpened, [fn]),
             returnValue:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(#doWhenOpened, [fn]),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(this, Invocation.method(#doWhenOpened, [fn])),
+                _FakeFuture_11<T>(this, Invocation.method(#doWhenOpened, [fn])),
             returnValueForMissingStub:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(#doWhenOpened, [fn]),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(this, Invocation.method(#doWhenOpened, [fn])),
+                _FakeFuture_11<T>(this, Invocation.method(#doWhenOpened, [fn])),
           )
-          as _i11.Future<T>);
+          as _i7.Future<T>);
 
   @override
-  _i8.InsertStatement<T, D> into<T extends _i8.Table, D>(
-    _i8.TableInfo<T, D>? table,
+  _i12.InsertStatement<T, D> into<T extends _i12.Table, D>(
+    _i12.TableInfo<T, D>? table,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#into, [table]),
-            returnValue: _FakeInsertStatement_16<T, D>(
+            returnValue: _FakeInsertStatement_26<T, D>(
               this,
               Invocation.method(#into, [table]),
             ),
-            returnValueForMissingStub: _FakeInsertStatement_16<T, D>(
+            returnValueForMissingStub: _FakeInsertStatement_26<T, D>(
               this,
               Invocation.method(#into, [table]),
             ),
           )
-          as _i8.InsertStatement<T, D>);
+          as _i12.InsertStatement<T, D>);
 
   @override
-  _i8.UpdateStatement<Tbl, R> update<Tbl extends _i8.Table, R>(
-    _i8.TableInfo<Tbl, R>? table,
+  _i12.UpdateStatement<Tbl, R> update<Tbl extends _i12.Table, R>(
+    _i12.TableInfo<Tbl, R>? table,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#update, [table]),
-            returnValue: _FakeUpdateStatement_17<Tbl, R>(
+            returnValue: _FakeUpdateStatement_27<Tbl, R>(
               this,
               Invocation.method(#update, [table]),
             ),
-            returnValueForMissingStub: _FakeUpdateStatement_17<Tbl, R>(
+            returnValueForMissingStub: _FakeUpdateStatement_27<Tbl, R>(
               this,
               Invocation.method(#update, [table]),
             ),
           )
-          as _i8.UpdateStatement<Tbl, R>);
+          as _i12.UpdateStatement<Tbl, R>);
 
   @override
-  _i8.SimpleSelectStatement<T, R> select<T extends _i8.HasResultSet, R>(
-    _i8.ResultSetImplementation<T, R>? table, {
+  _i12.SimpleSelectStatement<T, R> select<T extends _i12.HasResultSet, R>(
+    _i12.ResultSetImplementation<T, R>? table, {
     bool? distinct = false,
   }) =>
       (super.noSuchMethod(
             Invocation.method(#select, [table], {#distinct: distinct}),
-            returnValue: _FakeSimpleSelectStatement_18<T, R>(
+            returnValue: _FakeSimpleSelectStatement_28<T, R>(
               this,
               Invocation.method(#select, [table], {#distinct: distinct}),
             ),
-            returnValueForMissingStub: _FakeSimpleSelectStatement_18<T, R>(
+            returnValueForMissingStub: _FakeSimpleSelectStatement_28<T, R>(
               this,
               Invocation.method(#select, [table], {#distinct: distinct}),
             ),
           )
-          as _i8.SimpleSelectStatement<T, R>);
+          as _i12.SimpleSelectStatement<T, R>);
 
   @override
-  _i8.JoinedSelectStatement<T, R> selectOnly<T extends _i8.HasResultSet, R>(
-    _i8.ResultSetImplementation<T, R>? table, {
+  _i12.JoinedSelectStatement<T, R> selectOnly<T extends _i12.HasResultSet, R>(
+    _i12.ResultSetImplementation<T, R>? table, {
     bool? distinct = false,
   }) =>
       (super.noSuchMethod(
             Invocation.method(#selectOnly, [table], {#distinct: distinct}),
-            returnValue: _FakeJoinedSelectStatement_19<T, R>(
+            returnValue: _FakeJoinedSelectStatement_29<T, R>(
               this,
               Invocation.method(#selectOnly, [table], {#distinct: distinct}),
             ),
-            returnValueForMissingStub: _FakeJoinedSelectStatement_19<T, R>(
+            returnValueForMissingStub: _FakeJoinedSelectStatement_29<T, R>(
               this,
               Invocation.method(#selectOnly, [table], {#distinct: distinct}),
             ),
           )
-          as _i8.JoinedSelectStatement<T, R>);
+          as _i12.JoinedSelectStatement<T, R>);
 
   @override
-  _i8.BaseSelectStatement<_i8.TypedResult> selectExpressions(
-    Iterable<_i8.Expression<Object>>? columns,
+  _i12.BaseSelectStatement<_i12.TypedResult> selectExpressions(
+    Iterable<_i12.Expression<Object>>? columns,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#selectExpressions, [columns]),
-            returnValue: _FakeBaseSelectStatement_20<_i8.TypedResult>(
+            returnValue: _FakeBaseSelectStatement_30<_i12.TypedResult>(
               this,
               Invocation.method(#selectExpressions, [columns]),
             ),
             returnValueForMissingStub:
-                _FakeBaseSelectStatement_20<_i8.TypedResult>(
+                _FakeBaseSelectStatement_30<_i12.TypedResult>(
                   this,
                   Invocation.method(#selectExpressions, [columns]),
                 ),
           )
-          as _i8.BaseSelectStatement<_i8.TypedResult>);
+          as _i12.BaseSelectStatement<_i12.TypedResult>);
 
   @override
-  _i8.DeleteStatement<T, D> delete<T extends _i8.Table, D>(
-    _i8.TableInfo<T, D>? table,
+  _i12.DeleteStatement<T, D> delete<T extends _i12.Table, D>(
+    _i12.TableInfo<T, D>? table,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#delete, [table]),
-            returnValue: _FakeDeleteStatement_21<T, D>(
+            returnValue: _FakeDeleteStatement_31<T, D>(
               this,
               Invocation.method(#delete, [table]),
             ),
-            returnValueForMissingStub: _FakeDeleteStatement_21<T, D>(
+            returnValueForMissingStub: _FakeDeleteStatement_31<T, D>(
               this,
               Invocation.method(#delete, [table]),
             ),
           )
-          as _i8.DeleteStatement<T, D>);
+          as _i12.DeleteStatement<T, D>);
 
   @override
-  _i11.Future<int> customUpdate(
+  _i7.Future<int> customUpdate(
     String? query, {
-    List<_i8.Variable<Object>>? variables = const [],
-    Set<_i8.ResultSetImplementation<dynamic, dynamic>>? updates,
-    _i8.UpdateKind? updateKind,
+    List<_i12.Variable<Object>>? variables = const [],
+    Set<_i12.ResultSetImplementation<dynamic, dynamic>>? updates,
+    _i12.UpdateKind? updateKind,
   }) =>
       (super.noSuchMethod(
             Invocation.method(
@@ -1419,16 +2598,16 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
                 #updateKind: updateKind,
               },
             ),
-            returnValue: _i11.Future<int>.value(0),
-            returnValueForMissingStub: _i11.Future<int>.value(0),
+            returnValue: _i7.Future<int>.value(0),
+            returnValueForMissingStub: _i7.Future<int>.value(0),
           )
-          as _i11.Future<int>);
+          as _i7.Future<int>);
 
   @override
-  _i11.Future<int> customInsert(
+  _i7.Future<int> customInsert(
     String? query, {
-    List<_i8.Variable<Object>>? variables = const [],
-    Set<_i8.ResultSetImplementation<dynamic, dynamic>>? updates,
+    List<_i12.Variable<Object>>? variables = const [],
+    Set<_i12.ResultSetImplementation<dynamic, dynamic>>? updates,
   }) =>
       (super.noSuchMethod(
             Invocation.method(
@@ -1436,17 +2615,17 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
               [query],
               {#variables: variables, #updates: updates},
             ),
-            returnValue: _i11.Future<int>.value(0),
-            returnValueForMissingStub: _i11.Future<int>.value(0),
+            returnValue: _i7.Future<int>.value(0),
+            returnValueForMissingStub: _i7.Future<int>.value(0),
           )
-          as _i11.Future<int>);
+          as _i7.Future<int>);
 
   @override
-  _i11.Future<List<_i8.QueryRow>> customWriteReturning(
+  _i7.Future<List<_i12.QueryRow>> customWriteReturning(
     String? query, {
-    List<_i8.Variable<Object>>? variables = const [],
-    Set<_i8.ResultSetImplementation<dynamic, dynamic>>? updates,
-    _i8.UpdateKind? updateKind,
+    List<_i12.Variable<Object>>? variables = const [],
+    Set<_i12.ResultSetImplementation<dynamic, dynamic>>? updates,
+    _i12.UpdateKind? updateKind,
   }) =>
       (super.noSuchMethod(
             Invocation.method(
@@ -1458,20 +2637,20 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
                 #updateKind: updateKind,
               },
             ),
-            returnValue: _i11.Future<List<_i8.QueryRow>>.value(
-              <_i8.QueryRow>[],
+            returnValue: _i7.Future<List<_i12.QueryRow>>.value(
+              <_i12.QueryRow>[],
             ),
-            returnValueForMissingStub: _i11.Future<List<_i8.QueryRow>>.value(
-              <_i8.QueryRow>[],
+            returnValueForMissingStub: _i7.Future<List<_i12.QueryRow>>.value(
+              <_i12.QueryRow>[],
             ),
           )
-          as _i11.Future<List<_i8.QueryRow>>);
+          as _i7.Future<List<_i12.QueryRow>>);
 
   @override
-  _i8.Selectable<_i8.QueryRow> customSelect(
+  _i12.Selectable<_i12.QueryRow> customSelect(
     String? query, {
-    List<_i8.Variable<Object>>? variables = const [],
-    Set<_i8.ResultSetImplementation<dynamic, dynamic>>? readsFrom = const {},
+    List<_i12.Variable<Object>>? variables = const [],
+    Set<_i12.ResultSetImplementation<dynamic, dynamic>>? readsFrom = const {},
   }) =>
       (super.noSuchMethod(
             Invocation.method(
@@ -1479,7 +2658,7 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
               [query],
               {#variables: variables, #readsFrom: readsFrom},
             ),
-            returnValue: _FakeSelectable_22<_i8.QueryRow>(
+            returnValue: _FakeSelectable_32<_i12.QueryRow>(
               this,
               Invocation.method(
                 #customSelect,
@@ -1487,7 +2666,7 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
                 {#variables: variables, #readsFrom: readsFrom},
               ),
             ),
-            returnValueForMissingStub: _FakeSelectable_22<_i8.QueryRow>(
+            returnValueForMissingStub: _FakeSelectable_32<_i12.QueryRow>(
               this,
               Invocation.method(
                 #customSelect,
@@ -1496,13 +2675,13 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
               ),
             ),
           )
-          as _i8.Selectable<_i8.QueryRow>);
+          as _i12.Selectable<_i12.QueryRow>);
 
   @override
-  _i8.Selectable<_i8.QueryRow> customSelectQuery(
+  _i12.Selectable<_i12.QueryRow> customSelectQuery(
     String? query, {
-    List<_i8.Variable<Object>>? variables = const [],
-    Set<_i8.ResultSetImplementation<dynamic, dynamic>>? readsFrom = const {},
+    List<_i12.Variable<Object>>? variables = const [],
+    Set<_i12.ResultSetImplementation<dynamic, dynamic>>? readsFrom = const {},
   }) =>
       (super.noSuchMethod(
             Invocation.method(
@@ -1510,7 +2689,7 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
               [query],
               {#variables: variables, #readsFrom: readsFrom},
             ),
-            returnValue: _FakeSelectable_22<_i8.QueryRow>(
+            returnValue: _FakeSelectable_32<_i12.QueryRow>(
               this,
               Invocation.method(
                 #customSelectQuery,
@@ -1518,7 +2697,7 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
                 {#variables: variables, #readsFrom: readsFrom},
               ),
             ),
-            returnValueForMissingStub: _FakeSelectable_22<_i8.QueryRow>(
+            returnValueForMissingStub: _FakeSelectable_32<_i12.QueryRow>(
               this,
               Invocation.method(
                 #customSelectQuery,
@@ -1527,20 +2706,20 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
               ),
             ),
           )
-          as _i8.Selectable<_i8.QueryRow>);
+          as _i12.Selectable<_i12.QueryRow>);
 
   @override
-  _i11.Future<void> customStatement(String? statement, [List<dynamic>? args]) =>
+  _i7.Future<void> customStatement(String? statement, [List<dynamic>? args]) =>
       (super.noSuchMethod(
             Invocation.method(#customStatement, [statement, args]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<T> transaction<T>(
-    _i11.Future<T> Function()? action, {
+  _i7.Future<T> transaction<T>(
+    _i7.Future<T> Function()? action, {
     bool? requireNew = false,
   }) =>
       (super.noSuchMethod(
@@ -1550,8 +2729,8 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
               {#requireNew: requireNew},
             ),
             returnValue:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(
                       #transaction,
@@ -1559,9 +2738,9 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
                       {#requireNew: requireNew},
                     ),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(
+                _FakeFuture_11<T>(
                   this,
                   Invocation.method(
                     #transaction,
@@ -1570,8 +2749,8 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
                   ),
                 ),
             returnValueForMissingStub:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(
                       #transaction,
@@ -1579,9 +2758,9 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
                       {#requireNew: requireNew},
                     ),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(
+                _FakeFuture_11<T>(
                   this,
                   Invocation.method(
                     #transaction,
@@ -1590,54 +2769,52 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
                   ),
                 ),
           )
-          as _i11.Future<T>);
+          as _i7.Future<T>);
 
   @override
-  _i11.Future<T> exclusively<T>(_i11.Future<T> Function()? action) =>
+  _i7.Future<T> exclusively<T>(_i7.Future<T> Function()? action) =>
       (super.noSuchMethod(
             Invocation.method(#exclusively, [action]),
             returnValue:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(#exclusively, [action]),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(
+                _FakeFuture_11<T>(
                   this,
                   Invocation.method(#exclusively, [action]),
                 ),
             returnValueForMissingStub:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(#exclusively, [action]),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(
+                _FakeFuture_11<T>(
                   this,
                   Invocation.method(#exclusively, [action]),
                 ),
           )
-          as _i11.Future<T>);
+          as _i7.Future<T>);
 
   @override
-  _i11.Future<void> batch(
-    _i11.FutureOr<void> Function(_i8.Batch)? runInBatch,
-  ) =>
+  _i7.Future<void> batch(_i7.FutureOr<void> Function(_i12.Batch)? runInBatch) =>
       (super.noSuchMethod(
             Invocation.method(#batch, [runInBatch]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<T> runWithInterceptor<T>(
-    _i11.Future<T> Function()? action, {
-    required _i8.QueryInterceptor? interceptor,
+  _i7.Future<T> runWithInterceptor<T>(
+    _i7.Future<T> Function()? action, {
+    required _i12.QueryInterceptor? interceptor,
   }) =>
       (super.noSuchMethod(
             Invocation.method(
@@ -1646,8 +2823,8 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
               {#interceptor: interceptor},
             ),
             returnValue:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(
                       #runWithInterceptor,
@@ -1655,9 +2832,9 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
                       {#interceptor: interceptor},
                     ),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(
+                _FakeFuture_11<T>(
                   this,
                   Invocation.method(
                     #runWithInterceptor,
@@ -1666,8 +2843,8 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
                   ),
                 ),
             returnValueForMissingStub:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(
                       #runWithInterceptor,
@@ -1675,9 +2852,9 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
                       {#interceptor: interceptor},
                     ),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(
+                _FakeFuture_11<T>(
                   this,
                   Invocation.method(
                     #runWithInterceptor,
@@ -1686,11 +2863,11 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
                   ),
                 ),
           )
-          as _i11.Future<T>);
+          as _i7.Future<T>);
 
   @override
-  _i8.GenerationContext $write(
-    _i8.Component? component, {
+  _i12.GenerationContext $write(
+    _i12.Component? component, {
     bool? hasMultipleTables,
     int? startIndex,
   }) =>
@@ -1700,7 +2877,7 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
               [component],
               {#hasMultipleTables: hasMultipleTables, #startIndex: startIndex},
             ),
-            returnValue: _FakeGenerationContext_23(
+            returnValue: _FakeGenerationContext_33(
               this,
               Invocation.method(
                 #$write,
@@ -1711,7 +2888,7 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
                 },
               ),
             ),
-            returnValueForMissingStub: _FakeGenerationContext_23(
+            returnValueForMissingStub: _FakeGenerationContext_33(
               this,
               Invocation.method(
                 #$write,
@@ -1723,12 +2900,12 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
               ),
             ),
           )
-          as _i8.GenerationContext);
+          as _i12.GenerationContext);
 
   @override
-  _i8.GenerationContext $writeInsertable(
-    _i8.TableInfo<_i8.Table, dynamic>? table,
-    _i8.Insertable<dynamic>? insertable, {
+  _i12.GenerationContext $writeInsertable(
+    _i12.TableInfo<_i12.Table, dynamic>? table,
+    _i12.Insertable<dynamic>? insertable, {
     int? startIndex,
   }) =>
       (super.noSuchMethod(
@@ -1737,7 +2914,7 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
               [table, insertable],
               {#startIndex: startIndex},
             ),
-            returnValue: _FakeGenerationContext_23(
+            returnValue: _FakeGenerationContext_33(
               this,
               Invocation.method(
                 #$writeInsertable,
@@ -1745,7 +2922,7 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
                 {#startIndex: startIndex},
               ),
             ),
-            returnValueForMissingStub: _FakeGenerationContext_23(
+            returnValueForMissingStub: _FakeGenerationContext_33(
               this,
               Invocation.method(
                 #$writeInsertable,
@@ -1754,17 +2931,17 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
               ),
             ),
           )
-          as _i8.GenerationContext);
+          as _i12.GenerationContext);
 
   @override
   String $expandVar(int? start, int? amount) =>
       (super.noSuchMethod(
             Invocation.method(#$expandVar, [start, amount]),
-            returnValue: _i13.dummyValue<String>(
+            returnValue: _i16.dummyValue<String>(
               this,
               Invocation.method(#$expandVar, [start, amount]),
             ),
-            returnValueForMissingStub: _i13.dummyValue<String>(
+            returnValueForMissingStub: _i16.dummyValue<String>(
               this,
               Invocation.method(#$expandVar, [start, amount]),
             ),
@@ -1772,227 +2949,227 @@ class MockMessageDao extends _i1.Mock implements _i10.MessageDao {
           as String);
 
   @override
-  _i11.Future<void> close() =>
+  _i7.Future<void> close() =>
       (super.noSuchMethod(
             Invocation.method(#close, []),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 }
 
 /// A class which mocks [ConversationDao].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
+class MockConversationDao extends _i1.Mock implements _i15.ConversationDao {
   @override
-  _i7.AppDatabase get attachedDatabase =>
+  _i11.AppDatabase get attachedDatabase =>
       (super.noSuchMethod(
             Invocation.getter(#attachedDatabase),
-            returnValue: _FakeAppDatabase_6(
+            returnValue: _FakeAppDatabase_17(
               this,
               Invocation.getter(#attachedDatabase),
             ),
-            returnValueForMissingStub: _FakeAppDatabase_6(
+            returnValueForMissingStub: _FakeAppDatabase_17(
               this,
               Invocation.getter(#attachedDatabase),
             ),
           )
-          as _i7.AppDatabase);
+          as _i11.AppDatabase);
 
   @override
-  _i8.DatabaseConnection get connection =>
+  _i12.DatabaseConnection get connection =>
       (super.noSuchMethod(
             Invocation.getter(#connection),
-            returnValue: _FakeDatabaseConnection_7(
+            returnValue: _FakeDatabaseConnection_18(
               this,
               Invocation.getter(#connection),
             ),
-            returnValueForMissingStub: _FakeDatabaseConnection_7(
+            returnValueForMissingStub: _FakeDatabaseConnection_18(
               this,
               Invocation.getter(#connection),
             ),
           )
-          as _i8.DatabaseConnection);
+          as _i12.DatabaseConnection);
 
   @override
-  _i8.DriftDatabaseOptions get options =>
+  _i12.DriftDatabaseOptions get options =>
       (super.noSuchMethod(
             Invocation.getter(#options),
-            returnValue: _FakeDriftDatabaseOptions_8(
+            returnValue: _FakeDriftDatabaseOptions_19(
               this,
               Invocation.getter(#options),
             ),
-            returnValueForMissingStub: _FakeDriftDatabaseOptions_8(
+            returnValueForMissingStub: _FakeDriftDatabaseOptions_19(
               this,
               Invocation.getter(#options),
             ),
           )
-          as _i8.DriftDatabaseOptions);
+          as _i12.DriftDatabaseOptions);
 
   @override
-  _i8.SqlTypes get typeMapping =>
+  _i12.SqlTypes get typeMapping =>
       (super.noSuchMethod(
             Invocation.getter(#typeMapping),
-            returnValue: _i13.dummyValue<_i8.SqlTypes>(
+            returnValue: _i16.dummyValue<_i12.SqlTypes>(
               this,
               Invocation.getter(#typeMapping),
             ),
-            returnValueForMissingStub: _i13.dummyValue<_i8.SqlTypes>(
+            returnValueForMissingStub: _i16.dummyValue<_i12.SqlTypes>(
               this,
               Invocation.getter(#typeMapping),
             ),
           )
-          as _i8.SqlTypes);
+          as _i12.SqlTypes);
 
   @override
-  _i8.QueryExecutor get executor =>
+  _i12.QueryExecutor get executor =>
       (super.noSuchMethod(
             Invocation.getter(#executor),
-            returnValue: _FakeQueryExecutor_9(
+            returnValue: _FakeQueryExecutor_20(
               this,
               Invocation.getter(#executor),
             ),
-            returnValueForMissingStub: _FakeQueryExecutor_9(
+            returnValueForMissingStub: _FakeQueryExecutor_20(
               this,
               Invocation.getter(#executor),
             ),
           )
-          as _i8.QueryExecutor);
+          as _i12.QueryExecutor);
 
   @override
-  _i9.StreamQueryStore get streamQueries =>
+  _i13.StreamQueryStore get streamQueries =>
       (super.noSuchMethod(
             Invocation.getter(#streamQueries),
-            returnValue: _FakeStreamQueryStore_10(
+            returnValue: _FakeStreamQueryStore_21(
               this,
               Invocation.getter(#streamQueries),
             ),
-            returnValueForMissingStub: _FakeStreamQueryStore_10(
+            returnValueForMissingStub: _FakeStreamQueryStore_21(
               this,
               Invocation.getter(#streamQueries),
             ),
           )
-          as _i9.StreamQueryStore);
+          as _i13.StreamQueryStore);
 
   @override
-  _i8.DatabaseConnectionUser get resolvedEngine =>
+  _i12.DatabaseConnectionUser get resolvedEngine =>
       (super.noSuchMethod(
             Invocation.getter(#resolvedEngine),
-            returnValue: _FakeDatabaseConnectionUser_11(
+            returnValue: _FakeDatabaseConnectionUser_22(
               this,
               Invocation.getter(#resolvedEngine),
             ),
-            returnValueForMissingStub: _FakeDatabaseConnectionUser_11(
+            returnValueForMissingStub: _FakeDatabaseConnectionUser_22(
               this,
               Invocation.getter(#resolvedEngine),
             ),
           )
-          as _i8.DatabaseConnectionUser);
+          as _i12.DatabaseConnectionUser);
 
   @override
-  _i7.$ConversationsTable get conversations =>
+  _i11.$ConversationsTable get conversations =>
       (super.noSuchMethod(
             Invocation.getter(#conversations),
-            returnValue: _Fake$ConversationsTable_12(
+            returnValue: _Fake$ConversationsTable_23(
               this,
               Invocation.getter(#conversations),
             ),
-            returnValueForMissingStub: _Fake$ConversationsTable_12(
+            returnValueForMissingStub: _Fake$ConversationsTable_23(
               this,
               Invocation.getter(#conversations),
             ),
           )
-          as _i7.$ConversationsTable);
+          as _i11.$ConversationsTable);
 
   @override
-  _i12.ConversationDaoManager get managers =>
+  _i15.ConversationDaoManager get managers =>
       (super.noSuchMethod(
             Invocation.getter(#managers),
-            returnValue: _FakeConversationDaoManager_24(
+            returnValue: _FakeConversationDaoManager_34(
               this,
               Invocation.getter(#managers),
             ),
-            returnValueForMissingStub: _FakeConversationDaoManager_24(
+            returnValueForMissingStub: _FakeConversationDaoManager_34(
               this,
               Invocation.getter(#managers),
             ),
           )
-          as _i12.ConversationDaoManager);
+          as _i15.ConversationDaoManager);
 
   @override
-  _i11.Future<void> insert(_i16.LocalConversation? conversation) =>
+  _i7.Future<void> insert(_i22.LocalConversation? conversation) =>
       (super.noSuchMethod(
             Invocation.method(#insert, [conversation]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> updateConversation(_i16.LocalConversation? conversation) =>
+  _i7.Future<void> updateConversation(_i22.LocalConversation? conversation) =>
       (super.noSuchMethod(
             Invocation.method(#updateConversation, [conversation]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> deleteConversation(String? id) =>
+  _i7.Future<void> deleteConversation(String? id) =>
       (super.noSuchMethod(
             Invocation.method(#deleteConversation, [id]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<_i16.LocalConversation?> getById(String? id) =>
+  _i7.Future<_i22.LocalConversation?> getById(String? id) =>
       (super.noSuchMethod(
             Invocation.method(#getById, [id]),
-            returnValue: _i11.Future<_i16.LocalConversation?>.value(),
+            returnValue: _i7.Future<_i22.LocalConversation?>.value(),
             returnValueForMissingStub:
-                _i11.Future<_i16.LocalConversation?>.value(),
+                _i7.Future<_i22.LocalConversation?>.value(),
           )
-          as _i11.Future<_i16.LocalConversation?>);
+          as _i7.Future<_i22.LocalConversation?>);
 
   @override
-  _i11.Future<_i16.LocalConversation?> getByRecipientId(String? recipientId) =>
+  _i7.Future<_i22.LocalConversation?> getByRecipientId(String? recipientId) =>
       (super.noSuchMethod(
             Invocation.method(#getByRecipientId, [recipientId]),
-            returnValue: _i11.Future<_i16.LocalConversation?>.value(),
+            returnValue: _i7.Future<_i22.LocalConversation?>.value(),
             returnValueForMissingStub:
-                _i11.Future<_i16.LocalConversation?>.value(),
+                _i7.Future<_i22.LocalConversation?>.value(),
           )
-          as _i11.Future<_i16.LocalConversation?>);
+          as _i7.Future<_i22.LocalConversation?>);
 
   @override
-  _i11.Future<List<_i16.LocalConversation>> getAll() =>
+  _i7.Future<List<_i22.LocalConversation>> getAll() =>
       (super.noSuchMethod(
             Invocation.method(#getAll, []),
-            returnValue: _i11.Future<List<_i16.LocalConversation>>.value(
-              <_i16.LocalConversation>[],
+            returnValue: _i7.Future<List<_i22.LocalConversation>>.value(
+              <_i22.LocalConversation>[],
             ),
             returnValueForMissingStub:
-                _i11.Future<List<_i16.LocalConversation>>.value(
-                  <_i16.LocalConversation>[],
+                _i7.Future<List<_i22.LocalConversation>>.value(
+                  <_i22.LocalConversation>[],
                 ),
           )
-          as _i11.Future<List<_i16.LocalConversation>>);
+          as _i7.Future<List<_i22.LocalConversation>>);
 
   @override
-  _i11.Stream<List<_i16.LocalConversation>> watchAll() =>
+  _i7.Stream<List<_i22.LocalConversation>> watchAll() =>
       (super.noSuchMethod(
             Invocation.method(#watchAll, []),
-            returnValue: _i11.Stream<List<_i16.LocalConversation>>.empty(),
+            returnValue: _i7.Stream<List<_i22.LocalConversation>>.empty(),
             returnValueForMissingStub:
-                _i11.Stream<List<_i16.LocalConversation>>.empty(),
+                _i7.Stream<List<_i22.LocalConversation>>.empty(),
           )
-          as _i11.Stream<List<_i16.LocalConversation>>);
+          as _i7.Stream<List<_i22.LocalConversation>>);
 
   @override
-  _i11.Future<void> updateLastMessage({
+  _i7.Future<void> updateLastMessage({
     required String? conversationId,
     required String? content,
     required DateTime? timestamp,
@@ -2003,58 +3180,58 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
               #content: content,
               #timestamp: timestamp,
             }),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> incrementUnreadCount(String? conversationId) =>
+  _i7.Future<void> incrementUnreadCount(String? conversationId) =>
       (super.noSuchMethod(
             Invocation.method(#incrementUnreadCount, [conversationId]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> resetUnreadCount(String? conversationId) =>
+  _i7.Future<void> resetUnreadCount(String? conversationId) =>
       (super.noSuchMethod(
             Invocation.method(#resetUnreadCount, [conversationId]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<int> getTotalUnreadCount() =>
+  _i7.Future<int> getTotalUnreadCount() =>
       (super.noSuchMethod(
             Invocation.method(#getTotalUnreadCount, []),
-            returnValue: _i11.Future<int>.value(0),
-            returnValueForMissingStub: _i11.Future<int>.value(0),
+            returnValue: _i7.Future<int>.value(0),
+            returnValueForMissingStub: _i7.Future<int>.value(0),
           )
-          as _i11.Future<int>);
+          as _i7.Future<int>);
 
   @override
-  _i11.Stream<T> createStream<T extends Object>(
-    _i9.QueryStreamFetcher<T>? stmt,
+  _i7.Stream<T> createStream<T extends Object>(
+    _i13.QueryStreamFetcher<T>? stmt,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#createStream, [stmt]),
-            returnValue: _i11.Stream<T>.empty(),
-            returnValueForMissingStub: _i11.Stream<T>.empty(),
+            returnValue: _i7.Stream<T>.empty(),
+            returnValueForMissingStub: _i7.Stream<T>.empty(),
           )
-          as _i11.Stream<T>);
+          as _i7.Stream<T>);
 
   @override
-  T alias<T, D>(_i8.ResultSetImplementation<T, D>? table, String? alias) =>
+  T alias<T, D>(_i12.ResultSetImplementation<T, D>? table, String? alias) =>
       (super.noSuchMethod(
             Invocation.method(#alias, [table, alias]),
-            returnValue: _i13.dummyValue<T>(
+            returnValue: _i16.dummyValue<T>(
               this,
               Invocation.method(#alias, [table, alias]),
             ),
-            returnValueForMissingStub: _i13.dummyValue<T>(
+            returnValueForMissingStub: _i16.dummyValue<T>(
               this,
               Invocation.method(#alias, [table, alias]),
             ),
@@ -2062,168 +3239,169 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
           as T);
 
   @override
-  void markTablesUpdated(Iterable<_i8.TableInfo<_i8.Table, dynamic>>? tables) =>
-      super.noSuchMethod(
-        Invocation.method(#markTablesUpdated, [tables]),
-        returnValueForMissingStub: null,
-      );
+  void markTablesUpdated(
+    Iterable<_i12.TableInfo<_i12.Table, dynamic>>? tables,
+  ) => super.noSuchMethod(
+    Invocation.method(#markTablesUpdated, [tables]),
+    returnValueForMissingStub: null,
+  );
 
   @override
-  void notifyUpdates(Set<_i8.TableUpdate>? updates) => super.noSuchMethod(
+  void notifyUpdates(Set<_i12.TableUpdate>? updates) => super.noSuchMethod(
     Invocation.method(#notifyUpdates, [updates]),
     returnValueForMissingStub: null,
   );
 
   @override
-  _i11.Stream<Set<_i8.TableUpdate>> tableUpdates([
-    _i8.TableUpdateQuery? query = const _i8.TableUpdateQuery.any(),
+  _i7.Stream<Set<_i12.TableUpdate>> tableUpdates([
+    _i12.TableUpdateQuery? query = const _i12.TableUpdateQuery.any(),
   ]) =>
       (super.noSuchMethod(
             Invocation.method(#tableUpdates, [query]),
-            returnValue: _i11.Stream<Set<_i8.TableUpdate>>.empty(),
+            returnValue: _i7.Stream<Set<_i12.TableUpdate>>.empty(),
             returnValueForMissingStub:
-                _i11.Stream<Set<_i8.TableUpdate>>.empty(),
+                _i7.Stream<Set<_i12.TableUpdate>>.empty(),
           )
-          as _i11.Stream<Set<_i8.TableUpdate>>);
+          as _i7.Stream<Set<_i12.TableUpdate>>);
 
   @override
-  _i11.Future<T> doWhenOpened<T>(
-    _i11.FutureOr<T> Function(_i8.QueryExecutor)? fn,
+  _i7.Future<T> doWhenOpened<T>(
+    _i7.FutureOr<T> Function(_i12.QueryExecutor)? fn,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#doWhenOpened, [fn]),
             returnValue:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(#doWhenOpened, [fn]),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(this, Invocation.method(#doWhenOpened, [fn])),
+                _FakeFuture_11<T>(this, Invocation.method(#doWhenOpened, [fn])),
             returnValueForMissingStub:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(#doWhenOpened, [fn]),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(this, Invocation.method(#doWhenOpened, [fn])),
+                _FakeFuture_11<T>(this, Invocation.method(#doWhenOpened, [fn])),
           )
-          as _i11.Future<T>);
+          as _i7.Future<T>);
 
   @override
-  _i8.InsertStatement<T, D> into<T extends _i8.Table, D>(
-    _i8.TableInfo<T, D>? table,
+  _i12.InsertStatement<T, D> into<T extends _i12.Table, D>(
+    _i12.TableInfo<T, D>? table,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#into, [table]),
-            returnValue: _FakeInsertStatement_16<T, D>(
+            returnValue: _FakeInsertStatement_26<T, D>(
               this,
               Invocation.method(#into, [table]),
             ),
-            returnValueForMissingStub: _FakeInsertStatement_16<T, D>(
+            returnValueForMissingStub: _FakeInsertStatement_26<T, D>(
               this,
               Invocation.method(#into, [table]),
             ),
           )
-          as _i8.InsertStatement<T, D>);
+          as _i12.InsertStatement<T, D>);
 
   @override
-  _i8.UpdateStatement<Tbl, R> update<Tbl extends _i8.Table, R>(
-    _i8.TableInfo<Tbl, R>? table,
+  _i12.UpdateStatement<Tbl, R> update<Tbl extends _i12.Table, R>(
+    _i12.TableInfo<Tbl, R>? table,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#update, [table]),
-            returnValue: _FakeUpdateStatement_17<Tbl, R>(
+            returnValue: _FakeUpdateStatement_27<Tbl, R>(
               this,
               Invocation.method(#update, [table]),
             ),
-            returnValueForMissingStub: _FakeUpdateStatement_17<Tbl, R>(
+            returnValueForMissingStub: _FakeUpdateStatement_27<Tbl, R>(
               this,
               Invocation.method(#update, [table]),
             ),
           )
-          as _i8.UpdateStatement<Tbl, R>);
+          as _i12.UpdateStatement<Tbl, R>);
 
   @override
-  _i8.SimpleSelectStatement<T, R> select<T extends _i8.HasResultSet, R>(
-    _i8.ResultSetImplementation<T, R>? table, {
+  _i12.SimpleSelectStatement<T, R> select<T extends _i12.HasResultSet, R>(
+    _i12.ResultSetImplementation<T, R>? table, {
     bool? distinct = false,
   }) =>
       (super.noSuchMethod(
             Invocation.method(#select, [table], {#distinct: distinct}),
-            returnValue: _FakeSimpleSelectStatement_18<T, R>(
+            returnValue: _FakeSimpleSelectStatement_28<T, R>(
               this,
               Invocation.method(#select, [table], {#distinct: distinct}),
             ),
-            returnValueForMissingStub: _FakeSimpleSelectStatement_18<T, R>(
+            returnValueForMissingStub: _FakeSimpleSelectStatement_28<T, R>(
               this,
               Invocation.method(#select, [table], {#distinct: distinct}),
             ),
           )
-          as _i8.SimpleSelectStatement<T, R>);
+          as _i12.SimpleSelectStatement<T, R>);
 
   @override
-  _i8.JoinedSelectStatement<T, R> selectOnly<T extends _i8.HasResultSet, R>(
-    _i8.ResultSetImplementation<T, R>? table, {
+  _i12.JoinedSelectStatement<T, R> selectOnly<T extends _i12.HasResultSet, R>(
+    _i12.ResultSetImplementation<T, R>? table, {
     bool? distinct = false,
   }) =>
       (super.noSuchMethod(
             Invocation.method(#selectOnly, [table], {#distinct: distinct}),
-            returnValue: _FakeJoinedSelectStatement_19<T, R>(
+            returnValue: _FakeJoinedSelectStatement_29<T, R>(
               this,
               Invocation.method(#selectOnly, [table], {#distinct: distinct}),
             ),
-            returnValueForMissingStub: _FakeJoinedSelectStatement_19<T, R>(
+            returnValueForMissingStub: _FakeJoinedSelectStatement_29<T, R>(
               this,
               Invocation.method(#selectOnly, [table], {#distinct: distinct}),
             ),
           )
-          as _i8.JoinedSelectStatement<T, R>);
+          as _i12.JoinedSelectStatement<T, R>);
 
   @override
-  _i8.BaseSelectStatement<_i8.TypedResult> selectExpressions(
-    Iterable<_i8.Expression<Object>>? columns,
+  _i12.BaseSelectStatement<_i12.TypedResult> selectExpressions(
+    Iterable<_i12.Expression<Object>>? columns,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#selectExpressions, [columns]),
-            returnValue: _FakeBaseSelectStatement_20<_i8.TypedResult>(
+            returnValue: _FakeBaseSelectStatement_30<_i12.TypedResult>(
               this,
               Invocation.method(#selectExpressions, [columns]),
             ),
             returnValueForMissingStub:
-                _FakeBaseSelectStatement_20<_i8.TypedResult>(
+                _FakeBaseSelectStatement_30<_i12.TypedResult>(
                   this,
                   Invocation.method(#selectExpressions, [columns]),
                 ),
           )
-          as _i8.BaseSelectStatement<_i8.TypedResult>);
+          as _i12.BaseSelectStatement<_i12.TypedResult>);
 
   @override
-  _i8.DeleteStatement<T, D> delete<T extends _i8.Table, D>(
-    _i8.TableInfo<T, D>? table,
+  _i12.DeleteStatement<T, D> delete<T extends _i12.Table, D>(
+    _i12.TableInfo<T, D>? table,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#delete, [table]),
-            returnValue: _FakeDeleteStatement_21<T, D>(
+            returnValue: _FakeDeleteStatement_31<T, D>(
               this,
               Invocation.method(#delete, [table]),
             ),
-            returnValueForMissingStub: _FakeDeleteStatement_21<T, D>(
+            returnValueForMissingStub: _FakeDeleteStatement_31<T, D>(
               this,
               Invocation.method(#delete, [table]),
             ),
           )
-          as _i8.DeleteStatement<T, D>);
+          as _i12.DeleteStatement<T, D>);
 
   @override
-  _i11.Future<int> customUpdate(
+  _i7.Future<int> customUpdate(
     String? query, {
-    List<_i8.Variable<Object>>? variables = const [],
-    Set<_i8.ResultSetImplementation<dynamic, dynamic>>? updates,
-    _i8.UpdateKind? updateKind,
+    List<_i12.Variable<Object>>? variables = const [],
+    Set<_i12.ResultSetImplementation<dynamic, dynamic>>? updates,
+    _i12.UpdateKind? updateKind,
   }) =>
       (super.noSuchMethod(
             Invocation.method(
@@ -2235,16 +3413,16 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
                 #updateKind: updateKind,
               },
             ),
-            returnValue: _i11.Future<int>.value(0),
-            returnValueForMissingStub: _i11.Future<int>.value(0),
+            returnValue: _i7.Future<int>.value(0),
+            returnValueForMissingStub: _i7.Future<int>.value(0),
           )
-          as _i11.Future<int>);
+          as _i7.Future<int>);
 
   @override
-  _i11.Future<int> customInsert(
+  _i7.Future<int> customInsert(
     String? query, {
-    List<_i8.Variable<Object>>? variables = const [],
-    Set<_i8.ResultSetImplementation<dynamic, dynamic>>? updates,
+    List<_i12.Variable<Object>>? variables = const [],
+    Set<_i12.ResultSetImplementation<dynamic, dynamic>>? updates,
   }) =>
       (super.noSuchMethod(
             Invocation.method(
@@ -2252,17 +3430,17 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
               [query],
               {#variables: variables, #updates: updates},
             ),
-            returnValue: _i11.Future<int>.value(0),
-            returnValueForMissingStub: _i11.Future<int>.value(0),
+            returnValue: _i7.Future<int>.value(0),
+            returnValueForMissingStub: _i7.Future<int>.value(0),
           )
-          as _i11.Future<int>);
+          as _i7.Future<int>);
 
   @override
-  _i11.Future<List<_i8.QueryRow>> customWriteReturning(
+  _i7.Future<List<_i12.QueryRow>> customWriteReturning(
     String? query, {
-    List<_i8.Variable<Object>>? variables = const [],
-    Set<_i8.ResultSetImplementation<dynamic, dynamic>>? updates,
-    _i8.UpdateKind? updateKind,
+    List<_i12.Variable<Object>>? variables = const [],
+    Set<_i12.ResultSetImplementation<dynamic, dynamic>>? updates,
+    _i12.UpdateKind? updateKind,
   }) =>
       (super.noSuchMethod(
             Invocation.method(
@@ -2274,20 +3452,20 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
                 #updateKind: updateKind,
               },
             ),
-            returnValue: _i11.Future<List<_i8.QueryRow>>.value(
-              <_i8.QueryRow>[],
+            returnValue: _i7.Future<List<_i12.QueryRow>>.value(
+              <_i12.QueryRow>[],
             ),
-            returnValueForMissingStub: _i11.Future<List<_i8.QueryRow>>.value(
-              <_i8.QueryRow>[],
+            returnValueForMissingStub: _i7.Future<List<_i12.QueryRow>>.value(
+              <_i12.QueryRow>[],
             ),
           )
-          as _i11.Future<List<_i8.QueryRow>>);
+          as _i7.Future<List<_i12.QueryRow>>);
 
   @override
-  _i8.Selectable<_i8.QueryRow> customSelect(
+  _i12.Selectable<_i12.QueryRow> customSelect(
     String? query, {
-    List<_i8.Variable<Object>>? variables = const [],
-    Set<_i8.ResultSetImplementation<dynamic, dynamic>>? readsFrom = const {},
+    List<_i12.Variable<Object>>? variables = const [],
+    Set<_i12.ResultSetImplementation<dynamic, dynamic>>? readsFrom = const {},
   }) =>
       (super.noSuchMethod(
             Invocation.method(
@@ -2295,7 +3473,7 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
               [query],
               {#variables: variables, #readsFrom: readsFrom},
             ),
-            returnValue: _FakeSelectable_22<_i8.QueryRow>(
+            returnValue: _FakeSelectable_32<_i12.QueryRow>(
               this,
               Invocation.method(
                 #customSelect,
@@ -2303,7 +3481,7 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
                 {#variables: variables, #readsFrom: readsFrom},
               ),
             ),
-            returnValueForMissingStub: _FakeSelectable_22<_i8.QueryRow>(
+            returnValueForMissingStub: _FakeSelectable_32<_i12.QueryRow>(
               this,
               Invocation.method(
                 #customSelect,
@@ -2312,13 +3490,13 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
               ),
             ),
           )
-          as _i8.Selectable<_i8.QueryRow>);
+          as _i12.Selectable<_i12.QueryRow>);
 
   @override
-  _i8.Selectable<_i8.QueryRow> customSelectQuery(
+  _i12.Selectable<_i12.QueryRow> customSelectQuery(
     String? query, {
-    List<_i8.Variable<Object>>? variables = const [],
-    Set<_i8.ResultSetImplementation<dynamic, dynamic>>? readsFrom = const {},
+    List<_i12.Variable<Object>>? variables = const [],
+    Set<_i12.ResultSetImplementation<dynamic, dynamic>>? readsFrom = const {},
   }) =>
       (super.noSuchMethod(
             Invocation.method(
@@ -2326,7 +3504,7 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
               [query],
               {#variables: variables, #readsFrom: readsFrom},
             ),
-            returnValue: _FakeSelectable_22<_i8.QueryRow>(
+            returnValue: _FakeSelectable_32<_i12.QueryRow>(
               this,
               Invocation.method(
                 #customSelectQuery,
@@ -2334,7 +3512,7 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
                 {#variables: variables, #readsFrom: readsFrom},
               ),
             ),
-            returnValueForMissingStub: _FakeSelectable_22<_i8.QueryRow>(
+            returnValueForMissingStub: _FakeSelectable_32<_i12.QueryRow>(
               this,
               Invocation.method(
                 #customSelectQuery,
@@ -2343,20 +3521,20 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
               ),
             ),
           )
-          as _i8.Selectable<_i8.QueryRow>);
+          as _i12.Selectable<_i12.QueryRow>);
 
   @override
-  _i11.Future<void> customStatement(String? statement, [List<dynamic>? args]) =>
+  _i7.Future<void> customStatement(String? statement, [List<dynamic>? args]) =>
       (super.noSuchMethod(
             Invocation.method(#customStatement, [statement, args]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<T> transaction<T>(
-    _i11.Future<T> Function()? action, {
+  _i7.Future<T> transaction<T>(
+    _i7.Future<T> Function()? action, {
     bool? requireNew = false,
   }) =>
       (super.noSuchMethod(
@@ -2366,8 +3544,8 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
               {#requireNew: requireNew},
             ),
             returnValue:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(
                       #transaction,
@@ -2375,9 +3553,9 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
                       {#requireNew: requireNew},
                     ),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(
+                _FakeFuture_11<T>(
                   this,
                   Invocation.method(
                     #transaction,
@@ -2386,8 +3564,8 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
                   ),
                 ),
             returnValueForMissingStub:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(
                       #transaction,
@@ -2395,9 +3573,9 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
                       {#requireNew: requireNew},
                     ),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(
+                _FakeFuture_11<T>(
                   this,
                   Invocation.method(
                     #transaction,
@@ -2406,54 +3584,52 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
                   ),
                 ),
           )
-          as _i11.Future<T>);
+          as _i7.Future<T>);
 
   @override
-  _i11.Future<T> exclusively<T>(_i11.Future<T> Function()? action) =>
+  _i7.Future<T> exclusively<T>(_i7.Future<T> Function()? action) =>
       (super.noSuchMethod(
             Invocation.method(#exclusively, [action]),
             returnValue:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(#exclusively, [action]),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(
+                _FakeFuture_11<T>(
                   this,
                   Invocation.method(#exclusively, [action]),
                 ),
             returnValueForMissingStub:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(#exclusively, [action]),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(
+                _FakeFuture_11<T>(
                   this,
                   Invocation.method(#exclusively, [action]),
                 ),
           )
-          as _i11.Future<T>);
+          as _i7.Future<T>);
 
   @override
-  _i11.Future<void> batch(
-    _i11.FutureOr<void> Function(_i8.Batch)? runInBatch,
-  ) =>
+  _i7.Future<void> batch(_i7.FutureOr<void> Function(_i12.Batch)? runInBatch) =>
       (super.noSuchMethod(
             Invocation.method(#batch, [runInBatch]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<T> runWithInterceptor<T>(
-    _i11.Future<T> Function()? action, {
-    required _i8.QueryInterceptor? interceptor,
+  _i7.Future<T> runWithInterceptor<T>(
+    _i7.Future<T> Function()? action, {
+    required _i12.QueryInterceptor? interceptor,
   }) =>
       (super.noSuchMethod(
             Invocation.method(
@@ -2462,8 +3638,8 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
               {#interceptor: interceptor},
             ),
             returnValue:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(
                       #runWithInterceptor,
@@ -2471,9 +3647,9 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
                       {#interceptor: interceptor},
                     ),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(
+                _FakeFuture_11<T>(
                   this,
                   Invocation.method(
                     #runWithInterceptor,
@@ -2482,8 +3658,8 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
                   ),
                 ),
             returnValueForMissingStub:
-                _i13.ifNotNull(
-                  _i13.dummyValueOrNull<T>(
+                _i16.ifNotNull(
+                  _i16.dummyValueOrNull<T>(
                     this,
                     Invocation.method(
                       #runWithInterceptor,
@@ -2491,9 +3667,9 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
                       {#interceptor: interceptor},
                     ),
                   ),
-                  (T v) => _i11.Future<T>.value(v),
+                  (T v) => _i7.Future<T>.value(v),
                 ) ??
-                _FakeFuture_15<T>(
+                _FakeFuture_11<T>(
                   this,
                   Invocation.method(
                     #runWithInterceptor,
@@ -2502,11 +3678,11 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
                   ),
                 ),
           )
-          as _i11.Future<T>);
+          as _i7.Future<T>);
 
   @override
-  _i8.GenerationContext $write(
-    _i8.Component? component, {
+  _i12.GenerationContext $write(
+    _i12.Component? component, {
     bool? hasMultipleTables,
     int? startIndex,
   }) =>
@@ -2516,7 +3692,7 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
               [component],
               {#hasMultipleTables: hasMultipleTables, #startIndex: startIndex},
             ),
-            returnValue: _FakeGenerationContext_23(
+            returnValue: _FakeGenerationContext_33(
               this,
               Invocation.method(
                 #$write,
@@ -2527,7 +3703,7 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
                 },
               ),
             ),
-            returnValueForMissingStub: _FakeGenerationContext_23(
+            returnValueForMissingStub: _FakeGenerationContext_33(
               this,
               Invocation.method(
                 #$write,
@@ -2539,12 +3715,12 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
               ),
             ),
           )
-          as _i8.GenerationContext);
+          as _i12.GenerationContext);
 
   @override
-  _i8.GenerationContext $writeInsertable(
-    _i8.TableInfo<_i8.Table, dynamic>? table,
-    _i8.Insertable<dynamic>? insertable, {
+  _i12.GenerationContext $writeInsertable(
+    _i12.TableInfo<_i12.Table, dynamic>? table,
+    _i12.Insertable<dynamic>? insertable, {
     int? startIndex,
   }) =>
       (super.noSuchMethod(
@@ -2553,7 +3729,7 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
               [table, insertable],
               {#startIndex: startIndex},
             ),
-            returnValue: _FakeGenerationContext_23(
+            returnValue: _FakeGenerationContext_33(
               this,
               Invocation.method(
                 #$writeInsertable,
@@ -2561,7 +3737,7 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
                 {#startIndex: startIndex},
               ),
             ),
-            returnValueForMissingStub: _FakeGenerationContext_23(
+            returnValueForMissingStub: _FakeGenerationContext_33(
               this,
               Invocation.method(
                 #$writeInsertable,
@@ -2570,17 +3746,17 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
               ),
             ),
           )
-          as _i8.GenerationContext);
+          as _i12.GenerationContext);
 
   @override
   String $expandVar(int? start, int? amount) =>
       (super.noSuchMethod(
             Invocation.method(#$expandVar, [start, amount]),
-            returnValue: _i13.dummyValue<String>(
+            returnValue: _i16.dummyValue<String>(
               this,
               Invocation.method(#$expandVar, [start, amount]),
             ),
-            returnValueForMissingStub: _i13.dummyValue<String>(
+            returnValueForMissingStub: _i16.dummyValue<String>(
               this,
               Invocation.method(#$expandVar, [start, amount]),
             ),
@@ -2588,13 +3764,13 @@ class MockConversationDao extends _i1.Mock implements _i12.ConversationDao {
           as String);
 
   @override
-  _i11.Future<void> close() =>
+  _i7.Future<void> close() =>
       (super.noSuchMethod(
             Invocation.method(#close, []),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 }
 
 /// A class which mocks [User].
@@ -2623,11 +3799,11 @@ class MockUser extends _i1.Mock implements _i4.User {
   _i3.UserMetadata get metadata =>
       (super.noSuchMethod(
             Invocation.getter(#metadata),
-            returnValue: _FakeUserMetadata_25(
+            returnValue: _FakeUserMetadata_35(
               this,
               Invocation.getter(#metadata),
             ),
-            returnValueForMissingStub: _FakeUserMetadata_25(
+            returnValueForMissingStub: _FakeUserMetadata_35(
               this,
               Invocation.getter(#metadata),
             ),
@@ -2647,8 +3823,8 @@ class MockUser extends _i1.Mock implements _i4.User {
   String get uid =>
       (super.noSuchMethod(
             Invocation.getter(#uid),
-            returnValue: _i13.dummyValue<String>(this, Invocation.getter(#uid)),
-            returnValueForMissingStub: _i13.dummyValue<String>(
+            returnValue: _i16.dummyValue<String>(this, Invocation.getter(#uid)),
+            returnValueForMissingStub: _i16.dummyValue<String>(
               this,
               Invocation.getter(#uid),
             ),
@@ -2659,11 +3835,11 @@ class MockUser extends _i1.Mock implements _i4.User {
   _i4.MultiFactor get multiFactor =>
       (super.noSuchMethod(
             Invocation.getter(#multiFactor),
-            returnValue: _FakeMultiFactor_26(
+            returnValue: _FakeMultiFactor_36(
               this,
               Invocation.getter(#multiFactor),
             ),
-            returnValueForMissingStub: _FakeMultiFactor_26(
+            returnValueForMissingStub: _FakeMultiFactor_36(
               this,
               Invocation.getter(#multiFactor),
             ),
@@ -2671,173 +3847,171 @@ class MockUser extends _i1.Mock implements _i4.User {
           as _i4.MultiFactor);
 
   @override
-  _i11.Future<void> delete() =>
+  _i7.Future<void> delete() =>
       (super.noSuchMethod(
             Invocation.method(#delete, []),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<String?> getIdToken([bool? forceRefresh = false]) =>
+  _i7.Future<String?> getIdToken([bool? forceRefresh = false]) =>
       (super.noSuchMethod(
             Invocation.method(#getIdToken, [forceRefresh]),
-            returnValue: _i11.Future<String?>.value(),
-            returnValueForMissingStub: _i11.Future<String?>.value(),
+            returnValue: _i7.Future<String?>.value(),
+            returnValueForMissingStub: _i7.Future<String?>.value(),
           )
-          as _i11.Future<String?>);
+          as _i7.Future<String?>);
 
   @override
-  _i11.Future<_i3.IdTokenResult> getIdTokenResult([
+  _i7.Future<_i3.IdTokenResult> getIdTokenResult([
     bool? forceRefresh = false,
   ]) =>
       (super.noSuchMethod(
             Invocation.method(#getIdTokenResult, [forceRefresh]),
-            returnValue: _i11.Future<_i3.IdTokenResult>.value(
-              _FakeIdTokenResult_27(
+            returnValue: _i7.Future<_i3.IdTokenResult>.value(
+              _FakeIdTokenResult_37(
                 this,
                 Invocation.method(#getIdTokenResult, [forceRefresh]),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i3.IdTokenResult>.value(
-              _FakeIdTokenResult_27(
+            returnValueForMissingStub: _i7.Future<_i3.IdTokenResult>.value(
+              _FakeIdTokenResult_37(
                 this,
                 Invocation.method(#getIdTokenResult, [forceRefresh]),
               ),
             ),
           )
-          as _i11.Future<_i3.IdTokenResult>);
+          as _i7.Future<_i3.IdTokenResult>);
 
   @override
-  _i11.Future<_i4.UserCredential> linkWithCredential(
+  _i7.Future<_i4.UserCredential> linkWithCredential(
     _i3.AuthCredential? credential,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#linkWithCredential, [credential]),
-            returnValue: _i11.Future<_i4.UserCredential>.value(
+            returnValue: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#linkWithCredential, [credential]),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.UserCredential>.value(
+            returnValueForMissingStub: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#linkWithCredential, [credential]),
               ),
             ),
           )
-          as _i11.Future<_i4.UserCredential>);
+          as _i7.Future<_i4.UserCredential>);
 
   @override
-  _i11.Future<_i4.UserCredential> linkWithProvider(
-    _i3.AuthProvider? provider,
-  ) =>
+  _i7.Future<_i4.UserCredential> linkWithProvider(_i3.AuthProvider? provider) =>
       (super.noSuchMethod(
             Invocation.method(#linkWithProvider, [provider]),
-            returnValue: _i11.Future<_i4.UserCredential>.value(
+            returnValue: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#linkWithProvider, [provider]),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.UserCredential>.value(
+            returnValueForMissingStub: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#linkWithProvider, [provider]),
               ),
             ),
           )
-          as _i11.Future<_i4.UserCredential>);
+          as _i7.Future<_i4.UserCredential>);
 
   @override
-  _i11.Future<_i4.UserCredential> reauthenticateWithProvider(
+  _i7.Future<_i4.UserCredential> reauthenticateWithProvider(
     _i3.AuthProvider? provider,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#reauthenticateWithProvider, [provider]),
-            returnValue: _i11.Future<_i4.UserCredential>.value(
+            returnValue: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#reauthenticateWithProvider, [provider]),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.UserCredential>.value(
+            returnValueForMissingStub: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#reauthenticateWithProvider, [provider]),
               ),
             ),
           )
-          as _i11.Future<_i4.UserCredential>);
+          as _i7.Future<_i4.UserCredential>);
 
   @override
-  _i11.Future<_i4.UserCredential> reauthenticateWithPopup(
+  _i7.Future<_i4.UserCredential> reauthenticateWithPopup(
     _i3.AuthProvider? provider,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#reauthenticateWithPopup, [provider]),
-            returnValue: _i11.Future<_i4.UserCredential>.value(
+            returnValue: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#reauthenticateWithPopup, [provider]),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.UserCredential>.value(
+            returnValueForMissingStub: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#reauthenticateWithPopup, [provider]),
               ),
             ),
           )
-          as _i11.Future<_i4.UserCredential>);
+          as _i7.Future<_i4.UserCredential>);
 
   @override
-  _i11.Future<void> reauthenticateWithRedirect(_i3.AuthProvider? provider) =>
+  _i7.Future<void> reauthenticateWithRedirect(_i3.AuthProvider? provider) =>
       (super.noSuchMethod(
             Invocation.method(#reauthenticateWithRedirect, [provider]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<_i4.UserCredential> linkWithPopup(_i3.AuthProvider? provider) =>
+  _i7.Future<_i4.UserCredential> linkWithPopup(_i3.AuthProvider? provider) =>
       (super.noSuchMethod(
             Invocation.method(#linkWithPopup, [provider]),
-            returnValue: _i11.Future<_i4.UserCredential>.value(
+            returnValue: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#linkWithPopup, [provider]),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.UserCredential>.value(
+            returnValueForMissingStub: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#linkWithPopup, [provider]),
               ),
             ),
           )
-          as _i11.Future<_i4.UserCredential>);
+          as _i7.Future<_i4.UserCredential>);
 
   @override
-  _i11.Future<void> linkWithRedirect(_i3.AuthProvider? provider) =>
+  _i7.Future<void> linkWithRedirect(_i3.AuthProvider? provider) =>
       (super.noSuchMethod(
             Invocation.method(#linkWithRedirect, [provider]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<_i4.ConfirmationResult> linkWithPhoneNumber(
+  _i7.Future<_i4.ConfirmationResult> linkWithPhoneNumber(
     String? phoneNumber, [
     _i4.RecaptchaVerifier? verifier,
   ]) =>
       (super.noSuchMethod(
             Invocation.method(#linkWithPhoneNumber, [phoneNumber, verifier]),
-            returnValue: _i11.Future<_i4.ConfirmationResult>.value(
+            returnValue: _i7.Future<_i4.ConfirmationResult>.value(
               _FakeConfirmationResult_3(
                 this,
                 Invocation.method(#linkWithPhoneNumber, [
@@ -2846,134 +4020,133 @@ class MockUser extends _i1.Mock implements _i4.User {
                 ]),
               ),
             ),
-            returnValueForMissingStub:
-                _i11.Future<_i4.ConfirmationResult>.value(
-                  _FakeConfirmationResult_3(
-                    this,
-                    Invocation.method(#linkWithPhoneNumber, [
-                      phoneNumber,
-                      verifier,
-                    ]),
-                  ),
-                ),
+            returnValueForMissingStub: _i7.Future<_i4.ConfirmationResult>.value(
+              _FakeConfirmationResult_3(
+                this,
+                Invocation.method(#linkWithPhoneNumber, [
+                  phoneNumber,
+                  verifier,
+                ]),
+              ),
+            ),
           )
-          as _i11.Future<_i4.ConfirmationResult>);
+          as _i7.Future<_i4.ConfirmationResult>);
 
   @override
-  _i11.Future<_i4.UserCredential> reauthenticateWithCredential(
+  _i7.Future<_i4.UserCredential> reauthenticateWithCredential(
     _i3.AuthCredential? credential,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#reauthenticateWithCredential, [credential]),
-            returnValue: _i11.Future<_i4.UserCredential>.value(
+            returnValue: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#reauthenticateWithCredential, [credential]),
               ),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.UserCredential>.value(
+            returnValueForMissingStub: _i7.Future<_i4.UserCredential>.value(
               _FakeUserCredential_2(
                 this,
                 Invocation.method(#reauthenticateWithCredential, [credential]),
               ),
             ),
           )
-          as _i11.Future<_i4.UserCredential>);
+          as _i7.Future<_i4.UserCredential>);
 
   @override
-  _i11.Future<void> reload() =>
+  _i7.Future<void> reload() =>
       (super.noSuchMethod(
             Invocation.method(#reload, []),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> sendEmailVerification([
+  _i7.Future<void> sendEmailVerification([
     _i3.ActionCodeSettings? actionCodeSettings,
   ]) =>
       (super.noSuchMethod(
             Invocation.method(#sendEmailVerification, [actionCodeSettings]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<_i4.User> unlink(String? providerId) =>
+  _i7.Future<_i4.User> unlink(String? providerId) =>
       (super.noSuchMethod(
             Invocation.method(#unlink, [providerId]),
-            returnValue: _i11.Future<_i4.User>.value(
-              _FakeUser_28(this, Invocation.method(#unlink, [providerId])),
+            returnValue: _i7.Future<_i4.User>.value(
+              _FakeUser_38(this, Invocation.method(#unlink, [providerId])),
             ),
-            returnValueForMissingStub: _i11.Future<_i4.User>.value(
-              _FakeUser_28(this, Invocation.method(#unlink, [providerId])),
+            returnValueForMissingStub: _i7.Future<_i4.User>.value(
+              _FakeUser_38(this, Invocation.method(#unlink, [providerId])),
             ),
           )
-          as _i11.Future<_i4.User>);
+          as _i7.Future<_i4.User>);
 
   @override
-  _i11.Future<void> updateEmail(String? newEmail) =>
+  _i7.Future<void> updateEmail(String? newEmail) =>
       (super.noSuchMethod(
             Invocation.method(#updateEmail, [newEmail]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> updatePassword(String? newPassword) =>
+  _i7.Future<void> updatePassword(String? newPassword) =>
       (super.noSuchMethod(
             Invocation.method(#updatePassword, [newPassword]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> updatePhoneNumber(
+  _i7.Future<void> updatePhoneNumber(
     _i3.PhoneAuthCredential? phoneCredential,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#updatePhoneNumber, [phoneCredential]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> updateDisplayName(String? displayName) =>
+  _i7.Future<void> updateDisplayName(String? displayName) =>
       (super.noSuchMethod(
             Invocation.method(#updateDisplayName, [displayName]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> updatePhotoURL(String? photoURL) =>
+  _i7.Future<void> updatePhotoURL(String? photoURL) =>
       (super.noSuchMethod(
             Invocation.method(#updatePhotoURL, [photoURL]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> updateProfile({String? displayName, String? photoURL}) =>
+  _i7.Future<void> updateProfile({String? displayName, String? photoURL}) =>
       (super.noSuchMethod(
             Invocation.method(#updateProfile, [], {
               #displayName: displayName,
               #photoURL: photoURL,
             }),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 
   @override
-  _i11.Future<void> verifyBeforeUpdateEmail(
+  _i7.Future<void> verifyBeforeUpdateEmail(
     String? newEmail, [
     _i3.ActionCodeSettings? actionCodeSettings,
   ]) =>
@@ -2982,8 +4155,8 @@ class MockUser extends _i1.Mock implements _i4.User {
               newEmail,
               actionCodeSettings,
             ]),
-            returnValue: _i11.Future<void>.value(),
-            returnValueForMissingStub: _i11.Future<void>.value(),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
           )
-          as _i11.Future<void>);
+          as _i7.Future<void>);
 }
