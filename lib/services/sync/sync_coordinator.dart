@@ -10,6 +10,7 @@ import '../../repositories/conversation_dao.dart';
 import '../crypto/protocol_service.dart';
 import '../database/app_database.dart';
 import '../secure_storage.dart';
+import '../../utils/logger.dart';
 import '../../utils/security.dart';
 import '../vault/vault_sync_service.dart';
 import 'inbox_listener.dart';
@@ -283,7 +284,9 @@ class SyncCoordinator {
         if (await vault.shouldUpload()) {
           await vault.uploadUnsyncedMessages();
         }
-      } catch (_) {}
+      } catch (e, stackTrace) {
+        LoggerService.error('Vault upload failed during background sync', e, stackTrace);
+      }
     });
   }
 

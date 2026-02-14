@@ -28,7 +28,7 @@ class VaultEncryptionService {
 
     try {
       final compressed = Uint8List.fromList(
-        GZipCodec().encode(plaintext),
+        ZLibCodec().encode(plaintext),
       );
 
       final secretKey = SecretKey(vaultKey);
@@ -79,7 +79,7 @@ class VaultEncryptionService {
       );
 
       return Uint8List.fromList(
-        GZipCodec().decode(compressed),
+        ZLibCodec().decode(compressed),
       );
     } finally {
       SecurityUtils.secureClear(vaultKey);
