@@ -1990,6 +1990,32 @@ class MockSecureStorageService extends _i1.Mock
           as _i7.Future<void>);
 
   @override
+  _i7.Future<void> storeVaultKey(String? key) =>
+      (super.noSuchMethod(
+            Invocation.method(#storeVaultKey, [key]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<String?> getVaultKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#getVaultKey, []),
+            returnValue: _i7.Future<String?>.value(),
+          )
+          as _i7.Future<String?>);
+
+  @override
+  _i7.Future<void> deleteVaultKey() =>
+      (super.noSuchMethod(
+            Invocation.method(#deleteVaultKey, []),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
   _i7.Future<void> storeDatabaseKey(String? key) =>
       (super.noSuchMethod(
             Invocation.method(#storeDatabaseKey, [key]),

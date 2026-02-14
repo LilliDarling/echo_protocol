@@ -13,6 +13,7 @@ import 'services/crypto/protocol_service.dart';
 import 'services/secure_storage.dart';
 import 'services/notification.dart';
 import 'services/sync/sync_coordinator.dart';
+import 'services/vault/vault_sync_service.dart';
 import 'core/theme/app.dart';
 import 'core/providers/theme_provider.dart';
 
@@ -60,7 +61,7 @@ class AuthWrapper extends StatefulWidget {
   State<AuthWrapper> createState() => _AuthWrapperState();
 }
 
-class _AuthWrapperState extends State<AuthWrapper> {
+class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   final AuthService _authService = AuthService();
   final SecureStorageService _secureStorage = SecureStorageService();
   final ProtocolService _protocolService = ProtocolService();
@@ -71,6 +72,26 @@ class _AuthWrapperState extends State<AuthWrapper> {
   bool _checkedPendingPhrase = false;
   bool _notificationsInitialized = false;
   bool _syncInitialized = false;
+  bool _vaultInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused && _vaultInitialized) {
+      VaultSyncService().uploadUnsyncedMessages().catchError((_) => 0);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -128,6 +149,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         _checkedPendingPhrase = false;
         _notificationsInitialized = false;
         _syncInitialized = false;
+        _vaultInitialized = false;
         _notificationService.dispose();
         Provider.of<ThemeProvider>(context, listen: false).reset();
         return const LoginScreen();
@@ -161,6 +183,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
         if (!_syncInitialized && hasKeys) {
           await SyncCoordinator().initialize();
           _syncInitialized = true;
+        }
+
+        if (!_vaultInitialized && hasKeys) {
+          await VaultSyncService().initialize();
+          _vaultInitialized = true;
         }
       }
 
