@@ -129,6 +129,13 @@ class MessageDao extends DatabaseAccessor<AppDatabase>
     );
   }
 
+  Future<void> markBatchAsSynced(List<String> ids) async {
+    if (ids.isEmpty) return;
+    await (update(messages)..where((t) => t.id.isIn(ids))).write(
+      const MessagesCompanion(syncedToVault: Value(true)),
+    );
+  }
+
   Future<List<LocalMessage>> getUnsyncedMessages({int limit = 100}) {
     return (select(messages)
           ..where((t) => t.syncedToVault.equals(false))

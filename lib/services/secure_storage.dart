@@ -231,6 +231,8 @@ class SecureStorageService {
     await _secureDelete(_partnerPublicKeyKey);
     await _secureDelete(_userIdKey);
     await _secureDelete('current_key_version');
+    await _secureDelete(_vaultKeyKey);
+    await _secureDelete(_lastSyncedChunkIndexKey);
   }
 
   Future<bool> hasPartnerKey() async {
@@ -362,6 +364,35 @@ class SecureStorageService {
 
   Future<void> deleteCacheKey() async {
     await _secureDelete(_cacheKeyKey);
+  }
+
+  static const String _lastSyncedChunkIndexKey = 'vault_last_synced_chunk_index';
+
+  Future<int> getLastSyncedChunkIndex() async {
+    final value = await _secureRead(_lastSyncedChunkIndexKey);
+    return value != null ? int.tryParse(value) ?? -1 : -1;
+  }
+
+  Future<void> storeLastSyncedChunkIndex(int index) async {
+    await _secureWrite(_lastSyncedChunkIndexKey, index.toString());
+  }
+
+  Future<void> deleteLastSyncedChunkIndex() async {
+    await _secureDelete(_lastSyncedChunkIndexKey);
+  }
+
+  static const String _vaultKeyKey = 'vault_encryption_key';
+
+  Future<void> storeVaultKey(String key) async {
+    await _secureWrite(_vaultKeyKey, key);
+  }
+
+  Future<String?> getVaultKey() async {
+    return await _secureRead(_vaultKeyKey);
+  }
+
+  Future<void> deleteVaultKey() async {
+    await _secureDelete(_vaultKeyKey);
   }
 
   static const String _databaseKeyKey = 'database_encryption_key';

@@ -21,3 +21,4 @@ export {acceptPartnerInvite} from "./functions/acceptPartnerInvite.js";
 export {getPreKeyBundle} from "./functions/getPreKeyBundle.js";
 export {uploadPreKeys} from "./functions/uploadPreKeys.js";
 export {checkPreKeyCount} from "./functions/checkPreKeyCount.js";
+export {cleanupExpiredMedia} from "./functions/cleanupExpiredMedia.js";

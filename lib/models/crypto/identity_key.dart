@@ -60,6 +60,17 @@ class IdentityKeyPair {
     return result;
   }
 
+  /// Derives a 32-byte AES-256 vault encryption key from the master seed.
+  /// Uses distinct HKDF parameters for domain separation from identity keys.
+  static Uint8List deriveVaultKey(Uint8List seed) {
+    return SecurityUtils.hkdfSha256(
+      seed,
+      Uint8List.fromList(utf8.encode('EchoProtocol-Vault-v1')),
+      Uint8List.fromList(utf8.encode('aes-256-vault-key')),
+      32,
+    );
+  }
+
   static Future<IdentityKeyPair> _deriveFromMasterSeed(Uint8List seed) async {
     final ed25519Seed = SecurityUtils.hkdfSha256(
       seed,

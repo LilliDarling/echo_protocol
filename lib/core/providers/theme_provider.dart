@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/user.dart';
+import '../../models/vault/retention_settings.dart';
 
 class ThemeProvider extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.dark;
@@ -97,6 +98,15 @@ class ThemeProvider extends ChangeNotifier {
     if (_preferences.showTypingIndicator == show) return;
 
     _preferences = _preferences.copyWith(showTypingIndicator: show);
+    notifyListeners();
+
+    await _savePreferences();
+  }
+
+  Future<void> setVaultRetention(RetentionPolicy policy) async {
+    if (_preferences.vaultRetention == policy) return;
+
+    _preferences = _preferences.copyWith(vaultRetention: policy);
     notifyListeners();
 
     await _savePreferences();

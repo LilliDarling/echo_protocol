@@ -10,7 +10,9 @@ import '../../repositories/conversation_dao.dart';
 import '../crypto/protocol_service.dart';
 import '../database/app_database.dart';
 import '../secure_storage.dart';
+import '../../utils/logger.dart';
 import '../../utils/security.dart';
+import '../vault/vault_sync_service.dart';
 import 'inbox_listener.dart';
 import 'message_processor.dart';
 
@@ -146,6 +148,7 @@ class SyncCoordinator {
         final processed = await processor.processInboxMessage(message);
         if (processed != null) {
           _messageController.add(processed);
+          _triggerVaultUploadIfNeeded();
         }
         await _inboxListener.deleteMessage(message.id);
       }
@@ -226,6 +229,7 @@ class SyncCoordinator {
 
       if (data['success'] == true) {
         await _messageDao.updateStatus(messageId, LocalMessageStatus.sent);
+        _triggerVaultUploadIfNeeded();
         return true;
       } else {
         await _messageDao.updateStatus(messageId, LocalMessageStatus.failed);
@@ -271,6 +275,19 @@ class SyncCoordinator {
 
   Future<void> markConversationRead(String conversationId) async {
     await _conversationDao.resetUnreadCount(conversationId);
+  }
+
+  void _triggerVaultUploadIfNeeded() {
+    Future(() async {
+      try {
+        final vault = VaultSyncService();
+        if (await vault.shouldUpload()) {
+          await vault.uploadUnsyncedMessages();
+        }
+      } catch (e, stackTrace) {
+        LoggerService.error('Vault upload failed during background sync', e, stackTrace);
+      }
+    });
   }
 
   void _setState(SyncState newState) {

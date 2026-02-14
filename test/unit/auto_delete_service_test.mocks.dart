@@ -381,6 +381,15 @@ class MockMessageDao extends _i1.Mock implements _i5.MessageDao {
           as _i6.Future<void>);
 
   @override
+  _i6.Future<void> markBatchAsSynced(List<String>? ids) =>
+      (super.noSuchMethod(
+            Invocation.method(#markBatchAsSynced, [ids]),
+            returnValue: _i6.Future<void>.value(),
+            returnValueForMissingStub: _i6.Future<void>.value(),
+          )
+          as _i6.Future<void>);
+
+  @override
   _i6.Future<List<_i8.LocalMessage>> getUnsyncedMessages({int? limit = 100}) =>
       (super.noSuchMethod(
             Invocation.method(#getUnsyncedMessages, [], {#limit: limit}),
