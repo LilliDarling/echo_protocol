@@ -21,13 +21,31 @@ class VaultStorageService {
     required String userId,
     required VaultChunk chunk,
   }) async {
+    final storagePath = 'vault_chunks/$userId/${chunk.chunkId}.bin';
+    final docRef = _db
+        .collection('vaults')
+        .doc(userId)
+        .collection('chunks')
+        .doc(chunk.chunkId);
+
+    // Check if this chunk was already uploaded (crash recovery / retry)
+    final existingDoc = await docRef.get();
+    if (existingDoc.exists) {
+      return VaultChunkMetadata.fromFirestore(existingDoc.data()!);
+    }
+
+    // Clean up any orphaned Storage blob from a prior failed attempt
+    try {
+      await _firebaseStorage.ref().child(storagePath).delete();
+    } catch (_) {
+      // Expected — no orphan exists on first upload
+    }
+
     final plaintext = chunk.serialize();
     final encrypted = await _encryption.encryptChunk(
       plaintext: plaintext,
       chunkId: chunk.chunkId,
     );
-
-    final storagePath = 'vault_chunks/$userId/${chunk.chunkId}.bin';
 
     final ref = _firebaseStorage.ref().child(storagePath);
     await ref.putData(
@@ -38,6 +56,8 @@ class VaultStorageService {
       ),
     );
 
+    final checksum = VaultEncryptionService.computeChecksum(encrypted);
+
     final metadata = VaultChunkMetadata(
       chunkId: chunk.chunkId,
       chunkIndex: chunk.chunkIndex,
@@ -45,17 +65,12 @@ class VaultStorageService {
       endTimestamp: chunk.endTimestamp,
       messageCount: chunk.messageCount,
       compressedSize: encrypted.length,
-      checksum: chunk.checksum,
+      checksum: checksum,
       storagePath: storagePath,
       uploadedAt: DateTime.now(),
     );
 
-    await _db
-        .collection('vaults')
-        .doc(userId)
-        .collection('chunks')
-        .doc(chunk.chunkId)
-        .set(metadata.toFirestore());
+    await docRef.set(metadata.toFirestore());
 
     return metadata;
   }
@@ -68,38 +83,60 @@ class VaultStorageService {
     final data = await ref.getData();
     if (data == null) throw Exception('Vault chunk not found in storage');
 
+    // Verify encrypted blob integrity before decryption
+    final checksum = VaultEncryptionService.computeChecksum(data);
+    if (checksum != metadata.checksum) {
+      throw Exception('Vault chunk integrity check failed');
+    }
+
     final decrypted = await _encryption.decryptChunk(
       encrypted: data,
       chunkId: metadata.chunkId,
     );
 
-    final chunk = VaultChunk.deserialize(decrypted);
-
-    if (chunk.checksum != metadata.checksum) {
-      throw Exception('Vault chunk integrity check failed');
-    }
-
-    return chunk;
+    return VaultChunk.deserialize(decrypted);
   }
+
+  static const int _listChunksPageSize = 500;
 
   Future<List<VaultChunkMetadata>> listChunks({
     required String userId,
-    int? afterIndex,
+    DateTime? afterTimestamp,
   }) async {
-    Query<Map<String, dynamic>> query = _db
-        .collection('vaults')
-        .doc(userId)
-        .collection('chunks')
-        .orderBy('chunkIndex');
+    final results = <VaultChunkMetadata>[];
+    DocumentSnapshot? lastDoc;
 
-    if (afterIndex != null) {
-      query = query.where('chunkIndex', isGreaterThan: afterIndex);
+    while (true) {
+      Query<Map<String, dynamic>> query = _db
+          .collection('vaults')
+          .doc(userId)
+          .collection('chunks')
+          .orderBy('uploadedAt')
+          .limit(_listChunksPageSize);
+
+      if (afterTimestamp != null) {
+        query = query.where(
+          'uploadedAt',
+          isGreaterThan: afterTimestamp.millisecondsSinceEpoch,
+        );
+      }
+
+      if (lastDoc != null) {
+        query = query.startAfterDocument(lastDoc);
+      }
+
+      final snapshot = await query.get();
+      if (snapshot.docs.isEmpty) break;
+
+      results.addAll(
+        snapshot.docs.map((doc) => VaultChunkMetadata.fromFirestore(doc.data())),
+      );
+
+      if (snapshot.docs.length < _listChunksPageSize) break;
+      lastDoc = snapshot.docs.last;
     }
 
-    final snapshot = await query.get();
-    return snapshot.docs
-        .map((doc) => VaultChunkMetadata.fromFirestore(doc.data()))
-        .toList();
+    return results;
   }
 
   Future<int> getLatestChunkIndex(String userId) async {

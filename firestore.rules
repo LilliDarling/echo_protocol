@@ -412,10 +412,18 @@ service cloud.firestore {
     // VAULT (Encrypted History Sync)
     // =========================================================================
 
-    // Vault chunk metadata - owner-only, immutable after creation
+    // Vault metadata doc - managed by Cloud Function (chunkCount)
+    match /vaults/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;  // Only Cloud Function via Admin SDK
+    }
+
+    // Vault chunk metadata - owner-only, immutable, quota-checked
     match /vaults/{userId}/chunks/{chunkId} {
       allow read: if isOwner(userId);
-      allow create: if isOwner(userId);
+      allow create: if isOwner(userId)
+                    && (!exists(/databases/$(database)/documents/vaults/$(userId))
+                        || get(/databases/$(database)/documents/vaults/$(userId)).data.chunkCount < 10000);
       allow update, delete: if false;
     }
 

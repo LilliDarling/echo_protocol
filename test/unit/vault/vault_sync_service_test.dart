@@ -77,8 +77,8 @@ void main() {
 
       when(mockAuth.currentUser).thenReturn(mockUser);
       when(mockUser.uid).thenReturn('user123');
-      when(mockSecureStorage.getLastSyncedChunkIndex())
-          .thenAnswer((_) async => -1);
+      when(mockSecureStorage.getLastVaultSyncTimestamp())
+          .thenAnswer((_) async => null);
 
       service = VaultSyncService.forTesting(
         auth: mockAuth,
@@ -94,8 +94,10 @@ void main() {
 
     group('uploadUnsyncedMessages', () {
       test('returns 0 when no unsynced messages', () async {
-        when(mockStorage.getLatestChunkIndex('user123'))
-            .thenAnswer((_) async => -1);
+        when(mockStorage.listChunks(
+          userId: 'user123',
+          afterTimestamp: anyNamed('afterTimestamp'),
+        )).thenAnswer((_) async => []);
         when(mockMessageDao.getUnsyncedMessages(limit: 2000))
             .thenAnswer((_) async => []);
 
@@ -124,6 +126,10 @@ void main() {
           updatedAt: DateTime(2025, 1, 1),
         );
 
+        when(mockStorage.listChunks(
+          userId: 'user123',
+          afterTimestamp: anyNamed('afterTimestamp'),
+        )).thenAnswer((_) async => []);
         when(mockMessageDao.getUnsyncedMessages(limit: 2000))
             .thenAnswer((_) async => messages);
         when(mockConversationDao.getById('conv1'))
@@ -160,6 +166,10 @@ void main() {
           _makeMsg(id: 'msg1', conversationId: 'conv1'),
         ];
 
+        when(mockStorage.listChunks(
+          userId: 'user123',
+          afterTimestamp: anyNamed('afterTimestamp'),
+        )).thenAnswer((_) async => []);
         when(mockMessageDao.getUnsyncedMessages(limit: 2000))
             .thenAnswer((_) async => messages);
         when(mockConversationDao.getById('conv1')).thenAnswer(
@@ -209,8 +219,10 @@ void main() {
       });
 
       test('transitions state correctly on success', () async {
-        when(mockStorage.getLatestChunkIndex('user123'))
-            .thenAnswer((_) async => -1);
+        when(mockStorage.listChunks(
+          userId: 'user123',
+          afterTimestamp: anyNamed('afterTimestamp'),
+        )).thenAnswer((_) async => []);
         when(mockMessageDao.getUnsyncedMessages(limit: 2000))
             .thenAnswer((_) async => []);
 
@@ -224,8 +236,10 @@ void main() {
       });
 
       test('transitions state to error on failure', () async {
-        when(mockStorage.getLatestChunkIndex('user123'))
-            .thenAnswer((_) async => -1);
+        when(mockStorage.listChunks(
+          userId: 'user123',
+          afterTimestamp: anyNamed('afterTimestamp'),
+        )).thenAnswer((_) async => []);
         when(mockMessageDao.getUnsyncedMessages(limit: 2000))
             .thenThrow(Exception('DB error'));
 
@@ -242,11 +256,15 @@ void main() {
         expect(service.error, contains('DB error'));
       });
 
-      test('updates last synced chunk index after upload', () async {
+      test('updates sync timestamp after upload', () async {
         final messages = [
           _makeMsg(id: 'msg1', conversationId: 'conv1'),
         ];
 
+        when(mockStorage.listChunks(
+          userId: 'user123',
+          afterTimestamp: anyNamed('afterTimestamp'),
+        )).thenAnswer((_) async => []);
         when(mockMessageDao.getUnsyncedMessages(limit: 2000))
             .thenAnswer((_) async => messages);
         when(mockConversationDao.getById('conv1')).thenAnswer(
@@ -277,43 +295,72 @@ void main() {
 
         await service.uploadUnsyncedMessages();
 
-        verify(mockSecureStorage.storeLastSyncedChunkIndex(3)).called(1);
+        verify(mockSecureStorage.storeLastVaultSyncTimestamp(any)).called(1);
       });
 
       test('downloads newer chunks from other devices before uploading',
           () async {
-        // Server has chunk index 5, but local is at -1
-        when(mockSecureStorage.getLastSyncedChunkIndex())
-            .thenAnswer((_) async => -1);
+        final remoteMetadata = VaultChunkMetadata(
+          chunkId: 'chunk_5',
+          chunkIndex: 5,
+          startTimestamp: DateTime(2025, 1, 15),
+          endTimestamp: DateTime(2025, 1, 15),
+          messageCount: 1,
+          compressedSize: 50,
+          checksum: 'cs',
+          storagePath: 'path',
+          uploadedAt: DateTime(2025, 1, 15, 12, 0),
+        );
 
-        // First call returns 5 (conflict detected), second call returns 5 (after merge)
-        var callCount = 0;
-        when(mockStorage.getLatestChunkIndex('user123')).thenAnswer((_) async {
-          callCount++;
-          return 5;
-        });
+        // First listChunks call (conflict check) returns remote chunk
+        // Second listChunks call (inside _downloadAndMergeInternal) returns same
+        when(mockStorage.listChunks(
+          userId: 'user123',
+          afterTimestamp: anyNamed('afterTimestamp'),
+        )).thenAnswer((_) async => [remoteMetadata]);
 
-        // downloadAndMerge will be called - set up for it to find no new chunks
-        // (after the _isSyncing guard is released)
-        when(mockStorage.listChunks(userId: 'user123'))
-            .thenAnswer((_) async => []);
-        when(mockStorage.listChunks(userId: 'user123', afterIndex: -1))
-            .thenAnswer((_) async => []);
+        final remoteChunk = VaultChunk(
+          chunkId: 'chunk_5',
+          chunkIndex: 5,
+          startTimestamp: DateTime(2025, 1, 15),
+          endTimestamp: DateTime(2025, 1, 15),
+          conversations: [
+            VaultChunkConversation(
+              conversationId: 'conv1',
+              recipientId: 'r1',
+              recipientUsername: 'u1',
+              recipientPublicKey: 'pk1',
+              messages: [_makeMsg(id: 'remote_msg', conversationId: 'conv1')],
+            ),
+          ],
+        );
+
+        when(mockStorage.downloadChunk(
+          userId: 'user123',
+          metadata: remoteMetadata,
+        )).thenAnswer((_) async => remoteChunk);
+        when(mockConversationDao.getById('conv1'))
+            .thenAnswer((_) async => null);
 
         when(mockMessageDao.getUnsyncedMessages(limit: 2000))
             .thenAnswer((_) async => []);
 
         await service.uploadUnsyncedMessages();
 
-        // Verify getLatestChunkIndex was called (conflict check)
-        verify(mockStorage.getLatestChunkIndex('user123')).called(greaterThan(0));
+        // Verify download happened before upload proceeded
+        verify(mockStorage.downloadChunk(
+          userId: 'user123',
+          metadata: remoteMetadata,
+        )).called(1);
       });
     });
 
     group('downloadAndMerge', () {
       test('returns 0 when no chunks exist', () async {
-        when(mockStorage.listChunks(userId: 'user123'))
-            .thenAnswer((_) async => []);
+        when(mockStorage.listChunks(
+          userId: 'user123',
+          afterTimestamp: anyNamed('afterTimestamp'),
+        )).thenAnswer((_) async => []);
 
         final result = await service.downloadAndMerge();
 
@@ -321,6 +368,7 @@ void main() {
       });
 
       test('downloads chunks and merges conversations and messages', () async {
+        final uploadTime = DateTime(2025, 1, 15, 12, 0);
         final metadata = VaultChunkMetadata(
           chunkId: 'chunk_0',
           chunkIndex: 0,
@@ -330,7 +378,7 @@ void main() {
           compressedSize: 100,
           checksum: 'cs',
           storagePath: 'path',
-          uploadedAt: DateTime.now(),
+          uploadedAt: uploadTime,
         );
 
         final messages = [
@@ -352,11 +400,12 @@ void main() {
               messages: messages,
             ),
           ],
-          checksum: 'cs',
         );
 
-        when(mockStorage.listChunks(userId: 'user123'))
-            .thenAnswer((_) async => [metadata]);
+        when(mockStorage.listChunks(
+          userId: 'user123',
+          afterTimestamp: anyNamed('afterTimestamp'),
+        )).thenAnswer((_) async => [metadata]);
         when(mockStorage.downloadChunk(
           userId: 'user123',
           metadata: metadata,
@@ -368,7 +417,7 @@ void main() {
 
         expect(result, 2);
         verify(mockConversationDao.insert(any)).called(1);
-        verify(mockMessageDao.insertBatch(messages)).called(1);
+        verify(mockMessageDao.insertIfAbsent(messages)).called(1);
       });
 
       test('does not re-insert existing conversations', () async {
@@ -381,7 +430,7 @@ void main() {
           compressedSize: 50,
           checksum: 'cs',
           storagePath: 'path',
-          uploadedAt: DateTime.now(),
+          uploadedAt: DateTime(2025, 1, 15, 12, 0),
         );
 
         final chunk = VaultChunk(
@@ -398,7 +447,6 @@ void main() {
               messages: [_makeMsg(id: 'msg1', conversationId: 'conv1')],
             ),
           ],
-          checksum: 'cs',
         );
 
         final existingConversation = LocalConversation(
@@ -410,8 +458,10 @@ void main() {
           updatedAt: DateTime(2025, 1, 1),
         );
 
-        when(mockStorage.listChunks(userId: 'user123'))
-            .thenAnswer((_) async => [metadata]);
+        when(mockStorage.listChunks(
+          userId: 'user123',
+          afterTimestamp: anyNamed('afterTimestamp'),
+        )).thenAnswer((_) async => [metadata]);
         when(mockStorage.downloadChunk(
           userId: 'user123',
           metadata: metadata,
@@ -422,7 +472,7 @@ void main() {
         await service.downloadAndMerge();
 
         verifyNever(mockConversationDao.insert(any));
-        verify(mockMessageDao.insertBatch(any)).called(1);
+        verify(mockMessageDao.insertIfAbsent(any)).called(1);
       });
 
       test('throws when not authenticated', () async {
@@ -434,10 +484,12 @@ void main() {
         );
       });
 
-      test('uses incremental sync with afterIndex', () async {
-        when(mockSecureStorage.getLastSyncedChunkIndex())
-            .thenAnswer((_) async => 3);
+      test('uses incremental sync with afterTimestamp', () async {
+        final previousSync = DateTime(2025, 1, 15, 10, 0);
+        when(mockSecureStorage.getLastVaultSyncTimestamp())
+            .thenAnswer((_) async => previousSync);
 
+        final uploadTime = DateTime(2025, 1, 16, 12, 0);
         final metadata = VaultChunkMetadata(
           chunkId: 'chunk_4',
           chunkIndex: 4,
@@ -447,7 +499,7 @@ void main() {
           compressedSize: 50,
           checksum: 'cs',
           storagePath: 'path',
-          uploadedAt: DateTime.now(),
+          uploadedAt: uploadTime,
         );
 
         final chunk = VaultChunk(
@@ -464,11 +516,12 @@ void main() {
               messages: [_makeMsg(id: 'msg1', conversationId: 'conv1')],
             ),
           ],
-          checksum: 'cs',
         );
 
-        when(mockStorage.listChunks(userId: 'user123', afterIndex: 3))
-            .thenAnswer((_) async => [metadata]);
+        when(mockStorage.listChunks(
+          userId: 'user123',
+          afterTimestamp: previousSync,
+        )).thenAnswer((_) async => [metadata]);
         when(mockStorage.downloadChunk(userId: 'user123', metadata: metadata))
             .thenAnswer((_) async => chunk);
         when(mockConversationDao.getById('conv1'))
@@ -477,12 +530,16 @@ void main() {
         final result = await service.downloadAndMerge();
 
         expect(result, 1);
-        verify(mockStorage.listChunks(userId: 'user123', afterIndex: 3))
+        verify(mockStorage.listChunks(
+          userId: 'user123',
+          afterTimestamp: previousSync,
+        )).called(1);
+        verify(mockSecureStorage.storeLastVaultSyncTimestamp(uploadTime))
             .called(1);
-        verify(mockSecureStorage.storeLastSyncedChunkIndex(4)).called(1);
       });
 
-      test('updates last synced chunk index after download', () async {
+      test('updates sync timestamp after download', () async {
+        final uploadTime = DateTime(2025, 1, 15, 14, 30);
         final metadata = VaultChunkMetadata(
           chunkId: 'chunk_7',
           chunkIndex: 7,
@@ -492,7 +549,7 @@ void main() {
           compressedSize: 50,
           checksum: 'cs',
           storagePath: 'path',
-          uploadedAt: DateTime.now(),
+          uploadedAt: uploadTime,
         );
 
         final chunk = VaultChunk(
@@ -509,11 +566,12 @@ void main() {
               messages: [_makeMsg(id: 'msg1', conversationId: 'conv1')],
             ),
           ],
-          checksum: 'cs',
         );
 
-        when(mockStorage.listChunks(userId: 'user123'))
-            .thenAnswer((_) async => [metadata]);
+        when(mockStorage.listChunks(
+          userId: 'user123',
+          afterTimestamp: anyNamed('afterTimestamp'),
+        )).thenAnswer((_) async => [metadata]);
         when(mockStorage.downloadChunk(userId: 'user123', metadata: metadata))
             .thenAnswer((_) async => chunk);
         when(mockConversationDao.getById('conv1'))
@@ -521,14 +579,17 @@ void main() {
 
         await service.downloadAndMerge();
 
-        verify(mockSecureStorage.storeLastSyncedChunkIndex(7)).called(1);
+        verify(mockSecureStorage.storeLastVaultSyncTimestamp(uploadTime))
+            .called(1);
       });
     });
 
     group('concurrency guard', () {
       test('second upload returns 0 while first is in progress', () async {
-        when(mockStorage.getLatestChunkIndex('user123'))
-            .thenAnswer((_) async => -1);
+        when(mockStorage.listChunks(
+          userId: 'user123',
+          afterTimestamp: anyNamed('afterTimestamp'),
+        )).thenAnswer((_) async => []);
 
         final completer = Completer<List<LocalMessage>>();
         when(mockMessageDao.getUnsyncedMessages(limit: 2000))
@@ -545,8 +606,10 @@ void main() {
 
       test('second download returns 0 while first is in progress', () async {
         final completer = Completer<List<VaultChunkMetadata>>();
-        when(mockStorage.listChunks(userId: 'user123'))
-            .thenAnswer((_) => completer.future);
+        when(mockStorage.listChunks(
+          userId: 'user123',
+          afterTimestamp: anyNamed('afterTimestamp'),
+        )).thenAnswer((_) => completer.future);
 
         final firstCall = service.downloadAndMerge();
         final secondResult = await service.downloadAndMerge();

@@ -2,6 +2,9 @@ import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as logger from "firebase-functions/logger";
 import {db} from "../firebase.js";
 import {getStorage} from "firebase-admin/storage";
+import {QueryDocumentSnapshot} from "firebase-admin/firestore";
+
+const BATCH_SIZE = 200;
 
 export const cleanupExpiredMedia = onSchedule(
   {
@@ -18,37 +21,49 @@ export const cleanupExpiredMedia = onSchedule(
     logger.info("Starting vault media cleanup job");
 
     try {
-      const vaultsSnapshot = await db.collectionGroup("media")
-        .where("expireAt", "<=", now)
-        .where("expireAt", ">", 0)
-        .get();
-
-      if (vaultsSnapshot.empty) {
-        logger.info("No expired vault media found");
-        return;
-      }
-
-      logger.info(`Found ${vaultsSnapshot.size} expired media items`);
-
       const bucket = getStorage().bucket();
+      let lastDoc: QueryDocumentSnapshot | undefined;
 
-      for (const mediaDoc of vaultsSnapshot.docs) {
-        const data = mediaDoc.data();
-        const storagePath = data.storagePath as string | undefined;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        let query = db.collectionGroup("media")
+          .where("source", "==", "vault")
+          .where("expireAt", "<=", now)
+          .where("expireAt", ">", 0)
+          .orderBy("expireAt")
+          .limit(BATCH_SIZE);
 
-        try {
-          if (storagePath) {
-            await bucket.file(storagePath).delete().catch(() => {
-              // File may already be deleted
-            });
-          }
-
-          await mediaDoc.ref.delete();
-          deletedCount++;
-        } catch (err) {
-          logger.error(`Failed to delete media ${mediaDoc.id}`, err);
-          errorCount++;
+        if (lastDoc) {
+          query = query.startAfter(lastDoc);
         }
+
+        const snapshot = await query.get();
+
+        if (snapshot.empty) break;
+
+        for (const mediaDoc of snapshot.docs) {
+          const data = mediaDoc.data();
+          const storagePath = data.storagePath as string | undefined;
+
+          try {
+            if (storagePath) {
+              await bucket.file(storagePath).delete().catch(() => {
+                // File may already be deleted
+              });
+            }
+
+            await mediaDoc.ref.delete();
+            deletedCount++;
+          } catch (err) {
+            logger.error(`Failed to delete media ${mediaDoc.id}`, err);
+            errorCount++;
+          }
+        }
+
+        lastDoc = snapshot.docs[snapshot.docs.length - 1];
+
+        // If we got fewer than BATCH_SIZE, we've reached the end
+        if (snapshot.size < BATCH_SIZE) break;
       }
 
       logger.info(

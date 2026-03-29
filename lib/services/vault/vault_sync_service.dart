@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../../models/local/conversation.dart';
+import '../../models/local/message.dart';
 import '../../models/vault/vault_chunk.dart';
 import '../../models/vault/retention_settings.dart';
 import '../../repositories/message_dao.dart';
@@ -62,12 +63,17 @@ class VaultSyncService {
         _secureStorage = secureStorage,
         _messageDao = messageDao,
         _conversationDao = conversationDao,
-        _initialized = true;
+        _initialized = true,
+        _vaultKeyAvailable = true;
 
   Stream<VaultSyncState> get stateStream => _stateController.stream;
   VaultSyncState get state => _state;
   String? get error => _error;
   bool get isSyncing => _isSyncing;
+  bool get isVaultReady => _initialized && _vaultKeyAvailable;
+
+  bool _vaultKeyAvailable = false;
+  RetentionPolicy? _cachedRetentionPolicy;
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -76,8 +82,17 @@ class VaultSyncService {
       final db = await AppDatabase.instance();
       _messageDao = db.messageDao;
       _conversationDao = db.conversationDao;
+
+      final vaultKey = await _secureStorage.getVaultKey();
+      _vaultKeyAvailable = vaultKey != null;
+
       _initialized = true;
-      LoggerService.info('VaultSyncService initialized');
+      if (!_vaultKeyAvailable) {
+        LoggerService.info(
+            'VaultSyncService initialized without vault key — sync disabled until recovery phrase is entered');
+      } else {
+        LoggerService.info('VaultSyncService initialized');
+      }
     } catch (e) {
       LoggerService.error('VaultSyncService initialization failed', e);
       rethrow;
@@ -98,21 +113,21 @@ class VaultSyncService {
       final conversationDao = _conversationDao!;
 
       // Check for newer chunks from other devices before uploading
-      final lastSyncedIndex = await _secureStorage.getLastSyncedChunkIndex();
-      final serverLatestIndex =
-          await _storageService.getLatestChunkIndex(userId);
+      final lastSyncTimestamp = await _secureStorage.getLastVaultSyncTimestamp();
+      final newerChunks = await _storageService.listChunks(
+        userId: userId,
+        afterTimestamp: lastSyncTimestamp,
+      );
 
-      if (serverLatestIndex > lastSyncedIndex) {
+      if (newerChunks.isNotEmpty) {
         LoggerService.info(
-            'Newer vault chunks detected (server: $serverLatestIndex, local: $lastSyncedIndex), downloading first');
-        _isSyncing = false;
+            'Newer vault chunks detected (${newerChunks.length} new), downloading first');
         try {
-          await downloadAndMerge();
+          await _downloadAndMergeInternal(userId: userId);
         } catch (e) {
           LoggerService.error(
               'Failed to download newer chunks before upload', e);
         }
-        _isSyncing = true;
         _setState(VaultSyncState.uploading);
       }
 
@@ -168,11 +183,9 @@ class VaultSyncService {
         );
       }
 
-      // Update last synced index
+      // Update sync cursor to now — covers all chunks we just uploaded
       if (chunks.isNotEmpty) {
-        final maxIndex =
-            chunks.map((c) => c.chunkIndex).reduce((a, b) => a > b ? a : b);
-        await _secureStorage.storeLastSyncedChunkIndex(maxIndex);
+        await _secureStorage.storeLastVaultSyncTimestamp(DateTime.now());
       }
 
       LoggerService.info('Vault upload complete: $totalSynced messages');
@@ -198,61 +211,9 @@ class VaultSyncService {
     _setState(VaultSyncState.downloading);
 
     try {
-      final messageDao = _messageDao!;
-      final conversationDao = _conversationDao!;
-
-      // Only fetch chunks newer than our last synced index
-      final lastSyncedIndex = await _secureStorage.getLastSyncedChunkIndex();
-      final chunkMetadataList = await _storageService.listChunks(
-        userId: userId,
-        afterIndex: lastSyncedIndex >= 0 ? lastSyncedIndex : null,
-      );
-
-      if (chunkMetadataList.isEmpty) {
-        _setState(VaultSyncState.idle);
-        return 0;
-      }
-
-      var totalMerged = 0;
-
-      for (final metadata in chunkMetadataList) {
-        final chunk = await _storageService.downloadChunk(
-          userId: userId,
-          metadata: metadata,
-        );
-
-        for (final vaultConv in chunk.conversations) {
-          final existing =
-              await conversationDao.getById(vaultConv.conversationId);
-          if (existing == null) {
-            final now = DateTime.now();
-            await conversationDao.insert(LocalConversation(
-              id: vaultConv.conversationId,
-              recipientId: vaultConv.recipientId,
-              recipientUsername: vaultConv.recipientUsername,
-              recipientPublicKey: vaultConv.recipientPublicKey,
-              createdAt: now,
-              updatedAt: now,
-            ));
-          }
-
-          await messageDao.insertBatch(vaultConv.messages);
-          totalMerged += vaultConv.messages.length;
-        }
-
-        // Download media for recovered messages (best-effort)
-        await _downloadMediaForChunk(userId: userId, chunk: chunk);
-      }
-
-      // Update last synced chunk index
-      final maxIndex = chunkMetadataList
-          .map((m) => m.chunkIndex)
-          .reduce((a, b) => a > b ? a : b);
-      await _secureStorage.storeLastSyncedChunkIndex(maxIndex);
-
-      LoggerService.info('Vault download complete: $totalMerged messages');
+      final result = await _downloadAndMergeInternal(userId: userId);
       _setState(VaultSyncState.idle);
-      return totalMerged;
+      return result;
     } catch (e) {
       _error = e.toString();
       _setState(VaultSyncState.error);
@@ -263,6 +224,67 @@ class VaultSyncService {
     }
   }
 
+  /// Inner download logic, callable while [_isSyncing] is already held.
+  Future<int> _downloadAndMergeInternal({required String userId}) async {
+    final messageDao = _messageDao!;
+    final conversationDao = _conversationDao!;
+
+    final lastSyncTimestamp = await _secureStorage.getLastVaultSyncTimestamp();
+    final chunkMetadataList = await _storageService.listChunks(
+      userId: userId,
+      afterTimestamp: lastSyncTimestamp,
+    );
+
+    if (chunkMetadataList.isEmpty) return 0;
+
+    var totalMerged = 0;
+
+    for (final metadata in chunkMetadataList) {
+      final chunk = await _storageService.downloadChunk(
+        userId: userId,
+        metadata: metadata,
+      );
+
+      for (final vaultConv in chunk.conversations) {
+        final existing =
+            await conversationDao.getById(vaultConv.conversationId);
+        if (existing == null) {
+          final now = DateTime.now();
+          await conversationDao.insert(LocalConversation(
+            id: vaultConv.conversationId,
+            recipientId: vaultConv.recipientId,
+            recipientUsername: vaultConv.recipientUsername,
+            recipientPublicKey: vaultConv.recipientPublicKey,
+            createdAt: now,
+            updatedAt: now,
+          ));
+        }
+
+        // Reconcile conversation metadata with current Firestore data
+        await _reconcileConversationMetadata(
+          conversationDao: conversationDao,
+          conversationId: vaultConv.conversationId,
+          recipientId: vaultConv.recipientId,
+        );
+
+        await messageDao.insertIfAbsent(vaultConv.messages);
+        totalMerged += vaultConv.messages.length;
+      }
+
+      // Download media for recovered messages (best-effort)
+      await _downloadMediaForChunk(userId: userId, chunk: chunk);
+    }
+
+    // Update sync cursor to the latest uploadedAt from downloaded chunks
+    final maxUploadedAt = chunkMetadataList
+        .map((m) => m.uploadedAt)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+    await _secureStorage.storeLastVaultSyncTimestamp(maxUploadedAt);
+
+    LoggerService.info('Vault download complete: $totalMerged messages');
+    return totalMerged;
+  }
+
   Future<bool> shouldUpload() async {
     if (!_initialized) return false;
     final messages = await _messageDao!.getUnsyncedMessages(limit: 1);
@@ -270,16 +292,23 @@ class VaultSyncService {
   }
 
   Future<RetentionPolicy> _getRetentionPolicy(String userId) async {
+    if (_cachedRetentionPolicy != null) return _cachedRetentionPolicy!;
+
     try {
       final doc = await _db.collection('users').doc(userId).get();
       final prefs = doc.data()?['preferences'] as Map<String, dynamic>?;
       final value = prefs?['vaultRetention'] as String?;
-      return value != null
+      _cachedRetentionPolicy = value != null
           ? RetentionPolicy.fromString(value)
           : RetentionPolicy.smart;
     } catch (_) {
-      return RetentionPolicy.smart;
+      _cachedRetentionPolicy = RetentionPolicy.smart;
     }
+    return _cachedRetentionPolicy!;
+  }
+
+  void updateRetentionPolicy(RetentionPolicy policy) {
+    _cachedRetentionPolicy = policy;
   }
 
   Future<void> _uploadMediaForChunks({
@@ -321,10 +350,11 @@ class VaultSyncService {
   }
 
   Future<Uint8List?> _tryFetchMedia(String userId, String mediaId) async {
-    // Try common media storage paths
+    // Try all media storage paths including gifs
     final paths = [
       'media/images/$userId/$mediaId',
       'media/videos/$userId/$mediaId',
+      'media/gifs/$userId/$mediaId',
       'media/thumbnails/$userId/$mediaId',
     ];
 
@@ -353,10 +383,10 @@ class VaultSyncService {
               mediaId: msg.mediaId!,
             );
             if (encryptedBytes != null) {
-              // Re-upload to regular media storage for local access
+              final folder = _mediaFolderForType(msg.type);
               final ref = _firebaseStorage
                   .ref()
-                  .child('media/images/$userId/${msg.mediaId}');
+                  .child('media/$folder/$userId/${msg.mediaId}');
               await ref.putData(
                 encryptedBytes,
                 SettableMetadata(
@@ -374,8 +404,59 @@ class VaultSyncService {
     }
   }
 
+  // TODO: When voice messages are implemented, add LocalMessageType.voice => 'voice'
+  // and a corresponding media/voice/{userId}/ Storage path + storage.rules entry.
+  static String _mediaFolderForType(LocalMessageType type) {
+    switch (type) {
+      case LocalMessageType.video:
+        return 'videos';
+      case LocalMessageType.gif:
+        return 'gifs';
+      default:
+        return 'images';
+    }
+  }
+
+  Future<void> _reconcileConversationMetadata({
+    required ConversationDao conversationDao,
+    required String conversationId,
+    required String recipientId,
+  }) async {
+    try {
+      final userDoc = await _db.collection('users').doc(recipientId).get();
+      if (!userDoc.exists) return;
+
+      final data = userDoc.data()!;
+      final currentUsername = data['name'] as String?;
+      final currentPublicKey = data['publicKey'] as String?;
+      if (currentUsername == null && currentPublicKey == null) return;
+
+      final local = await conversationDao.getById(conversationId);
+      if (local == null) return;
+
+      final usernameChanged =
+          currentUsername != null && currentUsername != local.recipientUsername;
+      final keyChanged =
+          currentPublicKey != null && currentPublicKey != local.recipientPublicKey;
+
+      if (usernameChanged || keyChanged) {
+        await conversationDao.updateConversation(local.copyWith(
+          recipientUsername: currentUsername ?? local.recipientUsername,
+          recipientPublicKey: currentPublicKey ?? local.recipientPublicKey,
+          updatedAt: DateTime.now(),
+        ));
+      }
+    } catch (e) {
+      LoggerService.error(
+          'Failed to reconcile conversation metadata for $recipientId', e);
+    }
+  }
+
   void _setState(VaultSyncState newState) {
     _state = newState;
+    if (newState != VaultSyncState.error) {
+      _error = null;
+    }
     _stateController.add(newState);
   }
 

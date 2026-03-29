@@ -157,11 +157,24 @@ class IdentityKeyPair {
     );
   }
 
+  /// Zeros extracted private key bytes. Note: the cryptography package's
+  /// SimpleKeyPair retains its own internal copy which cannot be cleared
+  /// from outside the package. This limits the effectiveness of disposal
+  /// to the copies we can access. Callers should null their IdentityKeyPair
+  /// reference after dispose to allow GC to collect the SimpleKeyPair objects.
   Future<void> dispose() async {
     final edPrivate = await ed25519KeyPair.extractPrivateKeyBytes();
     final xPrivate = await x25519KeyPair.extractPrivateKeyBytes();
     SecurityUtils.secureClear(Uint8List.fromList(edPrivate));
     SecurityUtils.secureClear(Uint8List.fromList(xPrivate));
+    // Also zero the List<int> returned by extractPrivateKeyBytes in case
+    // the implementation returns a mutable view rather than a copy.
+    for (var i = 0; i < edPrivate.length; i++) {
+      edPrivate[i] = 0;
+    }
+    for (var i = 0; i < xPrivate.length; i++) {
+      xPrivate[i] = 0;
+    }
   }
 }
 

@@ -228,6 +228,8 @@ class AuthService {
 
   Future<void> signOut() async {
     _secureStorage.clearSessionCache();
+    await _secureStorage.clearEncryptionKeys();
+    _protocolService.dispose();
 
     if (!kIsWeb) {
       try {

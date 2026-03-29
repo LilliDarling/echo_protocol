@@ -1,10 +1,10 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:crypto/crypto.dart' as crypto_pkg;
 import '../../utils/security.dart';
 import '../secure_storage.dart';
+import 'vault_compression.dart';
 
 class VaultEncryptionService {
   final AesGcm _aesGcm = AesGcm.with256bits();
@@ -26,10 +26,9 @@ class VaultEncryptionService {
     final vaultKey = await _loadVaultKey();
     if (vaultKey == null) throw Exception('Vault key not available');
 
+    Uint8List? compressed;
     try {
-      final compressed = Uint8List.fromList(
-        ZLibCodec().encode(plaintext),
-      );
+      compressed = compressBytes(plaintext);
 
       final secretKey = SecretKey(vaultKey);
       final nonce = SecurityUtils.generateSecureRandomBytes(12);
@@ -48,6 +47,7 @@ class VaultEncryptionService {
         ...secretBox.mac.bytes,
       ]);
     } finally {
+      if (compressed != null) SecurityUtils.secureClear(compressed);
       SecurityUtils.secureClear(vaultKey);
     }
   }
@@ -63,6 +63,7 @@ class VaultEncryptionService {
     final vaultKey = await _loadVaultKey();
     if (vaultKey == null) throw Exception('Vault key not available');
 
+    Uint8List? compressed;
     try {
       final nonce = encrypted.sublist(0, 12);
       final ct = encrypted.sublist(12, encrypted.length - 16);
@@ -72,16 +73,15 @@ class VaultEncryptionService {
       final secretKey = SecretKey(vaultKey);
       final secretBox = SecretBox(ct, nonce: nonce, mac: Mac(tag));
 
-      final compressed = await _aesGcm.decrypt(
+      compressed = Uint8List.fromList(await _aesGcm.decrypt(
         secretBox,
         secretKey: secretKey,
         aad: aad,
-      );
+      ));
 
-      return Uint8List.fromList(
-        ZLibCodec().decode(compressed),
-      );
+      return decompressBytes(compressed);
     } finally {
+      if (compressed != null) SecurityUtils.secureClear(compressed);
       SecurityUtils.secureClear(vaultKey);
     }
   }

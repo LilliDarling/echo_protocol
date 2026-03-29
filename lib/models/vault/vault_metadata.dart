@@ -72,6 +72,7 @@ class VaultMediaMetadata {
         'uploadedAt': uploadedAt.millisecondsSinceEpoch,
         'expireAt': expireAt?.millisecondsSinceEpoch,
         'sizeBytes': sizeBytes,
+        'source': 'vault',
       };
 
   factory VaultMediaMetadata.fromFirestore(Map<String, dynamic> data) {

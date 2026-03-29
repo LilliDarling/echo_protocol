@@ -281,6 +281,7 @@ class SyncCoordinator {
     Future(() async {
       try {
         final vault = VaultSyncService();
+        if (!vault.isVaultReady) return;
         if (await vault.shouldUpload()) {
           await vault.uploadUnsyncedMessages();
         }

@@ -371,26 +371,26 @@ class MockSecureStorageService extends _i1.Mock
           as _i3.Future<void>);
 
   @override
-  _i3.Future<int> getLastSyncedChunkIndex() =>
+  _i3.Future<DateTime?> getLastVaultSyncTimestamp() =>
       (super.noSuchMethod(
-            Invocation.method(#getLastSyncedChunkIndex, []),
-            returnValue: _i3.Future<int>.value(0),
+            Invocation.method(#getLastVaultSyncTimestamp, []),
+            returnValue: _i3.Future<DateTime?>.value(),
           )
-          as _i3.Future<int>);
+          as _i3.Future<DateTime?>);
 
   @override
-  _i3.Future<void> storeLastSyncedChunkIndex(int? index) =>
+  _i3.Future<void> storeLastVaultSyncTimestamp(DateTime? timestamp) =>
       (super.noSuchMethod(
-            Invocation.method(#storeLastSyncedChunkIndex, [index]),
+            Invocation.method(#storeLastVaultSyncTimestamp, [timestamp]),
             returnValue: _i3.Future<void>.value(),
             returnValueForMissingStub: _i3.Future<void>.value(),
           )
           as _i3.Future<void>);
 
   @override
-  _i3.Future<void> deleteLastSyncedChunkIndex() =>
+  _i3.Future<void> deleteLastVaultSyncTimestamp() =>
       (super.noSuchMethod(
-            Invocation.method(#deleteLastSyncedChunkIndex, []),
+            Invocation.method(#deleteLastVaultSyncTimestamp, []),
             returnValue: _i3.Future<void>.value(),
             returnValueForMissingStub: _i3.Future<void>.value(),
           )

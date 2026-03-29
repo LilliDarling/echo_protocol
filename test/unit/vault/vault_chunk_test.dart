@@ -114,7 +114,6 @@ void main() {
             ),
           ),
         ],
-        checksum: 'abc123',
       );
     }
 
@@ -127,7 +126,6 @@ void main() {
       expect(restored.chunkIndex, chunk.chunkIndex);
       expect(restored.startTimestamp, chunk.startTimestamp);
       expect(restored.endTimestamp, chunk.endTimestamp);
-      expect(restored.checksum, chunk.checksum);
       expect(restored.version, VaultChunk.currentVersion);
       expect(restored.conversations.length, 2);
       expect(restored.conversations[0].messages.length, 2);
@@ -146,24 +144,52 @@ void main() {
         startTimestamp: DateTime(2025, 1, 1),
         endTimestamp: DateTime(2025, 1, 1),
         conversations: [],
-        checksum: '',
       );
       expect(chunk.messageCount, 0);
     });
 
-    test('fromJson defaults version to 1 when missing', () {
+    test('fromJson migrates missing version to currentVersion', () {
       final json = {
         'chunkId': 'test',
         'chunkIndex': 0,
         'startTimestamp': DateTime(2025, 1, 1).millisecondsSinceEpoch,
         'endTimestamp': DateTime(2025, 1, 1).millisecondsSinceEpoch,
         'conversations': <Map<String, dynamic>>[],
-        'checksum': 'abc',
-        // version intentionally omitted
+        // version intentionally omitted — treated as v1
       };
 
       final chunk = VaultChunk.fromJson(json);
-      expect(chunk.version, 1);
+      expect(chunk.version, VaultChunk.currentVersion);
+    });
+
+    test('fromJson rejects version higher than currentVersion', () {
+      final json = {
+        'chunkId': 'test',
+        'chunkIndex': 0,
+        'startTimestamp': DateTime(2025, 1, 1).millisecondsSinceEpoch,
+        'endTimestamp': DateTime(2025, 1, 1).millisecondsSinceEpoch,
+        'conversations': <Map<String, dynamic>>[],
+        'version': VaultChunk.currentVersion + 1,
+      };
+
+      expect(
+        () => VaultChunk.fromJson(json),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('fromJson accepts current version', () {
+      final json = {
+        'chunkId': 'test',
+        'chunkIndex': 0,
+        'startTimestamp': DateTime(2025, 1, 1).millisecondsSinceEpoch,
+        'endTimestamp': DateTime(2025, 1, 1).millisecondsSinceEpoch,
+        'conversations': <Map<String, dynamic>>[],
+        'version': VaultChunk.currentVersion,
+      };
+
+      final chunk = VaultChunk.fromJson(json);
+      expect(chunk.version, VaultChunk.currentVersion);
     });
 
     test('serialization preserves all message types', () {
@@ -184,7 +210,6 @@ void main() {
               ],
             ),
           ],
-          checksum: '',
         );
 
         final bytes = chunk.serialize();
@@ -221,7 +246,6 @@ void main() {
               messages: [msg],
             ),
           ],
-          checksum: '',
         );
 
         final bytes = chunk.serialize();

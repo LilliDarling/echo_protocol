@@ -42,20 +42,9 @@ VaultChunk _makeChunk({int chunkIndex = 0}) {
         messages: [msg],
       ),
     ],
-    checksum: '',
   );
 
-  final serialized = chunk.serialize();
-  final checksum = VaultEncryptionService.computeChecksum(serialized);
-
-  return VaultChunk(
-    chunkId: chunk.chunkId,
-    chunkIndex: chunk.chunkIndex,
-    startTimestamp: chunk.startTimestamp,
-    endTimestamp: chunk.endTimestamp,
-    conversations: chunk.conversations,
-    checksum: checksum,
-  );
+  return chunk;
 }
 
 void main() {
@@ -85,7 +74,7 @@ void main() {
     });
 
     group('listChunks', () {
-      test('returns chunks ordered by chunkIndex', () async {
+      test('returns chunks ordered by uploadedAt', () async {
         for (var i = 2; i >= 0; i--) {
           final meta = VaultChunkMetadata(
             chunkId: 'chunk_$i',
@@ -96,7 +85,7 @@ void main() {
             compressedSize: 500,
             checksum: 'cs_$i',
             storagePath: 'path/$i',
-            uploadedAt: DateTime(2025, 1, 15),
+            uploadedAt: DateTime(2025, 1, 15, i, 0),
           );
 
           await fakeFirestore
@@ -110,12 +99,12 @@ void main() {
         final result = await service.listChunks(userId: 'user123');
 
         expect(result.length, 3);
-        expect(result[0].chunkIndex, 0);
-        expect(result[1].chunkIndex, 1);
-        expect(result[2].chunkIndex, 2);
+        expect(result[0].chunkId, 'chunk_0');
+        expect(result[1].chunkId, 'chunk_1');
+        expect(result[2].chunkId, 'chunk_2');
       });
 
-      test('afterIndex filters correctly', () async {
+      test('afterTimestamp filters correctly', () async {
         for (var i = 0; i < 5; i++) {
           final meta = VaultChunkMetadata(
             chunkId: 'chunk_$i',
@@ -126,7 +115,7 @@ void main() {
             compressedSize: 500,
             checksum: 'cs_$i',
             storagePath: 'path/$i',
-            uploadedAt: DateTime(2025, 1, 15),
+            uploadedAt: DateTime(2025, 1, 15, i, 0),
           );
 
           await fakeFirestore
@@ -137,12 +126,14 @@ void main() {
               .set(meta.toFirestore());
         }
 
-        final result =
-            await service.listChunks(userId: 'user123', afterIndex: 2);
+        final result = await service.listChunks(
+          userId: 'user123',
+          afterTimestamp: DateTime(2025, 1, 15, 2, 0),
+        );
 
         expect(result.length, 2);
-        expect(result[0].chunkIndex, 3);
-        expect(result[1].chunkIndex, 4);
+        expect(result[0].chunkId, 'chunk_3');
+        expect(result[1].chunkId, 'chunk_4');
       });
 
       test('returns empty list when no chunks exist', () async {
@@ -183,10 +174,12 @@ void main() {
     });
 
     group('downloadChunk', () {
-      test('decrypts and verifies checksum', () async {
+      test('decrypts and verifies checksum on encrypted blob', () async {
         final chunk = _makeChunk();
         final serialized = chunk.serialize();
         final fakeEncrypted = Uint8List.fromList([1, 2, 3]);
+        final blobChecksum =
+            VaultEncryptionService.computeChecksum(fakeEncrypted);
 
         when(mockChildRef.getData(any))
             .thenAnswer((_) async => fakeEncrypted);
@@ -203,7 +196,7 @@ void main() {
           endTimestamp: chunk.endTimestamp,
           messageCount: chunk.messageCount,
           compressedSize: fakeEncrypted.length,
-          checksum: chunk.checksum,
+          checksum: blobChecksum,
           storagePath: 'vault_chunks/user123/${chunk.chunkId}.bin',
           uploadedAt: DateTime.now(),
         );

@@ -4,7 +4,6 @@ import '../../models/local/message.dart';
 import '../../models/local/conversation.dart';
 import '../../models/vault/vault_chunk.dart';
 import '../../utils/security.dart';
-import 'vault_encryption_service.dart';
 
 class VaultChunkBuilder {
   static const int maxMessages = 500;
@@ -29,7 +28,7 @@ class VaultChunkBuilder {
     for (final message in sorted) {
       windowStart ??= message.timestamp;
 
-      final msgSize = _estimateMessageSize(message);
+      final msgSize = _measureMessageSize(message);
 
       final wouldExceedMessages = currentMessages.length + 1 > maxMessages;
       final wouldExceedSize = currentSize + msgSize > maxBytes;
@@ -86,26 +85,12 @@ class VaultChunkBuilder {
 
     final chunkId = _generateChunkId(chunkIndex);
 
-    // Build without checksum to serialize, then compute checksum
-    final tempChunk = VaultChunk(
-      chunkId: chunkId,
-      chunkIndex: chunkIndex,
-      startTimestamp: messages.first.timestamp,
-      endTimestamp: messages.last.timestamp,
-      conversations: conversations,
-      checksum: '',
-    );
-
-    final serialized = tempChunk.serialize();
-    final checksum = VaultEncryptionService.computeChecksum(serialized);
-
     return VaultChunk(
       chunkId: chunkId,
       chunkIndex: chunkIndex,
       startTimestamp: messages.first.timestamp,
       endTimestamp: messages.last.timestamp,
       conversations: conversations,
-      checksum: checksum,
     );
   }
 
@@ -119,10 +104,7 @@ class VaultChunkBuilder {
         .substring(0, 24);
   }
 
-  static int _estimateMessageSize(LocalMessage message) {
-    return 200 +
-        message.content.length * 2 +
-        (message.mediaKey?.length ?? 0) +
-        (message.mediaId?.length ?? 0);
+  static int _measureMessageSize(LocalMessage message) {
+    return utf8.encode(jsonEncode(message.toMap())).length;
   }
 }

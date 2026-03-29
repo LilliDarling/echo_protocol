@@ -271,6 +271,15 @@ class MockMessageDao extends _i1.Mock implements _i5.MessageDao {
           as _i6.Future<void>);
 
   @override
+  _i6.Future<void> insertIfAbsent(List<_i8.LocalMessage>? messageList) =>
+      (super.noSuchMethod(
+            Invocation.method(#insertIfAbsent, [messageList]),
+            returnValue: _i6.Future<void>.value(),
+            returnValueForMissingStub: _i6.Future<void>.value(),
+          )
+          as _i6.Future<void>);
+
+  @override
   _i6.Future<void> updateMessage(_i8.LocalMessage? message) =>
       (super.noSuchMethod(
             Invocation.method(#updateMessage, [message]),

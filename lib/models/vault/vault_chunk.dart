@@ -44,7 +44,6 @@ class VaultChunk {
   final DateTime startTimestamp;
   final DateTime endTimestamp;
   final List<VaultChunkConversation> conversations;
-  final String checksum;
   final int version;
 
   static const int currentVersion = 1;
@@ -55,7 +54,6 @@ class VaultChunk {
     required this.startTimestamp,
     required this.endTimestamp,
     required this.conversations,
-    required this.checksum,
     this.version = currentVersion,
   });
 
@@ -68,11 +66,19 @@ class VaultChunk {
         'startTimestamp': startTimestamp.millisecondsSinceEpoch,
         'endTimestamp': endTimestamp.millisecondsSinceEpoch,
         'conversations': conversations.map((c) => c.toJson()).toList(),
-        'checksum': checksum,
         'version': version,
       };
 
   factory VaultChunk.fromJson(Map<String, dynamic> json) {
+    final version = json['version'] as int? ?? 1;
+
+    if (version > currentVersion) {
+      throw FormatException(
+        'Vault chunk version $version is not supported by this app version '
+        '(max supported: $currentVersion). Update the app to read this data.',
+      );
+    }
+
     return VaultChunk(
       chunkId: json['chunkId'] as String,
       chunkIndex: json['chunkIndex'] as int,
@@ -84,8 +90,7 @@ class VaultChunk {
           .map((c) =>
               VaultChunkConversation.fromJson(c as Map<String, dynamic>))
           .toList(),
-      checksum: json['checksum'] as String,
-      version: json['version'] as int? ?? 1,
+      version: currentVersion,
     );
   }
 

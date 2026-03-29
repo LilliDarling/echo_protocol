@@ -305,36 +305,17 @@ void main() {
       expect(conv.recipientPublicKey, 'pk_conv1');
     });
 
-    test('checksum is non-empty', () {
-      final messages = [
-        _makeMsg(
-          id: 'msg1',
-          conversationId: 'conv1',
-          timestamp: DateTime(2025, 1, 15, 12, 0),
-        ),
-      ];
-
-      final chunks = VaultChunkBuilder.buildChunks(
-        messages: messages,
-        conversationMap: _makeConvMap({'conv1'}),
-        startingIndex: 0,
-      );
-
-      expect(chunks[0].checksum, isNotEmpty);
-      expect(chunks[0].checksum.length, 64); // SHA-256 hex
-    });
-
     test('large messages trigger size-based splitting', () {
       final base = DateTime(2025, 1, 15, 12, 0);
-      // Each message: 200 + 10000*2 = 20200 bytes estimated
-      // 120 messages * 20200 = 2,424,000 > 2MB (2,097,152)
+      // Each message with 20000 chars of content serializes to ~20300 bytes
+      // 120 messages * 20300 = 2,436,000 > 2MB (2,097,152)
       final messages = List.generate(
         120,
         (i) => _makeMsg(
           id: 'msg_$i',
           conversationId: 'conv1',
           timestamp: base.add(Duration(seconds: i)),
-          content: 'x' * 10000,
+          content: 'x' * 20000,
         ),
       );
 
