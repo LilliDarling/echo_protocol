@@ -47,6 +47,19 @@ class MessageDao extends DatabaseAccessor<AppDatabase>
     });
   }
 
+  /// Inserts messages that don't already exist locally. Existing messages
+  /// are left untouched to avoid overwriting local edits with older vault data.
+  Future<void> insertIfAbsent(List<LocalMessage> messageList) async {
+    if (messageList.isEmpty) return;
+    await batch((b) {
+      b.insertAll(
+        messages,
+        messageList.map(_toCompanion).toList(),
+        mode: InsertMode.insertOrIgnore,
+      );
+    });
+  }
+
   Future<void> updateMessage(LocalMessage message) async {
     await (update(messages)..where((t) => t.id.equals(message.id)))
         .write(_toCompanion(message));
@@ -125,6 +138,13 @@ class MessageDao extends DatabaseAccessor<AppDatabase>
 
   Future<void> markAsSynced(String id) async {
     await (update(messages)..where((t) => t.id.equals(id))).write(
+      const MessagesCompanion(syncedToVault: Value(true)),
+    );
+  }
+
+  Future<void> markBatchAsSynced(List<String> ids) async {
+    if (ids.isEmpty) return;
+    await (update(messages)..where((t) => t.id.isIn(ids))).write(
       const MessagesCompanion(syncedToVault: Value(true)),
     );
   }

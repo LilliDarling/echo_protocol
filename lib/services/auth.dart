@@ -7,6 +7,7 @@ import '../models/user.dart';
 import '../utils/validators.dart';
 import 'crypto/protocol_service.dart';
 import 'secure_storage.dart';
+import 'vault/vault_sync_service.dart';
 import '../utils/logger.dart';
 
 class SignUpResult {
@@ -227,6 +228,8 @@ class AuthService {
 
   Future<void> signOut() async {
     _secureStorage.clearSessionCache();
+    await _secureStorage.clearEncryptionKeys();
+    _protocolService.dispose();
 
     if (!kIsWeb) {
       try {
@@ -474,6 +477,15 @@ class AuthService {
     }
 
     await _secureStorage.storeUserId(user.uid);
+
+    try {
+      final vault = VaultSyncService();
+      await vault.initialize();
+      await vault.downloadAndMerge();
+    } catch (e) {
+      LoggerService.error('Vault sync after recovery failed', e);
+    }
+
     LoggerService.auth('Recovery complete');
   }
 

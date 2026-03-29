@@ -408,6 +408,32 @@ service cloud.firestore {
       allow read, write: if false;  // Only Cloud Functions via Admin SDK
     }
 
+    // =========================================================================
+    // VAULT (Encrypted History Sync)
+    // =========================================================================
+
+    // Vault metadata doc - managed by Cloud Function (chunkCount)
+    match /vaults/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;  // Only Cloud Function via Admin SDK
+    }
+
+    // Vault chunk metadata - owner-only, immutable, quota-checked
+    match /vaults/{userId}/chunks/{chunkId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+                    && (!exists(/databases/$(database)/documents/vaults/$(userId))
+                        || get(/databases/$(database)/documents/vaults/$(userId)).data.chunkCount < 10000);
+      allow update, delete: if false;
+    }
+
+    // Vault media metadata - owner-only, immutable (Cloud Function handles deletion)
+    match /vaults/{userId}/media/{mediaId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update, delete: if false;
+    }
+
     // Deny all other collections by default
     match /{document=**} {
       allow read, write: if false;

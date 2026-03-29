@@ -6,6 +6,16 @@ import 'package:cryptography/cryptography.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/security.dart';
 
+// TODO: Extend this encryption layer to cover desktop platforms (Linux, and
+// potentially Windows/macOS as fallback) where flutter_secure_storage may not
+// have hardware-backed keystore support. On Linux, flutter_secure_storage uses
+// libsecret (GNOME Keyring / KDE Wallet) which may be unavailable on minimal
+// desktops, and its sqflite_common_ffi fallback stores values unencrypted on
+// disk. This affects ALL secrets (identity private keys, database encryption
+// key, TOTP secrets, vault key, etc.), not just the vault key.
+// Fix: rename _WebEncryptionLayer → _SoftwareEncryptionLayer, widen the
+// platform gate from kIsWeb to a hardware-keystore availability check, and
+// apply AES-256-GCM wrapping on any platform without guaranteed secure storage.
 class _WebEncryptionLayer {
   static const String _webSaltStorageKey = '_web_device_salt_v2';
   static Uint8List? _cachedKey;
@@ -231,6 +241,8 @@ class SecureStorageService {
     await _secureDelete(_partnerPublicKeyKey);
     await _secureDelete(_userIdKey);
     await _secureDelete('current_key_version');
+    await _secureDelete(_vaultKeyKey);
+    await _secureDelete(_lastVaultSyncTimestampKey);
   }
 
   Future<bool> hasPartnerKey() async {
@@ -362,6 +374,40 @@ class SecureStorageService {
 
   Future<void> deleteCacheKey() async {
     await _secureDelete(_cacheKeyKey);
+  }
+
+  static const String _lastVaultSyncTimestampKey = 'vault_last_sync_timestamp';
+
+  Future<DateTime?> getLastVaultSyncTimestamp() async {
+    final value = await _secureRead(_lastVaultSyncTimestampKey);
+    if (value == null) return null;
+    final ms = int.tryParse(value);
+    return ms != null ? DateTime.fromMillisecondsSinceEpoch(ms) : null;
+  }
+
+  Future<void> storeLastVaultSyncTimestamp(DateTime timestamp) async {
+    await _secureWrite(
+      _lastVaultSyncTimestampKey,
+      timestamp.millisecondsSinceEpoch.toString(),
+    );
+  }
+
+  Future<void> deleteLastVaultSyncTimestamp() async {
+    await _secureDelete(_lastVaultSyncTimestampKey);
+  }
+
+  static const String _vaultKeyKey = 'vault_encryption_key';
+
+  Future<void> storeVaultKey(String key) async {
+    await _secureWrite(_vaultKeyKey, key);
+  }
+
+  Future<String?> getVaultKey() async {
+    return await _secureRead(_vaultKeyKey);
+  }
+
+  Future<void> deleteVaultKey() async {
+    await _secureDelete(_vaultKeyKey);
   }
 
   static const String _databaseKeyKey = 'database_encryption_key';

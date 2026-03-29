@@ -52,6 +52,20 @@ service firebase.storage {
                    && request.resource.size < 20 * 1024 * 1024;  // 20MB max for GIFs
     }
 
+    // Vault encrypted chunks - owner-only, 3MB max
+    match /vault_chunks/{userId}/{chunkId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId)
+                   && request.resource.size < 3 * 1024 * 1024;
+    }
+
+    // Vault media - owner-only, 50MB max
+    match /vaults/{userId}/media/{mediaId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId)
+                   && request.resource.size < 50 * 1024 * 1024;
+    }
+
     // Deny all other access
     match /{allPaths=**} {
       allow read, write: if false;

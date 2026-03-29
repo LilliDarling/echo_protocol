@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'vault/retention_settings.dart';
 
 enum NotificationPreview {
   full('full'),
@@ -84,6 +85,7 @@ class UserPreferences {
   final NotificationPreview notificationPreview;
   final bool showTypingIndicator;
   final int autoDeleteDays;
+  final RetentionPolicy vaultRetention;
 
   UserPreferences({
     required this.theme,
@@ -91,6 +93,7 @@ class UserPreferences {
     required this.notificationPreview,
     required this.showTypingIndicator,
     required this.autoDeleteDays,
+    this.vaultRetention = RetentionPolicy.smart,
   });
 
   factory UserPreferences.fromJson(Map<String, dynamic> json) {
@@ -102,6 +105,9 @@ class UserPreferences {
       ),
       showTypingIndicator: json['showTypingIndicator'] as bool? ?? false,
       autoDeleteDays: json['autoDeleteDays'] as int,
+      vaultRetention: RetentionPolicy.fromString(
+        json['vaultRetention'] as String? ?? 'smart',
+      ),
     );
   }
 
@@ -112,6 +118,7 @@ class UserPreferences {
       'notificationPreview': notificationPreview.value,
       'showTypingIndicator': showTypingIndicator,
       'autoDeleteDays': autoDeleteDays,
+      'vaultRetention': vaultRetention.value,
     };
   }
 
@@ -121,6 +128,7 @@ class UserPreferences {
     NotificationPreview? notificationPreview,
     bool? showTypingIndicator,
     int? autoDeleteDays,
+    RetentionPolicy? vaultRetention,
   }) {
     return UserPreferences(
       theme: theme ?? this.theme,
@@ -128,6 +136,7 @@ class UserPreferences {
       notificationPreview: notificationPreview ?? this.notificationPreview,
       showTypingIndicator: showTypingIndicator ?? this.showTypingIndicator,
       autoDeleteDays: autoDeleteDays ?? this.autoDeleteDays,
+      vaultRetention: vaultRetention ?? this.vaultRetention,
     );
   }
 

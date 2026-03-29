@@ -689,6 +689,15 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
           as _i7.Future<void>);
 
   @override
+  _i7.Future<void> insertIfAbsent(List<_i13.LocalMessage>? messageList) =>
+      (super.noSuchMethod(
+            Invocation.method(#insertIfAbsent, [messageList]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
   _i7.Future<void> updateMessage(_i13.LocalMessage? message) =>
       (super.noSuchMethod(
             Invocation.method(#updateMessage, [message]),
@@ -793,6 +802,15 @@ class MockMessageDao extends _i1.Mock implements _i6.MessageDao {
   _i7.Future<void> markAsSynced(String? id) =>
       (super.noSuchMethod(
             Invocation.method(#markAsSynced, [id]),
+            returnValue: _i7.Future<void>.value(),
+            returnValueForMissingStub: _i7.Future<void>.value(),
+          )
+          as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> markBatchAsSynced(List<String>? ids) =>
+      (super.noSuchMethod(
+            Invocation.method(#markBatchAsSynced, [ids]),
             returnValue: _i7.Future<void>.value(),
             returnValueForMissingStub: _i7.Future<void>.value(),
           )

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:bip39/bip39.dart' as bip39;
 import '../../models/crypto/identity_key.dart';
 import '../../models/crypto/sealed_envelope.dart';
+import '../../utils/security.dart';
 import '../secure_storage.dart';
 import 'session_manager.dart';
 import 'media_encryption.dart';
@@ -32,7 +33,21 @@ class ProtocolService {
     }
 
     _identityKey = await _sessionManager.getOrCreateIdentityKey(seed: seed);
+
+    if (seed != null) {
+      await _deriveAndStoreVaultKey(seed);
+    }
+
     _initialized = true;
+  }
+
+  Future<void> _deriveAndStoreVaultKey(Uint8List seed) async {
+    final vaultKey = IdentityKeyPair.deriveVaultKey(seed);
+    try {
+      await _storage.storeVaultKey(base64Encode(vaultKey));
+    } finally {
+      SecurityUtils.secureClear(vaultKey);
+    }
   }
 
   Future<void> initializeFromStorage() async {
@@ -56,6 +71,7 @@ class ProtocolService {
 
     final seed = Uint8List.fromList(bip39.mnemonicToSeed(recoveryPhrase));
     _identityKey = await _sessionManager.getOrCreateIdentityKey(seed: seed);
+    await _deriveAndStoreVaultKey(seed);
 
     final signedPrekey = await _sessionManager.getOrCreateSignedPrekey(_identityKey!);
     final oneTimePrekeys = await _sessionManager.generateAndSaveOneTimePrekeys(count: 50);
